@@ -1,63 +1,74 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
+import { Chip } from '@/components/ui/Chip'
 import { BottomTab } from '@/components/ui/BottomTab'
-import { useSheets } from '@/hooks/useSheets'
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Receipt } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, Receipt, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 
+interface HouseResult {
+  houseId: string; houseName: string; district: string;
+  isConsignment: boolean; tenantCount: number;
+  rent: number; managementFee: number; totalIncome: number;
+  buildingRent: number; utilityExpense: number; totalExpense: number;
+  profit: number; hasUtility: boolean;
+}
+interface Totals {
+  tenantCount: number; totalIncome: number; totalRent: number; totalMgmt: number;
+  buildingRent: number; utilityExpense: number; totalExpense: number; profit: number;
+}
+interface SummaryData { year: number; month: number; results: HouseResult[]; totals: Totals }
+
+function toMan(n: number) {
+  const m = Math.round(n / 10000)
+  return `${m.toLocaleString()}만`
+}
 function fmt(n: number) { return n.toLocaleString('ko-KR') }
 
-// 입주자 row: [0]ID [1]방ID [2]지점명 [3]방코드 [4]이름 [5]연락처 [6]월세 [7]관리비 [8]보증금 [9]입주일 [10]퇴실일 [11]상태
-// 공과금 row: [0]ID [1]지점ID [2]지점명 [3]연도 [4]월 [5]전기 [6]가스 [7]수도 [8]인터넷 [9]정수기 [10]관리비 [11]청소 [12]수리기타 [13]메모
-
 export default function FinancePage() {
-  const { data: tenants, loading: tLoading } = useSheets('입주자')
-  const { data: costs, loading: cLoading } = useSheets('공과금')
+  const [data, setData] = useState<SummaryData | null>(null)
+  const [loading, setLoading] = useState(true)
   const [monthOffset, setMonthOffset] = useState(0)
+  const [tab, setTab] = useState<'house' | 'district'>('house')
+  const [openDistrict, setOpenDistrict] = useState<string | null>(null)
 
   const now = new Date()
   now.setMonth(now.getMonth() + monthOffset)
   const year = now.getFullYear()
   const month = now.getMonth() + 1
 
-  const activeTenants = tenants.filter(r => r[11] === '입주중')
+  useEffect(() => {
+    setLoading(true)
+    fetch(`/api/finance/summary?year=${year}&month=${month}`)
+      .then(r => r.json())
+      .then(d => setData(d))
+      .catch(() => setData(null))
+      .finally(() => setLoading(false))
+  }, [year, month])
 
-  // Group income by house
-  const incomeByHouse = useMemo(() => {
-    const map: Record<string, number> = {}
-    activeTenants.forEach(r => {
-      const house = r[2] || '미지정'
-      map[house] = (map[house] || 0) + (Number(r[6]) || 0)
+  const missingUtility = data?.results.filter(r => !r.hasUtility && r.tenantCount > 0) || []
+
+  const byDistrict = useMemo(() => {
+    if (!data) return {}
+    const map: Record<string, HouseResult[]> = {}
+    data.results.forEach(r => {
+      const d = r.district || '기타'
+      if (!map[d]) map[d] = []
+      map[d].push(r)
     })
     return map
-  }, [activeTenants])
+  }, [data])
 
-  // Group costs by house for selected month
-  const costByHouse = useMemo(() => {
-    const map: Record<string, number> = {}
-    costs.filter(r => Number(r[3]) === year && Number(r[4]) === month).forEach(r => {
-      const house = r[2] || '미지정'
-      const total = [5,6,7,8,9,10,11,12].reduce((s, i) => s + (Number(r[i]) || 0), 0)
-      map[house] = (map[house] || 0) + total
-    })
-    return map
-  }, [costs, year, month])
-
-  const allHouses = [...new Set([...Object.keys(incomeByHouse), ...Object.keys(costByHouse)])].sort()
-  const totalIncome = Object.values(incomeByHouse).reduce((s, v) => s + v, 0)
-  const totalExpense = Object.values(costByHouse).reduce((s, v) => s + v, 0)
-
-  const loading = tLoading || cLoading
+  const t = data?.totals
 
   return (
     <div className="flex flex-col min-h-screen">
       <PageHeader title="정산" />
 
       <div className="flex-1 overflow-y-auto px-5 pb-24">
-        {/* Utility Button */}
+        {/* Utility Link */}
         <Link href="/utility" className="flex items-center gap-3 px-4 py-3 mt-3 rounded-xl bg-[var(--card)] border border-[var(--border)]">
           <div className="w-9 h-9 rounded-xl bg-[var(--amber-light)] flex items-center justify-center">
             <Receipt size={18} color="var(--amber)" />
@@ -70,70 +81,139 @@ export default function FinancePage() {
         </Link>
 
         {/* Month Selector */}
-        <div className="flex items-center justify-center gap-5 py-5">
+        <div className="flex items-center justify-center gap-5 py-4">
           <button onClick={() => setMonthOffset(monthOffset - 1)} className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--card)] border border-[var(--border)]">
-            <ChevronLeft size={18} color="var(--text)" />
+            <ChevronLeft size={18} />
           </button>
           <span className="text-[16px] font-bold">{year}년 {month}월</span>
           <button onClick={() => setMonthOffset(monthOffset + 1)} className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--card)] border border-[var(--border)]">
-            <ChevronRight size={18} color="var(--text)" />
+            <ChevronRight size={18} />
           </button>
         </div>
 
         {loading ? (
           <p className="text-[13px] text-[var(--sub)] py-8 text-center">불러오는 중...</p>
+        ) : !t ? (
+          <p className="text-[13px] text-[var(--sub)] py-8 text-center">데이터를 불러올 수 없습니다</p>
         ) : (
           <>
-            {/* Income / Expense */}
-            <div className="grid grid-cols-2 gap-2.5">
-              <Card className="p-4">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <TrendingUp size={16} color="var(--blue)" />
-                  <span className="text-[12px] text-[var(--sub)]">총 수입</span>
-                </div>
-                <p className="text-[18px] font-bold text-[var(--blue)]">{fmt(totalIncome)}원</p>
-              </Card>
-              <Card className="p-4">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <TrendingDown size={16} color="var(--red)" />
-                  <span className="text-[12px] text-[var(--sub)]">총 지출</span>
-                </div>
-                <p className="text-[18px] font-bold text-[var(--red)]">{fmt(totalExpense)}원</p>
-              </Card>
+            {/* Summary Cards */}
+            <div className="flex flex-col gap-2.5">
+              {/* Income */}
+              <div className="rounded-2xl bg-[#3182F6] p-4">
+                <p className="text-[12px] text-white/70">이번달 수입</p>
+                <p className="text-[24px] font-bold text-white mt-0.5">{toMan(t.totalIncome)}원</p>
+                <p className="text-[11px] text-white/60 mt-1">월세 {toMan(t.totalRent)} + 관리비 {toMan(t.totalMgmt)}</p>
+              </div>
+
+              {/* Expense */}
+              <div className="rounded-2xl bg-[var(--red)] p-4">
+                <p className="text-[12px] text-white/70">이번달 지출</p>
+                <p className="text-[24px] font-bold text-white mt-0.5">{toMan(t.totalExpense)}원</p>
+                <p className="text-[11px] text-white/60 mt-1">집월세 {toMan(t.buildingRent)} + 공과금 {toMan(t.utilityExpense)}</p>
+              </div>
+
+              {/* Profit */}
+              <div className={`rounded-2xl p-4 ${t.profit >= 0 ? 'bg-[var(--green)]' : 'bg-[var(--red)]'}`}>
+                <p className="text-[12px] text-white/70">이번달 순이익</p>
+                <p className="text-[24px] font-bold text-white mt-0.5">{toMan(t.profit)}원</p>
+                <p className="text-[11px] text-white/60 mt-1">입주자 {t.tenantCount}명</p>
+              </div>
             </div>
 
-            {/* Net Profit */}
-            <div className="rounded-2xl bg-[#3182F6] p-4 mt-4 flex items-center justify-between">
-              <span className="text-[14px] text-white/80">순이익</span>
-              <span className="text-[20px] font-bold text-white">{fmt(totalIncome - totalExpense)}원</span>
+            {/* Missing Utility Banner */}
+            {missingUtility.length > 0 && (
+              <Link href="/utility" className="flex items-center gap-2 mt-4 px-4 py-2.5 rounded-xl bg-[var(--amber-light)]">
+                <AlertTriangle size={14} color="var(--amber)" />
+                <span className="text-[12px] font-semibold text-[var(--amber)]">공과금 미입력 {missingUtility.length}개 지점</span>
+              </Link>
+            )}
+
+            {/* Tabs */}
+            <div className="flex gap-2 mt-5 mb-3">
+              {[{ key: 'house' as const, label: '지점별' }, { key: 'district' as const, label: '구별' }].map(t => (
+                <button key={t.key} onClick={() => setTab(t.key)}
+                  className={`px-4 py-2 rounded-xl text-[13px] font-semibold transition-colors ${
+                    tab === t.key ? 'bg-[var(--blue)] text-white' : 'bg-[var(--card)] text-[var(--sub)] border border-[var(--border)]'
+                  }`}>{t.label}</button>
+              ))}
             </div>
 
-            {/* Per-House */}
-            <div className="mt-6">
-              <h2 className="text-[16px] font-bold mb-3">지점별 정산</h2>
-              {allHouses.length === 0 ? (
-                <p className="text-[13px] text-[var(--sub)] py-4 text-center">데이터가 없습니다</p>
-              ) : (
-                <div className="flex flex-col gap-2.5">
-                  {allHouses.map(house => {
-                    const income = incomeByHouse[house] || 0
-                    const expense = costByHouse[house] || 0
-                    return (
-                      <Card key={house} className="px-4 py-3.5">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[14px] font-semibold">{house}</span>
-                          <span className="text-[16px] font-bold text-[var(--blue)]">+{fmt(income - expense)}원</span>
+            {/* House Tab */}
+            {tab === 'house' && (
+              <div className="flex flex-col gap-2">
+                {data.results.map(r => (
+                  <Card key={r.houseId} className="px-4 py-3">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[13px] font-semibold">{r.houseName}</span>
+                        {r.isConsignment && <Chip label="위탁" variant="gray" />}
+                      </div>
+                      <span className={`text-[14px] font-bold ${r.profit >= 0 ? 'text-[var(--blue)]' : 'text-[var(--red)]'}`}>
+                        {r.profit >= 0 ? `+${toMan(r.profit)}` : `(${toMan(Math.abs(r.profit))})`}
+                      </span>
+                    </div>
+                    <div className="flex gap-3 text-[11px] text-[var(--sub)]">
+                      <span>수입 {fmt(r.totalIncome)}</span>
+                      <span>집월세 {r.isConsignment ? '-' : fmt(r.buildingRent)}</span>
+                      <span>공과금 {r.hasUtility ? fmt(r.utilityExpense) : <span className="text-[var(--sub)]">-</span>}</span>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {/* District Tab */}
+            {tab === 'district' && (
+              <div className="flex flex-col gap-2">
+                {Object.entries(byDistrict).map(([district, houses]) => {
+                  const dProfit = houses.reduce((s, h) => s + h.profit, 0)
+                  const dIncome = houses.reduce((s, h) => s + h.totalIncome, 0)
+                  const isOpen = openDistrict === district
+                  return (
+                    <div key={district}>
+                      <button onClick={() => setOpenDistrict(isOpen ? null : district)}
+                        className="w-full">
+                        <Card className="px-4 py-3 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <ChevronDown size={14} className={`text-[var(--sub)] transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                            <span className="text-[13px] font-semibold">{district}</span>
+                            <span className="text-[11px] text-[var(--sub)]">{houses.length}개</span>
+                          </div>
+                          <div className="text-right">
+                            <span className={`text-[13px] font-bold ${dProfit >= 0 ? 'text-[var(--blue)]' : 'text-[var(--red)]'}`}>
+                              {dProfit >= 0 ? `+${toMan(dProfit)}` : `(${toMan(Math.abs(dProfit))})`}
+                            </span>
+                            <p className="text-[10px] text-[var(--sub)]">수입 {toMan(dIncome)}</p>
+                          </div>
+                        </Card>
+                      </button>
+                      {isOpen && (
+                        <div className="ml-4 mt-1 flex flex-col gap-1.5">
+                          {houses.map(r => (
+                            <Card key={r.houseId} className="px-3 py-2.5">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[12px] font-medium">{r.houseName}</span>
+                                  {r.isConsignment && <Chip label="위탁" variant="gray" />}
+                                </div>
+                                <span className={`text-[12px] font-bold ${r.profit >= 0 ? 'text-[var(--blue)]' : 'text-[var(--red)]'}`}>
+                                  {r.profit >= 0 ? `+${toMan(r.profit)}` : `(${toMan(Math.abs(r.profit))})`}
+                                </span>
+                              </div>
+                              <div className="flex gap-2 text-[10px] text-[var(--sub)] mt-0.5">
+                                <span>수입 {fmt(r.totalIncome)}</span>
+                                <span>지출 {fmt(r.totalExpense)}</span>
+                              </div>
+                            </Card>
+                          ))}
                         </div>
-                        <div className="flex gap-3">
-                          <span className="text-[12px] text-[var(--sub)]">수입 <span className="text-[var(--text)] font-medium">{fmt(income)}원</span></span>
-                          <span className="text-[12px] text-[var(--sub)]">지출 <span className="text-[var(--text)] font-medium">{fmt(expense)}원</span></span>
-                        </div>
-                      </Card>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </>
         )}
       </div>
