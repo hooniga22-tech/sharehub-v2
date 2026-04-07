@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { Chip } from '@/components/ui/Chip'
 import { Card } from '@/components/ui/Card'
 import { X, Plus, Calendar, CheckCircle, Loader2, Copy, Check, ExternalLink } from 'lucide-react'
+import WorkerCalendar from '@/components/ui/WorkerCalendar'
 
 interface WorkerItem {
   _rowIndex: number; id: string; name: string; houseName: string;
@@ -106,6 +107,8 @@ export default function WorkersPage() {
           </button>
         }
       />
+
+      <WorkerCalendar />
 
       <div className="flex-1 overflow-y-auto px-5 pb-8">
         {/* Summary Cards */}

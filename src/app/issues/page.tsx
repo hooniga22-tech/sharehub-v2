@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/Card'
 import { BottomTab } from '@/components/ui/BottomTab'
 import { X, Plus, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
+import IssueCalendar from '@/components/ui/IssueCalendar'
 
 interface IssueItem {
   rowIndex: number; id: string; houseName: string; roomCode: string;
@@ -88,6 +89,8 @@ export default function IssuesPage() {
           </button>
         }
       />
+
+      <IssueCalendar />
 
       {openCount > 0 && (
         <div className="mx-5 mt-3 px-4 py-2.5 rounded-xl bg-[var(--red-light)] flex items-center justify-between">

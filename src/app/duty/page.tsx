@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { Chip } from '@/components/ui/Chip'
 import { Check, AlertTriangle, Plus, X, Loader2, Calendar } from 'lucide-react'
+import DutyCalendar from '@/components/ui/DutyCalendar'
 
 interface DutyItem {
   id: string; houseName: string; tenantId: string; tenantName: string; roomCode: string;
@@ -85,6 +86,8 @@ export default function DutyPage() {
   return (
     <div className="flex flex-col min-h-screen">
       <PageHeader title="청소 당번" />
+
+      <DutyCalendar houseName={selectedHouse || undefined} />
 
       <div className="flex-1 overflow-y-auto px-5 pb-8">
         {/* House Select */}
