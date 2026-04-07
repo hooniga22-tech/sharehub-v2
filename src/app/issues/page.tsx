@@ -1,15 +1,29 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Chip } from '@/components/ui/Chip'
 import { Card } from '@/components/ui/Card'
 import { BottomTab } from '@/components/ui/BottomTab'
-import { useSheets } from '@/hooks/useSheets'
-import { CheckCircle, RotateCcw } from 'lucide-react'
+import { X, Plus, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 
-const statuses = ['전체', '접수', '진행중', '완료', '보류']
+interface IssueItem {
+  rowIndex: number; id: string; houseName: string; roomCode: string;
+  title: string; content: string; category: string; status: string;
+  assignee: string; createdAt: string; completedAt: string; cost: number; memo: string;
+}
+
+const STATUSES = ['전체', '접수', '진행중', '완료', '보류']
+const CATEGORIES = ['전체', '수리', '청소', '민원', '교체', '기타']
+const CREATE_CATEGORIES = [
+  { value: '수리', desc: '시설물 고장, 파손' },
+  { value: '청소', desc: '공용공간, 개인공간' },
+  { value: '민원', desc: '소음, 분쟁 등' },
+  { value: '교체', desc: '소모품, 가구 교체' },
+  { value: '기타', desc: '기타 요청사항' },
+]
+
 const statusVariant: Record<string, 'red' | 'amber' | 'green' | 'gray'> = {
   '접수': 'red', '진행중': 'amber', '완료': 'green', '보류': 'gray',
 }
@@ -17,44 +31,44 @@ const categoryVariant: Record<string, 'blue' | 'green' | 'amber' | 'gray'> = {
   '수리': 'blue', '청소': 'green', '민원': 'amber', '교체': 'blue', '기타': 'gray',
 }
 
-// row: [0]ID [1]지점명 [2]방코드 [3]제목 [4]내용 [5]카테고리 [6]상태 [7]담당자 [8]등록일 [9]완료일 [10]비용 [11]메모
-
 export default function IssuesPage() {
-  const { data: issues, loading, refetch } = useSheets('이슈')
-  const [filter, setFilter] = useState('전체')
+  const [issues, setIssues] = useState<IssueItem[]>([])
+  const [houseNames, setHouseNames] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
+  const [statusFilter, setStatusFilter] = useState('전체')
+  const [categoryFilter, setCategoryFilter] = useState('전체')
+  const [showCreate, setShowCreate] = useState(false)
 
-  const filtered = filter === '전체' ? issues : issues.filter(r => r[6] === filter)
-  const openCount = issues.filter(r => r[6] !== '완료').length
-
-  async function quickResolve(rowIndex: number) {
-    const row = [...issues[rowIndex]]
-    row[6] = '완료'
-    row[9] = new Date().toISOString().slice(0, 10)
-    await fetch('/api/sheets', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sheet: '이슈', rowIndex, row }),
-    })
-    refetch()
+  function fetchIssues() {
+    setLoading(true)
+    fetch('/api/issues')
+      .then(r => r.json())
+      .then(d => { setIssues(d.issues || []); setHouseNames(d.houseNames || []) })
+      .catch(() => {})
+      .finally(() => setLoading(false))
   }
 
-  async function reopen(rowIndex: number) {
-    const row = [...issues[rowIndex]]
-    row[6] = '접수'
-    row[9] = ''
-    await fetch('/api/sheets', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sheet: '이슈', rowIndex, row }),
+  useEffect(() => { fetchIssues() }, [])
+
+  const filtered = useMemo(() => {
+    return issues.filter(r => {
+      if (statusFilter !== '전체' && r.status !== statusFilter) return false
+      if (categoryFilter !== '전체' && r.category !== categoryFilter) return false
+      return true
     })
-    refetch()
-  }
+  }, [issues, statusFilter, categoryFilter])
+
+  const openCount = issues.filter(r => r.status !== '완료').length
 
   return (
     <div className="flex flex-col min-h-screen">
       <PageHeader
         title="이슈"
-        right={<Link href="/issues/new" className="text-[14px] font-semibold text-[var(--blue)]">등록</Link>}
+        right={
+          <button onClick={() => setShowCreate(true)} className="flex items-center gap-1 text-[14px] font-semibold text-[var(--blue)]">
+            <Plus size={16} /> 등록
+          </button>
+        }
       />
 
       {openCount > 0 && (
@@ -63,12 +77,23 @@ export default function IssuesPage() {
         </div>
       )}
 
+      {/* Status Filter */}
       <div className="flex gap-2 px-5 py-3 overflow-x-auto no-scrollbar">
-        {statuses.map(s => (
-          <button key={s} onClick={() => setFilter(s)}
+        {STATUSES.map(s => (
+          <button key={s} onClick={() => setStatusFilter(s)}
             className={`shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-medium transition-colors ${
-              filter === s ? 'bg-[var(--blue)] text-white' : 'bg-[var(--card)] text-[var(--sub)] border border-[var(--border)]'
+              statusFilter === s ? 'bg-[var(--blue)] text-white' : 'bg-[var(--card)] text-[var(--sub)] border border-[var(--border)]'
             }`}>{s}</button>
+        ))}
+      </div>
+
+      {/* Category Filter */}
+      <div className="flex gap-2 px-5 pb-2 overflow-x-auto no-scrollbar">
+        {CATEGORIES.map(c => (
+          <button key={c} onClick={() => setCategoryFilter(c)}
+            className={`shrink-0 px-3 py-1 rounded-full text-[12px] font-medium transition-colors ${
+              categoryFilter === c ? 'bg-[var(--foreground)] text-[var(--bg)]' : 'bg-[var(--card)] text-[var(--sub)] border border-[var(--border)]'
+            }`}>{c}</button>
         ))}
       </div>
 
@@ -79,44 +104,139 @@ export default function IssuesPage() {
           <p className="text-[13px] text-[var(--sub)] py-8 text-center">이슈가 없습니다</p>
         ) : (
           <div className="flex flex-col gap-2.5 mt-1">
-            {filtered.map((r, i) => {
-              const realIndex = issues.indexOf(r)
-              return (
-                <Card key={i} className="px-4 py-3.5">
+            {filtered.map(r => (
+              <Link key={r.id} href={`/issues/${r.id}`}>
+                <Card className="px-4 py-3.5">
                   <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
-                    {r[5] && <Chip label={r[5]} variant={categoryVariant[r[5]] || 'gray'} />}
-                    <Chip label={r[6] || '접수'} variant={statusVariant[r[6]] || 'gray'} />
+                    {r.category && <Chip label={r.category} variant={categoryVariant[r.category] || 'gray'} />}
+                    <Chip label={r.status || '접수'} variant={statusVariant[r.status] || 'gray'} />
                   </div>
-                  <p className="text-[14px] font-semibold mt-1">{r[3]}</p>
-                  {r[4] && <p className="text-[12px] text-[var(--sub)] mt-0.5 line-clamp-2">{r[4]}</p>}
+                  <div className="flex items-center justify-between">
+                    <p className="text-[14px] font-semibold mt-1 flex-1">{r.title}</p>
+                    <ChevronRight size={16} color="var(--sub)" />
+                  </div>
+                  {r.content && <p className="text-[12px] text-[var(--sub)] mt-0.5 line-clamp-2">{r.content}</p>}
                   <div className="flex items-center gap-2 mt-2 text-[11px] text-[var(--sub)] flex-wrap">
-                    <span>{r[1]} {r[2]}</span>
-                    {r[7] && <span>· {r[7]}</span>}
-                    {Number(r[10]) > 0 && <span>· {Number(r[10]).toLocaleString()}원</span>}
-                    {r[8] && <span>· {r[8]}</span>}
-                  </div>
-                  <div className="flex gap-2 mt-2.5">
-                    {r[6] !== '완료' ? (
-                      <button onClick={() => quickResolve(realIndex)}
-                        className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-[var(--green-light)] text-[var(--green)] flex items-center gap-1">
-                        <CheckCircle size={12} /> 해결완료
-                      </button>
-                    ) : (
-                      <button onClick={() => reopen(realIndex)}
-                        className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-[#F2F2F2] text-[var(--sub)] flex items-center gap-1">
-                        <RotateCcw size={12} /> 재오픈
-                      </button>
-                    )}
+                    <span>{r.houseName} {r.roomCode}</span>
+                    {r.assignee && <span>· {r.assignee}</span>}
+                    {r.cost > 0 && <span>· {r.cost.toLocaleString()}원</span>}
+                    {r.createdAt && <span>· {r.createdAt}</span>}
                   </div>
                 </Card>
-              )
-            })}
+              </Link>
+            ))}
           </div>
         )}
       </div>
 
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px]">
         <BottomTab />
+      </div>
+
+      {/* Bottom Sheet: Create Issue */}
+      {showCreate && (
+        <CreateSheet
+          houseNames={houseNames}
+          onClose={() => setShowCreate(false)}
+          onCreated={() => { setShowCreate(false); fetchIssues() }}
+        />
+      )}
+    </div>
+  )
+}
+
+function CreateSheet({ houseNames, onClose, onCreated }: {
+  houseNames: string[]; onClose: () => void; onCreated: () => void
+}) {
+  const [houseName, setHouseName] = useState('')
+  const [roomCode, setRoomCode] = useState('')
+  const [category, setCategory] = useState('')
+  const [title, setTitle] = useState('')
+  const [content, setContent] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  async function handleSubmit() {
+    if (!houseName || !title.trim() || !category) return
+    setSubmitting(true)
+    await fetch('/api/issues', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ houseName, roomCode, category, title: title.trim(), content }),
+    })
+    onCreated()
+  }
+
+  const canSubmit = houseName && title.trim() && category
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative w-full max-w-[430px] bg-[var(--bg)] rounded-t-2xl max-h-[85vh] overflow-y-auto pb-8">
+        {/* Handle */}
+        <div className="flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 rounded-full bg-[var(--border)]" />
+        </div>
+
+        <div className="flex items-center justify-between px-5 py-3">
+          <h2 className="text-[17px] font-bold">이슈 등록</h2>
+          <button onClick={onClose}><X size={20} color="var(--sub)" /></button>
+        </div>
+
+        <div className="px-5 flex flex-col gap-4">
+          {/* House Select */}
+          <div>
+            <label className="text-[13px] font-semibold mb-1.5 block">지점</label>
+            <select value={houseName} onChange={e => setHouseName(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl bg-[var(--card)] border border-[var(--border)] text-[14px] outline-none">
+              <option value="">선택</option>
+              {houseNames.map(h => <option key={h} value={h}>{h}</option>)}
+            </select>
+          </div>
+
+          {/* Room */}
+          <div>
+            <label className="text-[13px] font-semibold mb-1.5 block">호실 (선택)</label>
+            <input value={roomCode} onChange={e => setRoomCode(e.target.value)} placeholder="예: 101호, 공용"
+              className="w-full px-4 py-3 rounded-xl bg-[var(--card)] border border-[var(--border)] text-[14px] outline-none placeholder:text-[var(--sub)]" />
+          </div>
+
+          {/* Category */}
+          <div>
+            <label className="text-[13px] font-semibold mb-1.5 block">카테고리</label>
+            <div className="flex flex-wrap gap-2">
+              {CREATE_CATEGORIES.map(c => (
+                <button key={c.value} onClick={() => setCategory(c.value)}
+                  className={`px-3.5 py-2 rounded-xl text-[13px] font-medium border transition-colors ${
+                    category === c.value
+                      ? 'border-[var(--blue)] bg-[var(--blue-light)] text-[var(--blue)]'
+                      : 'border-[var(--border)] bg-[var(--card)] text-[var(--sub)]'
+                  }`}>{c.value}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Title */}
+          <div>
+            <label className="text-[13px] font-semibold mb-1.5 block">제목</label>
+            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="이슈 제목"
+              className="w-full px-4 py-3 rounded-xl bg-[var(--card)] border border-[var(--border)] text-[14px] outline-none placeholder:text-[var(--sub)]" />
+          </div>
+
+          {/* Content */}
+          <div>
+            <label className="text-[13px] font-semibold mb-1.5 block">내용 (선택)</label>
+            <textarea value={content} onChange={e => setContent(e.target.value)} placeholder="상세 내용"
+              rows={3}
+              className="w-full px-4 py-3 rounded-xl bg-[var(--card)] border border-[var(--border)] text-[14px] outline-none resize-none placeholder:text-[var(--sub)]" />
+          </div>
+
+          <button onClick={handleSubmit} disabled={!canSubmit || submitting}
+            className={`w-full py-3.5 rounded-xl text-[15px] font-semibold transition-colors ${
+              canSubmit ? 'bg-[var(--blue)] text-white' : 'bg-[var(--border)] text-[var(--sub)]'
+            }`}>
+            {submitting ? '등록 중...' : '등록하기'}
+          </button>
+        </div>
       </div>
     </div>
   )
