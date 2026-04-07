@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import { Copy, Check, MapPin, ChevronRight, Loader2 } from 'lucide-react'
+import { Copy, Check, MapPin, ChevronRight, Loader2, Calendar, ArrowLeftRight } from 'lucide-react'
 
 type Lang = 'ko' | 'en'
 
@@ -16,6 +16,25 @@ interface HouseData {
   doorPassword: string; wifiSsid: string; wifiPassword: string; memo: string;
 }
 interface IssueItem { id: string; title: string; category: string; status: string; createdAt: string }
+interface DutyItem {
+  id: string; houseName: string; tenantId: string; tenantName: string; roomCode: string;
+  weekStart: string; weekEnd: string; isDone: boolean; note: string;
+}
+interface ExchangeItem {
+  id: string; requesterId: string; requesterName: string; requesterWeek: string;
+  targetId: string; targetName: string; targetWeek: string; status: string;
+}
+
+function formatWeek(ws: string, we: string) {
+  const s = new Date(ws), e = new Date(we)
+  const days = ['일', '월', '화', '수', '목', '금', '토']
+  return `${s.getMonth() + 1}/${s.getDate()}(${days[s.getDay()]}) ~ ${e.getMonth() + 1}/${e.getDate()}(${days[e.getDay()]})`
+}
+function getMonday(d: Date) {
+  const day = d.getDay()
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
+  return new Date(d.getFullYear(), d.getMonth(), diff)
+}
 
 const T: Record<string, Record<Lang, string>> = {
   hello: { ko: '안녕하세요', en: 'Hello' },
@@ -39,6 +58,18 @@ const T: Record<string, Record<Lang, string>> = {
   onRouter: { ko: '공유기에 표시됨', en: 'Shown on router' },
   noData: { ko: '문의 필요', en: 'Contact Manager' },
   viewGuide: { ko: '전체 입주 가이드 보기 →', en: 'View full house guide →' },
+  myDuty: { ko: '내 청소 당번', en: 'My Cleaning Duty' },
+  thisWeekDuty: { ko: '이번주 내 당번입니다', en: 'This week is your duty' },
+  dutyPhotoNotice: { ko: '공용 청소 완료 후 단톡방에 사진 업로드 필수', en: 'Upload photos to group chat after cleaning' },
+  dutyFineNotice: { ko: '미업로드 시 벌금 30,000원 발생', en: 'Fine of ₩30,000 if photos not uploaded' },
+  nextDuty: { ko: '다음 내 당번', en: 'Next duty' },
+  weeksLater: { ko: '주 후', en: 'weeks later' },
+  dutySchedule: { ko: '당번 순서', en: 'Duty Schedule' },
+  exchangeReq: { ko: '당번 교환 신청', en: 'Request Duty Swap' },
+  exchangeAlert: { ko: '님이 교환을 요청했어요', en: ' requested a swap' },
+  accept: { ko: '수락', en: 'Accept' },
+  reject: { ko: '거절', en: 'Reject' },
+  noDuty: { ko: '등록된 당번이 없습니다', en: 'No duties assigned yet' },
   issue: { ko: '불편사항 신청', en: 'Report an Issue' },
   issueTitle: { ko: '제목', en: 'Title' },
   issueContent: { ko: '내용 (선택)', en: 'Details (optional)' },
@@ -99,12 +130,25 @@ export default function TenantPortalPage() {
   const [supplySending, setSupplySending] = useState(false)
   const [supplySuccess, setSupplySuccess] = useState(false)
 
+  // Duty
+  const [allDuties, setAllDuties] = useState<DutyItem[]>([])
+  const [exchanges, setExchanges] = useState<ExchangeItem[]>([])
+
   useEffect(() => {
     fetch(`/api/tenant-portal/${token}`)
       .then(r => r.json())
       .then(d => {
         if (d.error) { setNotFound(true); return }
         setData(d)
+        // Fetch duties for this house
+        if (d.tenant?.houseName) {
+          fetch(`/api/duty?houseName=${encodeURIComponent(d.tenant.houseName)}`)
+            .then(r => r.json()).then(dd => { if (Array.isArray(dd)) setAllDuties(dd.sort((a: DutyItem, b: DutyItem) => a.weekStart.localeCompare(b.weekStart))) }).catch(() => {})
+        }
+        if (d.tenant?.id) {
+          fetch(`/api/duty/exchange?tenantId=${d.tenant.id}`)
+            .then(r => r.json()).then(ex => { if (Array.isArray(ex)) setExchanges(ex.filter((e: ExchangeItem) => e.status === '대기')) }).catch(() => {})
+        }
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false))
@@ -273,7 +317,14 @@ export default function TenantPortalPage() {
           </Section>
         )}
 
-        {/* Section 5: Issue Report */}
+        {/* Section 5: My Duty */}
+        <DutySection
+          lang={lang} t={t} token={token}
+          allDuties={allDuties} exchanges={exchanges}
+          setExchanges={setExchanges} setAllDuties={setAllDuties}
+        />
+
+        {/* Section 6: Issue Report */}
         <Section title={T.issue[lang]}>
           {issueSuccess ? (
             <div className="py-4 text-center">
@@ -408,5 +459,113 @@ function GuideRow({ label, value, isEmpty, copyable, copied, onCopy, copiedText,
         </button>
       )}
     </div>
+  )
+}
+
+/* ── Duty Section ── */
+function DutySection({ lang, t, token, allDuties, exchanges, setExchanges, setAllDuties }: {
+  lang: Lang; t: TenantData; token: string;
+  allDuties: DutyItem[]; exchanges: ExchangeItem[];
+  setExchanges: (v: ExchangeItem[]) => void; setAllDuties: (v: DutyItem[]) => void;
+}) {
+  const thisMonday = getMonday(new Date()).toISOString().split('T')[0]
+  const myDuties = allDuties.filter(d => d.tenantId === t.id)
+  const thisWeekMine = myDuties.find(d => d.weekStart === thisMonday)
+  const futureMine = myDuties.filter(d => d.weekStart > thisMonday && !d.isDone)
+  const nextDuty = futureMine[0]
+  const weeksUntilNext = nextDuty ? Math.round((new Date(nextDuty.weekStart).getTime() - Date.now()) / (7 * 86400000)) : 0
+
+  const pendingExchanges = exchanges.filter(e => e.targetId === t.id && e.status === '대기')
+
+  async function respondExchange(excId: string, action: string) {
+    await fetch('/api/duty/exchange', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ exchangeId: excId, action }),
+    })
+    setExchanges(exchanges.filter(e => e.id !== excId))
+    if (action === '수락') {
+      const res = await fetch(`/api/duty?houseName=${encodeURIComponent(t.houseName)}`)
+      const d = await res.json()
+      if (Array.isArray(d)) setAllDuties(d.sort((a: DutyItem, b: DutyItem) => a.weekStart.localeCompare(b.weekStart)))
+    }
+  }
+
+  if (allDuties.length === 0) {
+    return (
+      <section className="bg-white rounded-2xl p-5 shadow-sm mb-4">
+        <h2 className="text-[15px] font-bold mb-3">{T.myDuty[lang]}</h2>
+        <p className="text-[13px] text-gray-400 text-center py-3">{T.noDuty[lang]}</p>
+      </section>
+    )
+  }
+
+  return (
+    <section className="bg-white rounded-2xl p-5 shadow-sm mb-4">
+      <h2 className="text-[15px] font-bold mb-3">{T.myDuty[lang]}</h2>
+
+      {/* Exchange alerts */}
+      {pendingExchanges.map(ex => (
+        <div key={ex.id} className="rounded-xl bg-amber-50 border border-amber-200 p-3 mb-3">
+          <p className="text-[12px] font-semibold text-amber-700">
+            {ex.requesterName}{T.exchangeAlert[lang]}
+          </p>
+          <p className="text-[11px] text-amber-600 mt-0.5">
+            {formatWeek(ex.requesterWeek, '')} ↔ {formatWeek(ex.targetWeek, '')}
+          </p>
+          <div className="flex gap-2 mt-2">
+            <button onClick={() => respondExchange(ex.id, '수락')}
+              className="flex-1 py-1.5 rounded-lg bg-[#3182F6] text-white text-[11px] font-bold">{T.accept[lang]}</button>
+            <button onClick={() => respondExchange(ex.id, '거절')}
+              className="flex-1 py-1.5 rounded-lg bg-gray-200 text-gray-600 text-[11px] font-bold">{T.reject[lang]}</button>
+          </div>
+        </div>
+      ))}
+
+      {/* This week highlight */}
+      {thisWeekMine && (
+        <div className="rounded-xl bg-[#3182F6] p-4 mb-3">
+          <p className="text-[12px] text-white/80">{T.thisWeekDuty[lang]}</p>
+          <p className="text-[12px] text-white/70 mt-1">
+            <Calendar size={11} className="inline mr-1" />
+            {formatWeek(thisWeekMine.weekStart, thisWeekMine.weekEnd)}
+          </p>
+          <p className="text-[11px] text-white/60 mt-2">{T.dutyPhotoNotice[lang]}</p>
+          <p className="text-[11px] text-red-200 mt-0.5">{T.dutyFineNotice[lang]}</p>
+        </div>
+      )}
+
+      {/* Next duty */}
+      {!thisWeekMine && nextDuty && (
+        <div className="rounded-xl bg-blue-50 p-3 mb-3">
+          <p className="text-[12px] font-semibold text-blue-700">{T.nextDuty[lang]}</p>
+          <p className="text-[12px] text-blue-600 mt-0.5">
+            {formatWeek(nextDuty.weekStart, nextDuty.weekEnd)}
+            <span className="text-blue-400 ml-2">({lang === 'ko' ? `약 ${weeksUntilNext}${T.weeksLater[lang]}` : `~${weeksUntilNext} ${T.weeksLater[lang]}`})</span>
+          </p>
+        </div>
+      )}
+
+      {/* Full schedule (compact) */}
+      <p className="text-[12px] font-semibold text-gray-400 mb-2 mt-2">{T.dutySchedule[lang]}</p>
+      <div className="flex flex-col gap-1">
+        {allDuties.slice(0, 12).map(d => {
+          const isMine = d.tenantId === t.id
+          const isSkip = d.note === '청소용역'
+          const isCurrent = d.weekStart === thisMonday
+          return (
+            <div key={d.id} className={`flex items-center gap-2 py-1.5 px-2 rounded-lg text-[11px] ${
+              isMine ? 'bg-blue-50' : isSkip ? 'bg-gray-50' : ''
+            }`}>
+              <span className="text-gray-400 w-24 shrink-0">{formatWeek(d.weekStart, d.weekEnd).split(' ~ ')[0]}</span>
+              <span className={`flex-1 font-medium ${isSkip ? 'text-gray-400' : isMine ? 'text-blue-600 font-bold' : 'text-gray-700'}`}>
+                {isSkip ? (lang === 'ko' ? '용역' : 'Cleaning Service') : d.tenantName}
+              </span>
+              {isCurrent && <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-600 text-[9px] font-bold">{lang === 'ko' ? '이번주' : 'This week'}</span>}
+              {d.isDone && <span className="text-green-600">✓</span>}
+            </div>
+          )
+        })}
+      </div>
+    </section>
   )
 }

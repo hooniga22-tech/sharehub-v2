@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { Chip } from '@/components/ui/Chip'
 import { BottomTab } from '@/components/ui/BottomTab'
-import { ChevronLeft, ChevronRight, ChevronDown, Receipt, AlertTriangle, Wrench, TrendingUp, Wallet } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, Receipt, AlertTriangle, Wrench, TrendingUp, Wallet, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 
 interface HouseResult {
@@ -126,6 +126,18 @@ export default function FinancePage() {
           <div className="flex-1">
             <p className="text-[14px] font-semibold">지출 관리</p>
             <p className="text-[11px] text-[var(--sub)]">공과금 + 기타지출 통합 관리</p>
+          </div>
+          <ChevronRight size={16} color="var(--sub)" />
+        </Link>
+
+        {/* Duty Link */}
+        <Link href="/duty" className="flex items-center gap-3 px-4 py-3 mt-2 rounded-xl bg-[var(--card)] border border-[var(--border)]">
+          <div className="w-9 h-9 rounded-xl bg-[#F3EAFF] flex items-center justify-center">
+            <Sparkles size={18} color="#7C3AED" />
+          </div>
+          <div className="flex-1">
+            <p className="text-[14px] font-semibold">당번 관리</p>
+            <p className="text-[11px] text-[var(--sub)]">지점별 청소 당번 배정 및 벌금</p>
           </div>
           <ChevronRight size={16} color="var(--sub)" />
         </Link>
