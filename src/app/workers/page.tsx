@@ -121,23 +121,24 @@ export default function WorkersPage() {
 
         {/* Worker Portal Links */}
         {portalWorkers.length > 0 && (
-          <div className="mt-3 rounded-xl bg-[var(--card)] border border-[var(--border)] p-3">
-            <p className="text-[12px] font-bold text-[var(--sub)] mb-2">담당자 개인 페이지</p>
-            <div className="flex flex-col gap-1.5">
+          <div className="mt-4">
+            <p className="text-[13px] font-bold text-[var(--foreground)] mb-2">담당자 개인 페이지</p>
+            <div className="grid grid-cols-2 gap-2">
               {portalWorkers.map(pw => (
-                <div key={pw.token} className="flex items-center justify-between">
-                  <span className="text-[13px] font-medium">{pw.name}</span>
+                <div key={pw.token} className="rounded-2xl bg-[var(--card)] border border-[var(--border)] p-3.5 flex flex-col gap-2.5">
+                  <p className="text-[15px] font-bold">{pw.name}</p>
                   <div className="flex gap-1.5">
-                    <button onClick={() => {
-                      navigator.clipboard.writeText(`${window.location.origin}/worker/${pw.token}`)
-                      setLinkCopied(pw.token); setTimeout(() => setLinkCopied(''), 1500)
-                    }}
-                      className={`px-2 py-1 rounded-lg text-[10px] font-bold ${linkCopied === pw.token ? 'bg-green-50 text-green-600' : 'bg-[var(--blue-light)] text-[var(--blue)]'}`}>
-                      {linkCopied === pw.token ? <><Check size={9} className="inline mr-0.5" />복사됨</> : <><Copy size={9} className="inline mr-0.5" />링크</>}
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/worker/${pw.token}`)
+                        setLinkCopied(pw.token); setTimeout(() => setLinkCopied(''), 2000)
+                      }}
+                      className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-[12px] font-bold transition-colors ${linkCopied === pw.token ? 'bg-[var(--green-light)] text-[var(--green)]' : 'bg-[var(--blue-light)] text-[var(--blue)]'}`}>
+                      {linkCopied === pw.token ? <><Check size={12} />복사됨</> : <><Copy size={12} />링크복사</>}
                     </button>
                     <a href={`/worker/${pw.token}`} target="_blank" rel="noopener noreferrer"
-                      className="px-2 py-1 rounded-lg bg-gray-100 text-gray-500 text-[10px] font-bold">
-                      <ExternalLink size={9} className="inline mr-0.5" />열기
+                      className="flex items-center justify-center gap-1 px-3 py-2 rounded-xl bg-[var(--border)] text-[var(--sub)] text-[12px] font-bold">
+                      <ExternalLink size={12} />열기
                     </a>
                   </div>
                 </div>
