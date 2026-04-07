@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Home, Users, AlertCircle, BarChart2 } from 'lucide-react'
+import { Home, Users, AlertCircle, Building2, BarChart2 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
@@ -9,6 +9,7 @@ const tabs = [
   { href: '/', label: '홈', icon: Home },
   { href: '/tenants', label: '입주자', icon: Users },
   { href: '/issues', label: '이슈', icon: AlertCircle },
+  { href: '/houses', label: '지점', icon: Building2 },
   { href: '/finance', label: '정산', icon: BarChart2 },
 ]
 
@@ -33,7 +34,7 @@ export function BottomTab() {
         return (
           <Link key={href} href={href} className="flex-1 flex flex-col items-center gap-1 py-2.5 pb-4 relative">
             <div className="relative">
-              <Icon size={22} color={active ? 'var(--blue)' : 'var(--sub)'} strokeWidth={active ? 2.5 : 2} />
+              <Icon size={20} color={active ? 'var(--blue)' : 'var(--sub)'} strokeWidth={active ? 2.5 : 2} />
               {href === '/issues' && issueCount > 0 && (
                 <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-[16px] flex items-center justify-center rounded-full bg-[var(--red)] text-white text-[9px] font-bold px-1">
                   {issueCount > 99 ? '99+' : issueCount}
