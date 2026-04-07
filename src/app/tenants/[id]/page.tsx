@@ -5,13 +5,18 @@ import { useParams, useRouter } from 'next/navigation'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { Chip } from '@/components/ui/Chip'
-import { Phone, Calendar, CreditCard, FileText, Save, Copy, Check, ExternalLink, Share2 } from 'lucide-react'
+import { Phone, Calendar, CreditCard, FileText, Save, Copy, Check, ExternalLink, Share2, Clock, AlertCircle, Loader2 } from 'lucide-react'
 
 interface TenantData {
   id: string; roomId: string; houseName: string; roomCode: string;
   name: string; phone: string; rent: number; managementFee: number; deposit: number;
   startDate: string; endDate: string; status: string;
   nationality: string; memo: string; token: string;
+}
+
+interface PaymentItem {
+  id: string; tenantId: string; type: string; dueDate: string;
+  rent: number; mgmtFee: number; rentPaid: boolean; mgmtPaid: boolean; memo: string;
 }
 
 function calcDday(endDate: string) {
@@ -38,6 +43,11 @@ export default function TenantDetailPage() {
   const [saving, setSaving] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
 
+  // Payment timeline
+  const [payments, setPayments] = useState<PaymentItem[]>([])
+  const [paymentsLoading, setPaymentsLoading] = useState(false)
+  const [generating, setGenerating] = useState(false)
+
   useEffect(() => {
     fetch(`/api/tenants/${params.id}`)
       .then(r => r.json())
@@ -45,6 +55,16 @@ export default function TenantDetailPage() {
       .catch(() => setTenant(null))
       .finally(() => setLoading(false))
   }, [params.id])
+
+  useEffect(() => {
+    if (!tenant) return
+    setPaymentsLoading(true)
+    fetch(`/api/payments?tenantId=${tenant.id}`)
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d)) setPayments(d) })
+      .catch(() => {})
+      .finally(() => setPaymentsLoading(false))
+  }, [tenant])
 
   function startEdit() {
     if (!tenant) return
@@ -59,12 +79,56 @@ export default function TenantDetailPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form),
     })
-    // Refetch
     const r = await fetch(`/api/tenants/${params.id}`)
     const d = await r.json()
     if (!d.error) setTenant(d)
     setEditing(false)
     setSaving(false)
+  }
+
+  async function generateTimeline() {
+    if (!tenant) return
+    setGenerating(true)
+    const res = await fetch('/api/payments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tenantId: tenant.id, tenantName: tenant.name,
+        houseName: tenant.houseName, roomCode: tenant.roomCode,
+        rent: tenant.rent, mgmtFee: tenant.managementFee,
+        startDate: tenant.startDate, endDate: tenant.endDate,
+      }),
+    })
+    const data = await res.json()
+    if (data.ok) {
+      // Refetch payments
+      const r = await fetch(`/api/payments?tenantId=${tenant.id}`)
+      const d = await r.json()
+      if (Array.isArray(d)) setPayments(d)
+    }
+    setGenerating(false)
+  }
+
+  async function togglePayment(paymentId: string, field: 'rentPaid' | 'mgmtPaid', currentVal: boolean) {
+    await fetch(`/api/payments/${paymentId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [field]: !currentVal }),
+    })
+    setPayments(prev => prev.map(p =>
+      p.id === paymentId ? { ...p, [field]: !currentVal } : p
+    ))
+  }
+
+  async function updatePaymentMemo(paymentId: string, memo: string) {
+    await fetch(`/api/payments/${paymentId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ memo }),
+    })
+    setPayments(prev => prev.map(p =>
+      p.id === paymentId ? { ...p, memo } : p
+    ))
   }
 
   if (loading) return <div className="flex items-center justify-center min-h-screen text-[var(--sub)]">불러오는 중...</div>
@@ -198,8 +262,45 @@ export default function TenantDetailPage() {
           )}
         </Card>
 
+        {/* 납부 타임라인 */}
+        <div className="mt-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-1.5">
+              <Clock size={14} color="var(--blue)" />
+              <span className="text-[14px] font-bold">납부 타임라인</span>
+            </div>
+            {payments.length > 0 && (
+              <span className="text-[11px] text-[var(--sub)]">
+                {payments.filter(p => p.rentPaid && (p.mgmtFee === 0 || p.mgmtPaid)).length}/{payments.length} 완료
+              </span>
+            )}
+          </div>
+
+          {paymentsLoading ? (
+            <p className="text-[13px] text-[var(--sub)] py-4 text-center">불러오는 중...</p>
+          ) : payments.length === 0 ? (
+            <Card className="p-5 text-center">
+              <p className="text-[13px] text-[var(--sub)] mb-3">납부 타임라인이 없습니다</p>
+              {tenant.startDate && tenant.endDate && (
+                <button onClick={generateTimeline} disabled={generating}
+                  className="px-5 py-2.5 rounded-xl text-[13px] font-semibold bg-[var(--blue)] text-white flex items-center gap-2 mx-auto">
+                  {generating ? <Loader2 size={14} className="animate-spin" /> : <Clock size={14} />}
+                  {generating ? '생성 중...' : '타임라인 자동 생성'}
+                </button>
+              )}
+            </Card>
+          ) : (
+            <div className="relative">
+              {payments.map((p, i) => (
+                <TimelineCard key={p.id} payment={p} isLast={i === payments.length - 1}
+                  onToggle={togglePayment} onMemoUpdate={updatePaymentMemo} />
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* 연락처 */}
-        <Card className="mt-3 p-4">
+        <Card className="mt-5 p-4">
           <div className="flex items-center gap-1.5 mb-3">
             <Phone size={14} color="var(--blue)" />
             <span className="text-[12px] font-bold text-[var(--sub)]">연락처</span>
@@ -288,6 +389,117 @@ export default function TenantDetailPage() {
             className="w-full py-3.5 rounded-xl text-[15px] font-semibold bg-[var(--blue)] text-white">
             수정하기
           </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ── Timeline Card ── */
+function TimelineCard({ payment: p, isLast, onToggle, onMemoUpdate }: {
+  payment: PaymentItem; isLast: boolean;
+  onToggle: (id: string, field: 'rentPaid' | 'mgmtPaid', val: boolean) => void;
+  onMemoUpdate: (id: string, memo: string) => void;
+}) {
+  const [editingMemo, setEditingMemo] = useState(false)
+  const [memoVal, setMemoVal] = useState(p.memo)
+
+  const today = new Date().toISOString().split('T')[0]
+  const dueMonth = new Date(p.dueDate).getMonth() + 1
+  const isComplete = p.rentPaid && (p.mgmtFee === 0 || p.mgmtPaid)
+  const isOverdue = !isComplete && p.dueDate < today
+  const isThisMonth = !isComplete && !isOverdue && p.dueDate.slice(0, 7) === today.slice(0, 7)
+  const isFuture = !isComplete && !isOverdue && !isThisMonth
+
+  // Dot style
+  let dotBg = '#D3D1C7'
+  let dotContent = String(dueMonth)
+  if (isComplete) { dotBg = '#00B33C'; dotContent = '✓' }
+  else if (isOverdue) { dotBg = '#F04452'; dotContent = '!' }
+  else if (isThisMonth) { dotBg = '#3182F6'; dotContent = String(dueMonth) }
+
+  // Status badge
+  let badgeLabel = '예정'
+  let badgeClass = 'bg-gray-100 text-gray-500'
+  if (isComplete) { badgeLabel = '완료'; badgeClass = 'bg-[var(--green-light)] text-[var(--green)]' }
+  else if (isOverdue) { badgeLabel = '미납'; badgeClass = 'bg-[var(--red-light)] text-[var(--red)]' }
+  else if (isThisMonth) { badgeLabel = '이달 예정'; badgeClass = 'bg-[var(--blue-light)] text-[var(--blue)]' }
+
+  return (
+    <div className="flex gap-3">
+      {/* Timeline column */}
+      <div className="flex flex-col items-center">
+        <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
+          style={{ backgroundColor: dotBg }}>
+          {dotContent}
+        </div>
+        {!isLast && <div className="w-px flex-1 bg-[#F2F2F2] min-h-[20px]" />}
+      </div>
+
+      {/* Card */}
+      <div className={`flex-1 mb-3 rounded-xl border border-[#F2F2F2] bg-white p-3.5 ${isComplete ? 'opacity-70' : ''}`}>
+        {/* Header row */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <span className="text-[13px] font-semibold">{p.type}</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${badgeClass}`}>{badgeLabel}</span>
+          </div>
+          <span className="text-[11px] text-[var(--sub)]">{p.dueDate}</span>
+        </div>
+
+        {/* Rent row */}
+        <div className="flex items-center justify-between py-1.5">
+          <span className="text-[12px] text-[var(--sub)]">월세통장</span>
+          <div className="flex items-center gap-2">
+            <span className="text-[12px] font-medium">{fmt(p.rent)}원</span>
+            <button onClick={() => onToggle(p.id, 'rentPaid', p.rentPaid)}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-colors ${
+                p.rentPaid ? 'bg-[var(--green-light)] text-[var(--green)]' : 'bg-gray-100 text-gray-400'
+              }`}>
+              {p.rentPaid ? '✓ 완료' : '체크'}
+            </button>
+          </div>
+        </div>
+
+        {/* Mgmt fee row */}
+        {p.mgmtFee > 0 && (
+          <div className="flex items-center justify-between py-1.5">
+            <span className="text-[12px] text-[var(--sub)]">관리비통장</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] font-medium">{fmt(p.mgmtFee)}원</span>
+              <button onClick={() => onToggle(p.id, 'mgmtPaid', p.mgmtPaid)}
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-colors ${
+                  p.mgmtPaid ? 'bg-[var(--green-light)] text-[var(--green)]' : 'bg-gray-100 text-gray-400'
+                }`}>
+                {p.mgmtPaid ? '✓ 완료' : '체크'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Memo row */}
+        {(p.memo || editingMemo) && (
+          <div className="mt-2">
+            {editingMemo ? (
+              <div className="flex gap-1.5">
+                <input value={memoVal} onChange={e => setMemoVal(e.target.value)}
+                  className="flex-1 px-2.5 py-1.5 rounded-lg bg-gray-50 border border-[var(--border)] text-[11px] outline-none" />
+                <button onClick={() => { onMemoUpdate(p.id, memoVal); setEditingMemo(false) }}
+                  className="px-2.5 py-1.5 rounded-lg bg-[var(--blue)] text-white text-[10px] font-bold">저장</button>
+              </div>
+            ) : (
+              <button onClick={() => { setMemoVal(p.memo); setEditingMemo(true) }}
+                className="px-2.5 py-1 rounded-full bg-gray-100 text-[11px] text-[var(--sub)]">
+                {p.memo}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Add memo button if no memo */}
+        {!p.memo && !editingMemo && (
+          <button onClick={() => setEditingMemo(true)}
+            className="mt-1.5 text-[10px] text-[var(--sub)] underline">메모 추가</button>
         )}
       </div>
     </div>
