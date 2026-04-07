@@ -223,20 +223,7 @@ export default function ContractPage() {
           <p>■ 관리비 납입계좌: 케이뱅크 유재훈 100-166-670094</p>
         </div>
 
-        {/* 계약일 */}
-        <p style={{ textAlign: 'right', margin: '14px 0 8px', fontSize: '9.5pt' }}>계약일: {todayStr}</p>
-
-        {/* 서명란 */}
-        <div className="sign">
-          <p style={{ fontWeight: 700, marginBottom: 8 }}>임차인</p>
-          <div className="sr">이름: <EI v={f.name} k="name" onChange={v => setF(p => ({ ...p, name: v }))} />&nbsp;&nbsp;&nbsp;&nbsp;본가주소: <EI v={f.homeAddress || '___________________________'} k="homeAddress" onChange={v => setF(p => ({ ...p, homeAddress: v }))} /></div>
-          <div className="sr">연락처: <EI v={f.phone} k="phone" onChange={v => setF(p => ({ ...p, phone: v }))} />&nbsp;&nbsp;&nbsp;&nbsp;생년월일: <EI v={f.birthDate || '_____________'} k="birthDate" onChange={v => setF(p => ({ ...p, birthDate: v }))} />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(인)</div>
-          <div className="sr">보호자: <EI v={f.guardianName || '_____________'} k="guardianName" onChange={v => setF(p => ({ ...p, guardianName: v }))} />&nbsp;&nbsp;관계: <EI v={f.guardianRelation || '_______'} k="guardianRelation" onChange={v => setF(p => ({ ...p, guardianRelation: v }))} />&nbsp;&nbsp;연락처: <EI v={f.guardianPhone || '________________'} k="guardianPhone" onChange={v => setF(p => ({ ...p, guardianPhone: v }))} /></div>
-          <p style={{ fontWeight: 700, margin: '14px 0 8px' }}>임대인</p>
-          <div className="sr">이름: 유재훈&nbsp;&nbsp;&nbsp;&nbsp;연락처: 010-____-____&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(인)</div>
-        </div>
-
-        {/* ═══════════ PAGE 2 ═══════════ */}
+        {/* ═══════════ PAGE 2: 특약 ═══════════ */}
         <div className="pb">
           <h1>쉐어하우스 별지 특약</h1>
           <p style={{ textAlign: 'center', fontSize: '9.5pt', color: '#555', margin: '8px 0 16px', lineHeight: 1.7 }}>
@@ -272,10 +259,44 @@ export default function ContractPage() {
           <p style={{ margin: '12px 0', fontSize: '9.5pt', fontStyle: 'italic' }}>
             운영에 관하여 변동이 있을 시 제공자는 최소 4주 전에 고지 의무를 가진다.
           </p>
+        </div>
 
-          <div className="sign" style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <div>임차인: ________________________ (인)</div>
-            <div>임대인: 유재훈 (인)</div>
+        {/* ═══════════ PAGE 3: 서명란 ═══════════ */}
+        <div className="pb">
+          <h1>쉐어메이트 계약서 서명란</h1>
+          <p className="sub">Share Mate Contract — Signature Page</p>
+
+          <div className="abox" style={{ margin: '16px 0' }}>
+            <p>■ 임대료(월세) 납입계좌: {house?.landlordName || '-'} (계약서 참조)</p>
+            <p>■ 관리비 납입계좌: 케이뱅크 유재훈 100-166-670094</p>
+          </div>
+
+          <p style={{ textAlign: 'right', margin: '14px 0 16px', fontSize: '9.5pt' }}>계약일: {todayStr}</p>
+
+          <div style={{ border: '1px solid #aaa', borderRadius: 4, padding: '16px 20px', marginBottom: 20 }}>
+            <p style={{ fontWeight: 700, fontSize: '11pt', marginBottom: 12 }}>임차인</p>
+            <div className="sr">이름: <EI v={f.name} k="name" onChange={v => setF(p => ({ ...p, name: v }))} /></div>
+            <div className="sr">연락처: <EI v={f.phone} k="phone" onChange={v => setF(p => ({ ...p, phone: v }))} /></div>
+            <div className="sr">생년월일: <EI v={f.birthDate || '_________________________'} k="birthDate" onChange={v => setF(p => ({ ...p, birthDate: v }))} /></div>
+            <div className="sr">본가주소: <EI v={f.homeAddress || '________________________________________________'} k="homeAddress" onChange={v => setF(p => ({ ...p, homeAddress: v }))} /></div>
+            <div className="sr">보호자: <EI v={f.guardianName || '_____________'} k="guardianName" onChange={v => setF(p => ({ ...p, guardianName: v }))} />&nbsp;&nbsp;관계: <EI v={f.guardianRelation || '_______'} k="guardianRelation" onChange={v => setF(p => ({ ...p, guardianRelation: v }))} />&nbsp;&nbsp;연락처: <EI v={f.guardianPhone || '____________________'} k="guardianPhone" onChange={v => setF(p => ({ ...p, guardianPhone: v }))} /></div>
+            <div style={{ textAlign: 'right', marginTop: 16, fontSize: '10pt' }}>서명: ________________________ (인)</div>
+          </div>
+
+          <div style={{ border: '1px solid #aaa', borderRadius: 4, padding: '16px 20px', marginBottom: 24 }}>
+            <p style={{ fontWeight: 700, fontSize: '11pt', marginBottom: 12 }}>임대인</p>
+            <div className="sr">이름: 유재훈</div>
+            <div className="sr">연락처: 010-____-____</div>
+            <div style={{ textAlign: 'right', marginTop: 16, fontSize: '10pt' }}>서명: ________________________ (인)</div>
+          </div>
+
+          <div style={{ borderTop: '1.5px solid #111', paddingTop: 14 }}>
+            <p style={{ fontWeight: 700, fontSize: '10pt', marginBottom: 10 }}>별지 특약 서명</p>
+            <p style={{ fontSize: '9pt', color: '#666', marginBottom: 12 }}>상기 별지 특약 사항을 모두 확인하였으며 이에 동의합니다.</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: '9.5pt' }}>임차인: ________________________ (인)</div>
+              <div style={{ fontSize: '9.5pt' }}>임대인: 유재훈 (인)</div>
+            </div>
           </div>
         </div>
       </div>
