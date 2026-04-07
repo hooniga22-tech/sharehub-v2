@@ -49,8 +49,8 @@ export default function TenantsPage() {
       <PageHeader
         title="입주자"
         right={
-          <Link href="/tenants/new" className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--blue)]">
-            <Plus size={18} color="#fff" />
+          <Link href="/tenants/new" className="flex items-center gap-1 text-[14px] font-semibold text-[var(--blue)]">
+            <Plus size={16} /> 등록
           </Link>
         }
       />
