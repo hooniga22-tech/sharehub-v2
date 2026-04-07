@@ -13,6 +13,7 @@ interface IssueItem {
   title: string; content: string; category: string; status: string;
   assignee: string; createdAt: string; completedAt: string; cost: number; memo: string;
 }
+interface HouseInfo { name: string; district: string }
 
 const STATUSES = ['전체', '접수', '진행중', '완료', '보류']
 const CATEGORIES = ['전체', '수리', '청소', '민원', '교체', '기타']
@@ -31,32 +32,49 @@ const categoryVariant: Record<string, 'blue' | 'green' | 'amber' | 'gray'> = {
   '수리': 'blue', '청소': 'green', '민원': 'amber', '교체': 'blue', '기타': 'gray',
 }
 
+function groupByDistrict(houses: HouseInfo[]) {
+  const map: Record<string, string[]> = {}
+  houses.forEach(h => {
+    const d = h.district || '기타'
+    if (!map[d]) map[d] = []
+    map[d].push(h.name)
+  })
+  return map
+}
+
 export default function IssuesPage() {
   const [issues, setIssues] = useState<IssueItem[]>([])
-  const [houseNames, setHouseNames] = useState<string[]>([])
+  const [houses, setHouses] = useState<HouseInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('전체')
   const [categoryFilter, setCategoryFilter] = useState('전체')
+  const [houseFilter, setHouseFilter] = useState('')
   const [showCreate, setShowCreate] = useState(false)
 
   function fetchIssues() {
     setLoading(true)
-    fetch('/api/issues')
-      .then(r => r.json())
-      .then(d => { setIssues(d.issues || []); setHouseNames(d.houseNames || []) })
-      .catch(() => {})
+    Promise.all([
+      fetch('/api/issues').then(r => r.json()),
+      fetch('/api/houses').then(r => r.json()),
+    ]).then(([d, h]) => {
+      setIssues(d.issues || [])
+      if (Array.isArray(h)) setHouses(h.map((x: { name: string; district: string }) => ({ name: x.name, district: x.district })))
+    }).catch(() => {})
       .finally(() => setLoading(false))
   }
 
   useEffect(() => { fetchIssues() }, [])
 
+  const byDistrict = useMemo(() => groupByDistrict(houses), [houses])
+
   const filtered = useMemo(() => {
     return issues.filter(r => {
       if (statusFilter !== '전체' && r.status !== statusFilter) return false
       if (categoryFilter !== '전체' && r.category !== categoryFilter) return false
+      if (houseFilter && r.houseName !== houseFilter) return false
       return true
     })
-  }, [issues, statusFilter, categoryFilter])
+  }, [issues, statusFilter, categoryFilter, houseFilter])
 
   const openCount = issues.filter(r => r.status !== '완료').length
 
@@ -87,7 +105,7 @@ export default function IssuesPage() {
         ))}
       </div>
 
-      {/* Category Filter */}
+      {/* Category + House Filter */}
       <div className="flex gap-2 px-5 pb-2 overflow-x-auto no-scrollbar">
         {CATEGORIES.map(c => (
           <button key={c} onClick={() => setCategoryFilter(c)}
@@ -95,6 +113,19 @@ export default function IssuesPage() {
               categoryFilter === c ? 'bg-[var(--foreground)] text-[var(--bg)]' : 'bg-[var(--card)] text-[var(--sub)] border border-[var(--border)]'
             }`}>{c}</button>
         ))}
+      </div>
+
+      {/* House Filter (grouped by district) */}
+      <div className="px-5 pb-2">
+        <select value={houseFilter} onChange={e => setHouseFilter(e.target.value)}
+          className="w-full px-3 py-2 rounded-xl bg-[var(--card)] border border-[var(--border)] text-[13px] outline-none">
+          <option value="">전체 지점</option>
+          {Object.entries(byDistrict).sort().map(([district, names]) => (
+            <optgroup key={district} label={district}>
+              {names.map(n => <option key={n} value={n}>{n}</option>)}
+            </optgroup>
+          ))}
+        </select>
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 pb-24">
@@ -117,7 +148,7 @@ export default function IssuesPage() {
                   </div>
                   {r.content && <p className="text-[12px] text-[var(--sub)] mt-0.5 line-clamp-2">{r.content}</p>}
                   <div className="flex items-center gap-2 mt-2 text-[11px] text-[var(--sub)] flex-wrap">
-                    <span>{r.houseName} {r.roomCode}</span>
+                    <span>{r.houseName}</span>
                     {r.assignee && <span>· {r.assignee}</span>}
                     {r.cost > 0 && <span>· {r.cost.toLocaleString()}원</span>}
                     {r.createdAt && <span>· {r.createdAt}</span>}
@@ -133,10 +164,10 @@ export default function IssuesPage() {
         <BottomTab />
       </div>
 
-      {/* Bottom Sheet: Create Issue */}
       {showCreate && (
         <CreateSheet
-          houseNames={houseNames}
+          houses={houses}
+          byDistrict={byDistrict}
           onClose={() => setShowCreate(false)}
           onCreated={() => { setShowCreate(false); fetchIssues() }}
         />
@@ -145,15 +176,24 @@ export default function IssuesPage() {
   )
 }
 
-function CreateSheet({ houseNames, onClose, onCreated }: {
-  houseNames: string[]; onClose: () => void; onCreated: () => void
+function CreateSheet({ houses, byDistrict, onClose, onCreated }: {
+  houses: HouseInfo[]; byDistrict: Record<string, string[]>;
+  onClose: () => void; onCreated: () => void;
 }) {
+  const [selectedDistrict, setSelectedDistrict] = useState('')
   const [houseName, setHouseName] = useState('')
-  const [roomCode, setRoomCode] = useState('')
   const [category, setCategory] = useState('')
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
+  const [assignee, setAssignee] = useState('')
+  const [workers, setWorkers] = useState<string[]>([])
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/workers/list').then(r => r.json())
+      .then(d => { if (Array.isArray(d)) setWorkers(d) })
+      .catch(() => {})
+  }, [])
 
   async function handleSubmit() {
     if (!houseName || !title.trim() || !category) return
@@ -161,7 +201,7 @@ function CreateSheet({ houseNames, onClose, onCreated }: {
     await fetch('/api/issues', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ houseName, roomCode, category, title: title.trim(), content }),
+      body: JSON.stringify({ houseName, category, title: title.trim(), content, assignee }),
     })
     onCreated()
   }
@@ -172,7 +212,6 @@ function CreateSheet({ houseNames, onClose, onCreated }: {
     <div className="fixed inset-0 z-50 flex items-end justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative w-full max-w-[430px] bg-[var(--bg)] rounded-t-2xl max-h-[85vh] overflow-y-auto pb-8">
-        {/* Handle */}
         <div className="flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 rounded-full bg-[var(--border)]" />
         </div>
@@ -183,22 +222,31 @@ function CreateSheet({ houseNames, onClose, onCreated }: {
         </div>
 
         <div className="px-5 flex flex-col gap-4">
-          {/* House Select */}
+          {/* District Select */}
           <div>
-            <label className="text-[13px] font-semibold mb-1.5 block">지점</label>
-            <select value={houseName} onChange={e => setHouseName(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-[var(--card)] border border-[var(--border)] text-[14px] outline-none">
-              <option value="">선택</option>
-              {houseNames.map(h => <option key={h} value={h}>{h}</option>)}
+            <label className="text-[13px] font-semibold mb-1.5 block">구 선택</label>
+            <select value={selectedDistrict} onChange={e => { setSelectedDistrict(e.target.value); setHouseName('') }}
+              className="w-full px-4 py-3 rounded-[10px] bg-[var(--card)] border border-[#F2F2F2] text-[14px] outline-none">
+              <option value="">구 선택</option>
+              {Object.keys(byDistrict).sort().map(d => (
+                <option key={d} value={d}>{d}</option>
+              ))}
             </select>
           </div>
 
-          {/* Room */}
-          <div>
-            <label className="text-[13px] font-semibold mb-1.5 block">호실 (선택)</label>
-            <input value={roomCode} onChange={e => setRoomCode(e.target.value)} placeholder="예: 101호, 공용"
-              className="w-full px-4 py-3 rounded-xl bg-[var(--card)] border border-[var(--border)] text-[14px] outline-none placeholder:text-[var(--sub)]" />
-          </div>
+          {/* House Select */}
+          {selectedDistrict && (
+            <div>
+              <label className="text-[13px] font-semibold mb-1.5 block">지점</label>
+              <select value={houseName} onChange={e => setHouseName(e.target.value)}
+                className="w-full px-4 py-3 rounded-[10px] bg-[var(--card)] border border-[#F2F2F2] text-[14px] outline-none">
+                <option value="">지점 선택</option>
+                {byDistrict[selectedDistrict]?.map(h => (
+                  <option key={h} value={h}>{h}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Category */}
           <div>
@@ -228,6 +276,19 @@ function CreateSheet({ houseNames, onClose, onCreated }: {
             <textarea value={content} onChange={e => setContent(e.target.value)} placeholder="상세 내용"
               rows={3}
               className="w-full px-4 py-3 rounded-xl bg-[var(--card)] border border-[var(--border)] text-[14px] outline-none resize-none placeholder:text-[var(--sub)]" />
+          </div>
+
+          {/* Assignee */}
+          <div>
+            <label className="text-[13px] font-semibold mb-1.5 block">담당자 (선택)</label>
+            <select value={assignee} onChange={e => setAssignee(e.target.value)}
+              className="w-full px-4 py-3 rounded-[10px] bg-[var(--card)] border border-[#F2F2F2] text-[14px] outline-none">
+              <option value="">담당자 선택</option>
+              <option value="미배정">미배정</option>
+              {workers.map(name => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
           </div>
 
           <button onClick={handleSubmit} disabled={!canSubmit || submitting}
