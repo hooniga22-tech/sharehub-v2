@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { Chip } from '@/components/ui/Chip'
 import { BottomTab } from '@/components/ui/BottomTab'
-import { ChevronLeft, ChevronRight, ChevronDown, Receipt, AlertTriangle, Wrench, TrendingUp, Wallet, Sparkles } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, Receipt, AlertTriangle, Wrench, TrendingUp, Wallet, Sparkles, ClipboardList } from 'lucide-react'
 import Link from 'next/link'
 
 interface HouseResult {
@@ -150,6 +150,18 @@ export default function FinancePage() {
           <div className="flex-1">
             <p className="text-[14px] font-semibold">투자자 관리</p>
             <p className="text-[11px] text-[var(--sub)]">투자자별 수익 현황 링크 관리</p>
+          </div>
+          <ChevronRight size={16} color="var(--sub)" />
+        </Link>
+
+        {/* Applications Link */}
+        <Link href="/applications" className="flex items-center gap-3 px-4 py-3 mt-2 rounded-xl bg-[var(--card)] border border-[var(--border)]">
+          <div className="w-9 h-9 rounded-xl bg-[#E8F8EE] flex items-center justify-center">
+            <ClipboardList size={18} color="#27500A" />
+          </div>
+          <div className="flex-1">
+            <p className="text-[14px] font-semibold">신청 관리</p>
+            <p className="text-[11px] text-[var(--sub)]">투어 신청 내역 확인 및 상태 관리</p>
           </div>
           <ChevronRight size={16} color="var(--sub)" />
         </Link>
