@@ -1,146 +1,264 @@
 'use client'
 
-import { useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useParams, useRouter } from 'next/navigation'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { Chip } from '@/components/ui/Chip'
-import { useSheets } from '@/hooks/useSheets'
-import { Edit2, UserMinus, FileText, Phone, Calendar, CreditCard, Save, X } from 'lucide-react'
-import { calcContractProgress, won } from '@/lib/contract'
+import { Phone, Calendar, CreditCard, FileText, Save } from 'lucide-react'
 
-// row: [0]ID [1]방ID [2]지점명 [3]방코드 [4]이름 [5]연락처 [6]월세 [7]관리비 [8]보증금 [9]입주일 [10]퇴실일 [11]상태 [12]국적 [13]메모 [14]토큰
+interface TenantData {
+  id: string; roomId: string; houseName: string; roomCode: string;
+  name: string; phone: string; rent: number; managementFee: number; deposit: number;
+  startDate: string; endDate: string; status: string;
+  nationality: string; memo: string; token: string;
+}
+
+function calcDday(endDate: string) {
+  if (!endDate) return { days: 0, label: '종료일 미정', urgent: false }
+  const diff = Math.ceil((new Date(endDate).getTime() - Date.now()) / 86400000)
+  if (diff < 0) return { days: diff, label: '계약 만료됨', urgent: false }
+  if (diff === 0) return { days: 0, label: 'D-Day', urgent: true }
+  return { days: diff, label: `D-${diff}`, urgent: diff <= 30 }
+}
+
+function fmt(n: number) { return n.toLocaleString('ko-KR') }
+
+const statusVariant: Record<string, 'green' | 'amber' | 'gray'> = {
+  '입주중': 'green', '퇴실예정': 'amber', '퇴실': 'gray',
+}
 
 export default function TenantDetailPage() {
   const params = useParams()
-  const { data: tenants, loading } = useSheets('입주자')
-  const [editingMemo, setEditingMemo] = useState(false)
-  const [memo, setMemo] = useState('')
+  const router = useRouter()
+  const [tenant, setTenant] = useState<TenantData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState(false)
+  const [form, setForm] = useState<Partial<TenantData>>({})
+  const [saving, setSaving] = useState(false)
 
-  const t = tenants.find(r => r[0] === params.id)
+  useEffect(() => {
+    fetch(`/api/tenants/${params.id}`)
+      .then(r => r.json())
+      .then(d => { if (d.error) setTenant(null); else setTenant(d) })
+      .catch(() => setTenant(null))
+      .finally(() => setLoading(false))
+  }, [params.id])
+
+  function startEdit() {
+    if (!tenant) return
+    setForm({ ...tenant })
+    setEditing(true)
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    await fetch(`/api/tenants/${params.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
+    })
+    // Refetch
+    const r = await fetch(`/api/tenants/${params.id}`)
+    const d = await r.json()
+    if (!d.error) setTenant(d)
+    setEditing(false)
+    setSaving(false)
+  }
 
   if (loading) return <div className="flex items-center justify-center min-h-screen text-[var(--sub)]">불러오는 중...</div>
-  if (!t) return <div className="flex items-center justify-center min-h-screen text-[var(--sub)]">입주자를 찾을 수 없습니다</div>
+  if (!tenant) return <div className="flex items-center justify-center min-h-screen text-[var(--sub)]">입주자를 찾을 수 없습니다</div>
 
-  const name = t[4], phone = t[5], house = t[2], room = t[3]
-  const rent = Number(t[6]) || 0, maintenance = Number(t[7]) || 0, deposit = Number(t[8]) || 0
-  const startDate = t[9], endDate = t[10], status = t[11] || '입주중'
-  const nationality = t[12], memoText = t[13]
-  const isActive = status === '입주중'
-  const progress = calcContractProgress(startDate, endDate)
-
-  if (!editingMemo && memo !== memoText) setMemo(memoText || '')
+  const dday = calcDday(tenant.endDate)
+  const monthlyTotal = tenant.rent + tenant.managementFee
 
   return (
     <div className="flex flex-col min-h-screen">
       <PageHeader
-        title="입주자 상세"
-        right={<button className="text-[13px] font-semibold text-[var(--blue)] flex items-center gap-1"><Edit2 size={14} /> 수정</button>}
+        title={editing ? '입주자 수정' : '입주자 상세'}
+        right={
+          !editing ? (
+            <button onClick={startEdit} className="text-[13px] font-semibold text-[var(--blue)]">수정</button>
+          ) : (
+            <button onClick={() => setEditing(false)} className="text-[13px] font-semibold text-[var(--sub)]">취소</button>
+          )
+        }
       />
 
-      <div className="flex-1 overflow-y-auto px-5 pb-8">
+      <div className="flex-1 overflow-y-auto px-5 pb-28">
         {/* Profile Header */}
         <div className="mt-4">
           <Card className="overflow-hidden">
-            <div className="h-1.5 bg-[var(--blue)]" />
+            <div className={`h-1.5 ${tenant.status === '입주중' ? 'bg-[var(--green)]' : tenant.status === '퇴실예정' ? 'bg-[var(--amber)]' : 'bg-[var(--sub)]'}`} />
             <div className="p-4">
               <div className="flex items-center gap-3">
                 <div className="w-14 h-14 rounded-full bg-[var(--blue)] flex items-center justify-center shrink-0">
-                  <span className="text-[18px] font-bold text-white">{name?.[0]}</span>
+                  <span className="text-[18px] font-bold text-white">{tenant.name?.[0]}</span>
                 </div>
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-[17px] font-bold">{name}</h3>
-                    <Chip label={status} variant={isActive ? 'green' : status === '퇴실예정' ? 'amber' : 'gray'} />
-                    {nationality && nationality !== '한국' && <Chip label={nationality} variant="blue" />}
-                  </div>
-                  <p className="text-[13px] text-[var(--sub)] mt-0.5">{house} · {room}</p>
-                  {phone && (
-                    <div className="flex items-center gap-1 mt-1">
-                      <Phone size={12} color="var(--sub)" />
-                      <span className="text-[12px] text-[var(--sub)]">{phone}</span>
+                  {editing ? (
+                    <input value={form.name || ''} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                      className="text-[17px] font-bold w-full outline-none border-b border-[var(--blue)] pb-0.5" />
+                  ) : (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-[17px] font-bold">{tenant.name}</h3>
+                      <Chip label={tenant.status} variant={statusVariant[tenant.status] || 'gray'} />
                     </div>
                   )}
+                  <p className="text-[13px] text-[var(--sub)] mt-0.5">{tenant.houseName} · {tenant.roomCode}</p>
                 </div>
               </div>
             </div>
           </Card>
         </div>
 
-        {/* Actions */}
-        {isActive && (
-          <div className="flex gap-2 mt-3">
-            <button className="flex-1 py-2.5 rounded-xl text-[12px] font-bold bg-[var(--blue-light)] text-[var(--blue)] flex items-center justify-center gap-1.5">
-              <FileText size={14} /> 계약서 출력
-            </button>
-            <button className="flex-1 py-2.5 rounded-xl text-[12px] font-bold bg-[var(--red-light)] text-[var(--red)] flex items-center justify-center gap-1.5">
-              <UserMinus size={14} /> 퇴실 처리
-            </button>
-          </div>
-        )}
-
-        {/* Contract Period */}
+        {/* 계약 정보 */}
         <Card className="mt-3 p-4">
           <div className="flex items-center gap-1.5 mb-3">
             <Calendar size={14} color="var(--blue)" />
-            <span className="text-[12px] font-bold text-[var(--sub)]">계약기간</span>
+            <span className="text-[12px] font-bold text-[var(--sub)]">계약 정보</span>
           </div>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[13px] font-semibold">{startDate || '-'}</span>
-            <span className="text-[13px] font-semibold">{endDate || '-'}</span>
-          </div>
-          <div className="w-full h-2 bg-[var(--border)] rounded-full overflow-hidden">
-            <div className="h-full rounded-full transition-all"
-              style={{ width: `${progress.percent}%`, backgroundColor: progress.daysLeft <= 60 ? 'var(--amber)' : 'var(--blue)' }} />
-          </div>
-          <div className="flex items-center justify-between mt-2">
-            <span className="text-[11px] text-[var(--sub)]">{progress.percent}% 경과</span>
-            <span className={`text-[11px] font-semibold ${progress.daysLeft <= 60 ? 'text-[var(--amber)]' : 'text-[var(--blue)]'}`}>
-              {progress.daysLeft > 0 ? `D-${progress.daysLeft}` : '만료'}
-            </span>
-          </div>
-        </Card>
-
-        {/* Amount Grid */}
-        <div className="grid grid-cols-3 gap-2 mt-3">
-          {[
-            { label: '보증금', value: won(deposit), color: 'text-[var(--text)]' },
-            { label: '월세', value: won(rent), color: 'text-[var(--blue)]' },
-            { label: '관리비', value: won(maintenance), color: 'text-[var(--text)]' },
-          ].map(item => (
-            <Card key={item.label} className="p-3 text-center">
-              <p className={`text-[14px] font-bold ${item.color}`}>{item.value}</p>
-              <p className="text-[10px] text-[var(--sub)] mt-1">{item.label}</p>
-            </Card>
-          ))}
-        </div>
-
-        {/* Memo */}
-        <Card className="mt-3 p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[12px] font-bold text-[var(--sub)] flex items-center gap-1">
-              <CreditCard size={12} /> 관리자 메모
-            </span>
-            {editingMemo ? (
-              <div className="flex gap-1.5">
-                <button onClick={() => { /* TODO: save via API */ setEditingMemo(false) }} className="w-7 h-7 flex items-center justify-center rounded-lg bg-[var(--green-light)]">
-                  <Save size={14} color="var(--green)" />
-                </button>
-                <button onClick={() => { setMemo(memoText || ''); setEditingMemo(false) }} className="w-7 h-7 flex items-center justify-center rounded-lg bg-[var(--border)]">
-                  <X size={14} color="var(--sub)" />
-                </button>
+          {editing ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-semibold text-[var(--sub)]">계약 시작일</label>
+                  <input type="date" value={form.startDate || ''} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))}
+                    className="w-full mt-1 px-3 py-2 rounded-lg bg-[var(--bg)] border border-[var(--border)] text-[13px] outline-none" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-[var(--sub)]">계약 종료일</label>
+                  <input type="date" value={form.endDate || ''} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))}
+                    className="w-full mt-1 px-3 py-2 rounded-lg bg-[var(--bg)] border border-[var(--border)] text-[13px] outline-none" />
+                </div>
               </div>
-            ) : (
-              <button onClick={() => setEditingMemo(true)} className="text-[12px] font-semibold text-[var(--blue)]">편집</button>
-            )}
-          </div>
-          {editingMemo ? (
-            <textarea value={memo} onChange={e => setMemo(e.target.value)}
-              className="w-full text-[13px] bg-transparent outline-none resize-none min-h-[60px]" autoFocus />
+              <div>
+                <label className="text-[10px] font-semibold text-[var(--sub)]">상태</label>
+                <select value={form.status || ''} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
+                  className="w-full mt-1 px-3 py-2 rounded-lg bg-[var(--bg)] border border-[var(--border)] text-[13px] outline-none">
+                  <option value="입주중">입주중</option>
+                  <option value="퇴실예정">퇴실예정</option>
+                  <option value="퇴실">퇴실</option>
+                </select>
+              </div>
+            </div>
           ) : (
-            <p className="text-[13px] min-h-[24px]">{memoText || <span className="text-[var(--sub)]">메모 없음</span>}</p>
+            <>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[13px]">{tenant.startDate || '-'} ~ {tenant.endDate || '-'}</span>
+                <span className={`text-[12px] font-bold ${dday.urgent ? 'text-[var(--red)]' : dday.days < 0 ? 'text-[var(--sub)]' : 'text-[var(--blue)]'}`}>
+                  {dday.label}
+                </span>
+              </div>
+              <p className="text-[11px] text-[var(--sub)]">방 구분: {tenant.roomCode}</p>
+            </>
           )}
         </Card>
+
+        {/* 납부 정보 */}
+        <Card className="mt-3 p-4">
+          <div className="flex items-center gap-1.5 mb-3">
+            <CreditCard size={14} color="var(--blue)" />
+            <span className="text-[12px] font-bold text-[var(--sub)]">납부 정보</span>
+          </div>
+          {editing ? (
+            <div className="space-y-3">
+              {[
+                { key: 'rent' as const, label: '월세' },
+                { key: 'managementFee' as const, label: '관리비' },
+                { key: 'deposit' as const, label: '보증금' },
+              ].map(f => (
+                <div key={f.key}>
+                  <label className="text-[10px] font-semibold text-[var(--sub)]">{f.label}</label>
+                  <input type="number" value={form[f.key] || ''} onChange={e => setForm(prev => ({ ...prev, [f.key]: Number(e.target.value) || 0 }))}
+                    className="w-full mt-1 px-3 py-2 rounded-lg bg-[var(--bg)] border border-[var(--border)] text-[13px] outline-none" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex justify-between text-[13px]">
+                <span className="text-[var(--sub)]">월세</span>
+                <span className="font-semibold">{fmt(tenant.rent)}원</span>
+              </div>
+              <div className="flex justify-between text-[13px]">
+                <span className="text-[var(--sub)]">관리비</span>
+                <span className="font-semibold">{fmt(tenant.managementFee)}원</span>
+              </div>
+              <div className="flex justify-between text-[13px]">
+                <span className="text-[var(--sub)]">보증금</span>
+                <span className="font-semibold">{fmt(tenant.deposit)}원</span>
+              </div>
+              <div className="border-t border-[var(--border)] pt-2 mt-2 flex justify-between">
+                <span className="text-[13px] font-semibold text-[var(--blue)]">월 납부액</span>
+                <span className="text-[15px] font-bold text-[var(--blue)]">{fmt(monthlyTotal)}원</span>
+              </div>
+            </div>
+          )}
+        </Card>
+
+        {/* 연락처 */}
+        <Card className="mt-3 p-4">
+          <div className="flex items-center gap-1.5 mb-3">
+            <Phone size={14} color="var(--blue)" />
+            <span className="text-[12px] font-bold text-[var(--sub)]">연락처</span>
+          </div>
+          {editing ? (
+            <div className="space-y-3">
+              <div>
+                <label className="text-[10px] font-semibold text-[var(--sub)]">전화번호</label>
+                <input value={form.phone || ''} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                  className="w-full mt-1 px-3 py-2 rounded-lg bg-[var(--bg)] border border-[var(--border)] text-[13px] outline-none" />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-[var(--sub)]">국적</label>
+                <input value={form.nationality || ''} onChange={e => setForm(f => ({ ...f, nationality: e.target.value }))}
+                  className="w-full mt-1 px-3 py-2 rounded-lg bg-[var(--bg)] border border-[var(--border)] text-[13px] outline-none" />
+              </div>
+            </div>
+          ) : (
+            <>
+              {tenant.phone ? (
+                <a href={`tel:${tenant.phone}`} className="text-[14px] text-[var(--blue)] font-medium">{tenant.phone}</a>
+              ) : (
+                <p className="text-[13px] text-[var(--sub)]">전화번호 없음</p>
+              )}
+              {tenant.nationality && <p className="text-[12px] text-[var(--sub)] mt-1">국적: {tenant.nationality}</p>}
+            </>
+          )}
+        </Card>
+
+        {/* 메모 */}
+        <Card className="mt-3 p-4">
+          <div className="flex items-center gap-1.5 mb-3">
+            <FileText size={14} color="var(--blue)" />
+            <span className="text-[12px] font-bold text-[var(--sub)]">메모</span>
+          </div>
+          {editing ? (
+            <textarea value={form.memo || ''} onChange={e => setForm(f => ({ ...f, memo: e.target.value }))}
+              placeholder="메모를 입력해주세요" rows={3}
+              className="w-full px-3 py-2 rounded-lg bg-[var(--bg)] border border-[var(--border)] text-[13px] outline-none resize-none placeholder:text-[var(--sub)]" />
+          ) : (
+            <p className="text-[13px] min-h-[24px]">
+              {tenant.memo || <span className="text-[var(--sub)]">메모 없음</span>}
+            </p>
+          )}
+        </Card>
+      </div>
+
+      {/* Bottom Fixed Button */}
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] p-4 bg-[var(--bg)]">
+        {editing ? (
+          <button onClick={handleSave} disabled={saving}
+            className="w-full py-3.5 rounded-xl text-[15px] font-semibold bg-[var(--blue)] text-white disabled:opacity-50 flex items-center justify-center gap-2">
+            <Save size={16} /> {saving ? '저장 중...' : '저장하기'}
+          </button>
+        ) : (
+          <button onClick={startEdit}
+            className="w-full py-3.5 rounded-xl text-[15px] font-semibold bg-[var(--blue)] text-white">
+            수정하기
+          </button>
+        )}
       </div>
     </div>
   )
