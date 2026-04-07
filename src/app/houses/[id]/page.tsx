@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { Chip } from '@/components/ui/Chip'
 import { useParams, useRouter } from 'next/navigation'
-import { Copy, MapPin, Check, Loader2 } from 'lucide-react'
+import { Copy, MapPin, Check, Loader2, ExternalLink, Share2 } from 'lucide-react'
 import Link from 'next/link'
 
 interface HouseDetail {
@@ -218,6 +218,29 @@ export default function HouseDetailPage() {
             placeholder="-"
             isLast
           />
+        </Card>
+
+        {/* Guide Link */}
+        <Card className="mt-3 px-4 py-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Share2 size={14} color="var(--blue)" />
+            <p className="text-[13px] font-bold text-[var(--sub)]">입주 안내 링크</p>
+          </div>
+          <p className="text-[12px] text-[var(--sub)] mb-3 break-all">
+            sharehub-v2.vercel.app/house/{encodeURIComponent(house.name)}
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => copyToClipboard(`https://sharehub-v2.vercel.app/house/${encodeURIComponent(house.name)}`, '링크')}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[12px] font-semibold bg-[var(--blue-light)] text-[var(--blue)]">
+              {copied === '링크' ? <Check size={12} /> : <Copy size={12} />}
+              {copied === '링크' ? '복사됨!' : '링크 복사'}
+            </button>
+            <a href={`/house/${encodeURIComponent(house.name)}`} target="_blank" rel="noopener noreferrer"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[12px] font-semibold bg-[var(--card)] border border-[var(--border)] text-[var(--sub)]">
+              <ExternalLink size={12} /> 미리보기
+            </a>
+          </div>
         </Card>
 
         {/* Section 3: This month stats */}
