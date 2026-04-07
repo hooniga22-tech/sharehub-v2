@@ -43,3 +43,15 @@ export async function updateRow(sheetName: string, rowIndex: number, row: (strin
     requestBody: { values: [row] },
   })
 }
+
+export async function getUtilityCosts(): Promise<string[][]> {
+  return getSheetData('공과금')
+}
+
+export async function addUtilityCost(row: (string | number)[]): Promise<void> {
+  return appendRow('공과금', row)
+}
+
+export async function updateUtilityCost(rowIndex: number, row: (string | number)[]): Promise<void> {
+  return updateRow('공과금', rowIndex, row)
+}

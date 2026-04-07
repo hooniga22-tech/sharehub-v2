@@ -5,7 +5,8 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { BottomTab } from '@/components/ui/BottomTab'
 import { useSheets } from '@/hooks/useSheets'
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown } from 'lucide-react'
+import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Receipt } from 'lucide-react'
+import Link from 'next/link'
 
 function fmt(n: number) { return n.toLocaleString('ko-KR') }
 
@@ -56,6 +57,18 @@ export default function FinancePage() {
       <PageHeader title="정산" />
 
       <div className="flex-1 overflow-y-auto px-5 pb-24">
+        {/* Utility Button */}
+        <Link href="/utility" className="flex items-center gap-3 px-4 py-3 mt-3 rounded-xl bg-[var(--card)] border border-[var(--border)]">
+          <div className="w-9 h-9 rounded-xl bg-[var(--amber-light)] flex items-center justify-center">
+            <Receipt size={18} color="var(--amber)" />
+          </div>
+          <div className="flex-1">
+            <p className="text-[14px] font-semibold">공과금 관리</p>
+            <p className="text-[11px] text-[var(--sub)]">지점별 월별 공과금 입력 및 조회</p>
+          </div>
+          <ChevronRight size={16} color="var(--sub)" />
+        </Link>
+
         {/* Month Selector */}
         <div className="flex items-center justify-center gap-5 py-5">
           <button onClick={() => setMonthOffset(monthOffset - 1)} className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--card)] border border-[var(--border)]">

@@ -34,3 +34,19 @@ export interface Investor {
   id: string; name: string; houseId: string; houseName: string;
   ratio: number; token: string; phone: string; memo: string;
 }
+export interface UtilityCost {
+  id: string;
+  houseId: string;
+  houseName: string;
+  year: number;
+  month: number;
+  electricity: number;
+  gas: number;
+  water: number;
+  internet: number;
+  waterPurifier: number;
+  cleaning: number;
+  others: number;
+  memo: string;
+  createdAt: string;
+}
