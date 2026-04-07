@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { Chip } from '@/components/ui/Chip'
-import { Phone, Calendar, CreditCard, FileText, Save } from 'lucide-react'
+import { Phone, Calendar, CreditCard, FileText, Save, Copy, Check, ExternalLink, Share2 } from 'lucide-react'
 
 interface TenantData {
   id: string; roomId: string; houseName: string; roomCode: string;
@@ -36,6 +36,7 @@ export default function TenantDetailPage() {
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState<Partial<TenantData>>({})
   const [saving, setSaving] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
 
   useEffect(() => {
     fetch(`/api/tenants/${params.id}`)
@@ -244,6 +245,35 @@ export default function TenantDetailPage() {
             </p>
           )}
         </Card>
+
+        {/* 입주자 개인 링크 */}
+        {tenant.token && (
+          <Card className="mt-3 p-4">
+            <div className="flex items-center gap-1.5 mb-2">
+              <Share2 size={14} color="var(--blue)" />
+              <span className="text-[12px] font-bold text-[var(--sub)]">입주자 개인 링크</span>
+            </div>
+            <p className="text-[11px] text-[var(--sub)] mb-3 break-all">
+              sharehub-v2.vercel.app/tenant/{tenant.token}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`https://sharehub-v2.vercel.app/tenant/${tenant.token}`)
+                  setLinkCopied(true)
+                  setTimeout(() => setLinkCopied(false), 1500)
+                }}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[12px] font-semibold bg-[var(--blue-light)] text-[var(--blue)]">
+                {linkCopied ? <Check size={12} /> : <Copy size={12} />}
+                {linkCopied ? '복사됨!' : '링크 복사'}
+              </button>
+              <a href={`/tenant/${tenant.token}`} target="_blank" rel="noopener noreferrer"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[12px] font-semibold bg-[var(--card)] border border-[var(--border)] text-[var(--sub)]">
+                <ExternalLink size={12} /> 링크 열기
+              </a>
+            </div>
+          </Card>
+        )}
       </div>
 
       {/* Bottom Fixed Button */}
