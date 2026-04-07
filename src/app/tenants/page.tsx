@@ -29,7 +29,7 @@ export default function TenantsPage() {
     let list = filter === '전체' ? tenants : tenants.filter(r => r[2] === filter)
     if (search) {
       const q = search.toLowerCase()
-      list = list.filter(r => r[4]?.toLowerCase().includes(q) || r[5]?.includes(q) || r[3]?.includes(q))
+      list = list.filter(r => r[4]?.toLowerCase().includes(q) || r[5]?.includes(q) || r[3]?.includes(q) || r[2]?.toLowerCase().includes(q))
     }
     return list
   }, [tenants, filter, search])
@@ -75,7 +75,7 @@ export default function TenantsPage() {
       <div className="px-5 pt-3">
         <div className="relative">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--sub)]" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="이름, 연락처, 호실 검색"
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="이름, 연락처, 호실, 지점명 검색"
             className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-[var(--card)] border border-[var(--border)] text-[13px] outline-none placeholder:text-[var(--sub)]" />
         </div>
       </div>
