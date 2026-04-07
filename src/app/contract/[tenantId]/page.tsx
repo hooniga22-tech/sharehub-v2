@@ -111,7 +111,13 @@ export default function ContractPage() {
   return (
     <>
       <style jsx global>{`
-        @media print { .no-print { display: none !important; } @page { size: A4; margin: 15mm 18mm; } body { margin: 0; } }
+        @media print {
+          html, body { width: 210mm !important; height: 297mm !important; margin: 0 !important; padding: 0 !important; }
+          body > div, #__next, main { max-width: 100% !important; width: 100% !important; padding: 0 !important; margin: 0 !important; }
+          .ct { max-width: 100% !important; width: 100% !important; padding: 0 !important; margin: 0 !important; font-size: 9.5pt !important; }
+          .no-print { display: none !important; }
+          @page { size: A4; margin: 15mm 18mm; }
+        }
         .ct { font-family: 'Malgun Gothic', '맑은 고딕', 'Noto Sans KR', sans-serif; font-size: 10pt; line-height: 1.75; color: #111; max-width: 750px; margin: 0 auto; padding: 24px; background: #fff; }
         .ct h1 { font-size: 16pt; text-align: center; font-weight: 700; margin: 0 0 4px; }
         .ct .sub { font-size: 10pt; text-align: center; color: #666; margin-bottom: 18px; }
