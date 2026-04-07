@@ -52,7 +52,8 @@ export default function WorkersPage() {
     fetch('/api/sheets?sheet=용역담당자')
       .then(r => r.json())
       .then(d => {
-        if (Array.isArray(d)) setPortalWorkers(d.map((r: string[]) => ({ name: r[1]?.trim() || '', token: r[6] || '' })).filter((w: { token: string }) => w.token))
+        const rows = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : [])
+        setPortalWorkers(rows.map((r: string[]) => ({ name: r[1]?.trim() || '', token: r[6] || '' })).filter((w: { token: string }) => w.token))
       })
       .catch(() => {})
     fetch('/api/sheets?sheet=지점')
