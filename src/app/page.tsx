@@ -39,7 +39,7 @@ export default function DashboardPage() {
         {/* Header */}
         <div className="px-5 pt-14 pb-2">
           <p className="text-[13px] text-[var(--sub)]">{getToday()}</p>
-          <h1 className="text-[22px] font-bold mt-1">안녕하세요</h1>
+          <h1 className="text-[22px] font-bold mt-1">쉐어하우스 관리</h1>
         </div>
 
         {/* Main Revenue Card */}
