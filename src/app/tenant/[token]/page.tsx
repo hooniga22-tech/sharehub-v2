@@ -178,12 +178,19 @@ export default function TenantPortalPage() {
   }
 
   async function submitSupply() {
-    if (selectedSupplies.length === 0) return
+    if (selectedSupplies.length === 0 || !data) return
     setSupplySending(true)
-    await fetch('/api/tenant-portal/supplies', {
+    await fetch('/api/apply/supplies', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, items: selectedSupplies.join(', '), memo: supplyMemo }),
+      body: JSON.stringify({
+        tenantId: data.tenant.id,
+        tenantName: data.tenant.name,
+        houseName: data.tenant.houseName,
+        roomCode: data.tenant.roomCode,
+        items: selectedSupplies,
+        detail: supplyMemo,
+      }),
     })
     setSupplySending(false)
     setSupplySuccess(true)

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Chip } from '@/components/ui/Chip'
 import { BottomTab } from '@/components/ui/BottomTab'
-import { Users, Home, Clock, AlertCircle, ChevronRight, RefreshCw, Wrench } from 'lucide-react'
+import { Users, Home, Clock, AlertCircle, ChevronRight, RefreshCw, Wrench, ClipboardList } from 'lucide-react'
 import Link from 'next/link'
 
 interface DashboardData {
@@ -31,6 +31,18 @@ const categoryVariant: Record<string, 'blue' | 'green' | 'amber' | 'gray'> = {
   '수리': 'blue', '청소': 'green', '민원': 'amber', '교체': 'blue', '기타': 'gray',
 }
 
+function timeAgo(dateStr: string) {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const min = Math.floor(diff / 60000)
+  if (min < 1) return '방금'
+  if (min < 60) return `${min}분 전`
+  const hr = Math.floor(min / 60)
+  if (hr < 24) return `${hr}시간 전`
+  const day = Math.floor(hr / 24)
+  if (day === 1) return '어제'
+  return `${day}일 전`
+}
+
 function getToday() {
   const d = new Date()
   const month = d.getMonth() + 1
@@ -43,6 +55,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [pendingApps, setPendingApps] = useState<{ type: string; name: string; houseName: string; summary: string; createdAt: string }[]>([])
 
   function fetchData() {
     setLoading(prev => !data ? true : prev)
@@ -52,6 +65,30 @@ export default function DashboardPage() {
       .then(d => { if (!d.error) setData(d) })
       .catch(() => {})
       .finally(() => { setLoading(false); setRefreshing(false) })
+
+    // Fetch pending applications
+    Promise.all([
+      fetch('/api/apply/tour').then(r => r.json()).catch(() => []),
+      fetch('/api/apply/cleaning').then(r => r.json()).catch(() => []),
+      fetch('/api/apply/aircon').then(r => r.json()).catch(() => []),
+      fetch('/api/apply/checkout').then(r => r.json()).catch(() => []),
+      fetch('/api/apply/supplies').then(r => r.json()).catch(() => []),
+    ]).then(([tours, cleanings, aircons, checkouts, supplies]) => {
+      const pending: typeof pendingApps = []
+      const isPending = (s: string) => s === '신청접수' || s === '처리중'
+      if (Array.isArray(tours)) tours.filter((a: { status: string }) => isPending(a.status)).forEach((a: { name: string; region: string; tourDate: string; createdAt: string }) =>
+        pending.push({ type: '투어', name: a.name, houseName: a.region, summary: a.tourDate, createdAt: a.createdAt }))
+      if (Array.isArray(cleanings)) cleanings.filter((a: { status: string }) => isPending(a.status)).forEach((a: { name: string; houseName: string; cleanDate: string; createdAt: string }) =>
+        pending.push({ type: '청소', name: a.name, houseName: a.houseName, summary: a.cleanDate, createdAt: a.createdAt }))
+      if (Array.isArray(aircons)) aircons.filter((a: { status: string }) => isPending(a.status)).forEach((a: { name: string; houseName: string; roomType: string; createdAt: string }) =>
+        pending.push({ type: '에어컨', name: a.name, houseName: a.houseName, summary: a.roomType, createdAt: a.createdAt }))
+      if (Array.isArray(checkouts)) checkouts.filter((a: { status: string }) => isPending(a.status)).forEach((a: { name: string; houseName: string; checkoutDate: string; createdAt: string }) =>
+        pending.push({ type: '퇴실', name: a.name, houseName: a.houseName, summary: a.checkoutDate, createdAt: a.createdAt }))
+      if (Array.isArray(supplies)) supplies.filter((a: { status: string }) => isPending(a.status)).forEach((a: { tenantName: string; houseName: string; items: string; createdAt: string }) =>
+        pending.push({ type: '물품', name: a.tenantName, houseName: a.houseName, summary: a.items, createdAt: a.createdAt }))
+      pending.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+      setPendingApps(pending)
+    })
   }
 
   useEffect(() => { fetchData() }, [])
@@ -142,6 +179,44 @@ export default function DashboardPage() {
                 </Card>
               </Link>
             </div>
+
+            {/* ②-b Pending Applications */}
+            {pendingApps.length > 0 && (
+              <div className="rounded-xl border border-[#F2F2F2] overflow-hidden">
+                <div className="bg-[#FEF0F0] px-4 py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ClipboardList size={14} color="#F04452" />
+                    <span className="text-[14px] font-bold text-[#F04452]">미처리 신청 {pendingApps.length}건</span>
+                  </div>
+                  <Link href="/applications" className="text-[12px] text-[#F04452] flex items-center gap-0.5">
+                    전체보기 <ChevronRight size={12} />
+                  </Link>
+                </div>
+                <div className="bg-white px-4 py-2">
+                  {pendingApps.slice(0, 5).map((a, i) => {
+                    const typeColors: Record<string, { bg: string; text: string }> = {
+                      '투어': { bg: '#FFF3E4', text: '#633806' },
+                      '청소': { bg: '#E8F8EE', text: '#27500A' },
+                      '에어컨': { bg: '#F1EFE8', text: '#5F5E5A' },
+                      '퇴실': { bg: '#FEF0F0', text: '#791F1F' },
+                      '물품': { bg: '#EBF3FE', text: '#185FA5' },
+                    }
+                    const tc = typeColors[a.type] || typeColors['물품']
+                    return (
+                      <div key={i} className="flex items-center gap-3 py-2.5 border-b border-[#F9F9F9] last:border-0">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0"
+                          style={{ backgroundColor: tc.bg, color: tc.text }}>{a.type}</span>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-[13px] font-semibold">{a.name}</span>
+                          <p className="text-[11px] text-[var(--sub)] truncate">{a.houseName} {a.summary}</p>
+                        </div>
+                        <span className="text-[10px] text-[var(--sub)] shrink-0">{timeAgo(a.createdAt)}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* ③ Expiring Tenants */}
             <div>

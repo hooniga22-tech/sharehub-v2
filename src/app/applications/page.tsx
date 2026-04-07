@@ -12,7 +12,7 @@ interface AppItem {
 }
 
 const statusVariant: Record<string, 'blue' | 'green' | 'gray' | 'red' | 'amber'> = {
-  '신청접수': 'blue', '입금완료': 'green', '투어완료': 'gray', '처리중': 'amber', '완료': 'green', '취소': 'red',
+  '신청접수': 'blue', '입금완료': 'green', '투어완료': 'gray', '처리중': 'amber', '완료': 'green', '처리완료': 'green', '취소': 'red',
 }
 
 const TABS = [
@@ -20,6 +20,7 @@ const TABS = [
   { key: 'cleaning', label: '방청소', api: '/api/apply/cleaning', link: '/apply/cleaning' },
   { key: 'aircon', label: '에어컨', api: '/api/apply/aircon', link: '/apply/aircon' },
   { key: 'checkout', label: '퇴실', api: '/api/apply/checkout', link: '/apply/checkout' },
+  { key: 'supplies', label: '물품', api: '/api/apply/supplies', link: '' },
 ]
 
 export default function ApplicationsPage() {
@@ -71,6 +72,11 @@ export default function ApplicationsPage() {
       if (item.refundAccount) fields.push({ label: '환불계좌', value: String(item.refundAccount) })
       if (item.reason) fields.push({ label: '사유', value: String(item.reason) })
       if (item.memo) fields.push({ label: '메모', value: String(item.memo) })
+    } else if (activeTab === 'supplies') {
+      if (item.houseName) fields.push({ label: '지점', value: String(item.houseName) })
+      if (item.roomCode) fields.push({ label: '방코드', value: String(item.roomCode) })
+      if (item.items) fields.push({ label: '요청물품', value: String(item.items) })
+      if (item.detail) fields.push({ label: '상세', value: String(item.detail) })
     }
     fields.push({ label: '신청일', value: String(item.createdAt) })
     return fields
@@ -81,6 +87,7 @@ export default function ApplicationsPage() {
     if (activeTab === 'cleaning') return `${item.houseName || ''} · ${item.roomType || ''} · ${item.cleanDate || ''}`
     if (activeTab === 'aircon') return `${item.houseName || ''} · ${item.roomCode || ''} · ${item.roomType || ''}`
     if (activeTab === 'checkout') return `${item.houseName || ''} · ${item.roomCode || ''} · ${item.checkoutDate || ''}`
+    if (activeTab === 'supplies') return `${item.houseName || ''} · ${item.roomCode || ''} · ${item.items || ''}`
     return ''
   }
 
@@ -142,11 +149,11 @@ export default function ApplicationsPage() {
                   <button onClick={() => setExpandedId(isExpanded ? null : a.id)} className="w-full text-left">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-[var(--blue-light)] flex items-center justify-center shrink-0">
-                        <span className="text-[14px] font-bold text-[var(--blue)]">{a.name?.[0]}</span>
+                        <span className="text-[14px] font-bold text-[var(--blue)]">{(a.name || String(a.tenantName || ''))?.[0]}</span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-[14px] font-semibold">{a.name}</span>
+                          <span className="text-[14px] font-semibold">{a.name || String(a.tenantName || '')}</span>
                           <Chip label={a.status} variant={statusVariant[a.status] || 'gray'} />
                         </div>
                         <p className="text-[11px] text-[var(--sub)] mt-0.5 truncate">{getSummary(a)}</p>
