@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { Chip } from '@/components/ui/Chip'
 import { BottomTab } from '@/components/ui/BottomTab'
-import { ChevronLeft, ChevronRight, ChevronDown, Receipt, AlertTriangle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, Receipt, AlertTriangle, Wrench } from 'lucide-react'
 import Link from 'next/link'
 
 interface HouseResult {
@@ -33,6 +33,7 @@ export default function FinancePage() {
   const [monthOffset, setMonthOffset] = useState(0)
   const [tab, setTab] = useState<'house' | 'district'>('house')
   const [openDistrict, setOpenDistrict] = useState<string | null>(null)
+  const [pendingWorkers, setPendingWorkers] = useState(0)
 
   const now = new Date()
   now.setMonth(now.getMonth() + monthOffset)
@@ -47,6 +48,24 @@ export default function FinancePage() {
       .catch(() => setData(null))
       .finally(() => setLoading(false))
   }, [year, month])
+
+  useEffect(() => {
+    fetch('/api/workers')
+      .then(r => r.json())
+      .then(d => {
+        if (!Array.isArray(d)) return
+        const now = new Date()
+        const y = now.getFullYear(), m = now.getMonth() + 1
+        const pending = d.filter((w: { scheduledDate: string; isDone: string }) => {
+          if (w.isDone === 'Y') return false
+          if (!w.scheduledDate) return true
+          const [wy, wm] = w.scheduledDate.split('-').map(Number)
+          return wy === y && wm === m
+        }).length
+        setPendingWorkers(pending)
+      })
+      .catch(() => {})
+  }, [])
 
   const missingUtility = data?.results.filter(r => !r.hasUtility && r.tenantCount > 0) || []
 
@@ -78,6 +97,25 @@ export default function FinancePage() {
             <p className="text-[11px] text-[var(--sub)]">지점별 월별 공과금 입력 및 조회</p>
           </div>
           <ChevronRight size={16} color="var(--sub)" />
+        </Link>
+
+        {/* Worker Link */}
+        <Link href="/workers" className="flex items-center gap-3 px-4 py-3 mt-2 rounded-xl bg-[var(--card)] border border-[var(--border)]">
+          <div className="w-9 h-9 rounded-xl bg-[var(--blue-light)] flex items-center justify-center">
+            <Wrench size={18} color="var(--blue)" />
+          </div>
+          <div className="flex-1">
+            <p className="text-[14px] font-semibold">용역 관리</p>
+            <p className="text-[11px] text-[var(--sub)]">청소/수리 일정 등록 및 정산</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {pendingWorkers > 0 && (
+              <span className="px-2 py-0.5 rounded-full bg-[var(--amber-light)] text-[var(--amber)] text-[11px] font-bold">
+                {pendingWorkers}건
+              </span>
+            )}
+            <ChevronRight size={16} color="var(--sub)" />
+          </div>
         </Link>
 
         {/* Month Selector */}
