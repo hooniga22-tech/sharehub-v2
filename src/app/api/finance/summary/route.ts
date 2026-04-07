@@ -7,10 +7,11 @@ export async function GET(req: Request) {
     const year = Number(searchParams.get('year')) || new Date().getFullYear()
     const month = Number(searchParams.get('month')) || new Date().getMonth() + 1
 
-    const [tenantRows, utilityRows, houseRows] = await Promise.all([
+    const [tenantRows, utilityRows, houseRows, opexRows] = await Promise.all([
       getSheetData('입주자'),
       getSheetData('공과금'),
       getSheetData('지점'),
+      getSheetData('운영지출'),
     ])
 
     const houseMap: Record<string, { id: string; district: string; buildingRent: number; isConsignment: boolean }> = {}
@@ -47,19 +48,30 @@ export async function GET(req: Request) {
       expenseMap[houseName] = (expenseMap[houseName] || 0) + total
     }
 
+    // 기타지출(운영지출) 집계
+    const opexMap: Record<string, number> = {}
+    for (const row of opexRows) {
+      if (Number(row[7]) !== year || Number(row[8]) !== month) continue
+      if (row[9] === '삭제됨' || Number(row[4]) === 0) continue
+      const hn = row[1]?.trim()
+      if (!hn) continue
+      opexMap[hn] = (opexMap[hn] || 0) + (Number(row[4]) || 0)
+    }
+
     const results = Object.keys(houseMap).map(houseName => {
       const house = houseMap[houseName]
       const income = incomeMap[houseName] || { rent: 0, mgmt: 0, count: 0 }
       const utilityExpense = expenseMap[houseName] || 0
+      const opexExpense = opexMap[houseName] || 0
       const buildingRent = house.buildingRent
       const totalIncome = income.rent + income.mgmt
-      const totalExpense = buildingRent + utilityExpense
+      const totalExpense = buildingRent + utilityExpense + opexExpense
       const profit = totalIncome - totalExpense
       return {
         houseId: house.id, houseName, district: house.district,
         isConsignment: house.isConsignment, tenantCount: income.count,
         rent: income.rent, managementFee: income.mgmt, totalIncome,
-        buildingRent, utilityExpense, totalExpense, profit,
+        buildingRent, utilityExpense, opexExpense, totalExpense, profit,
         hasUtility: !!expenseMap[houseName],
       }
     })
@@ -73,9 +85,10 @@ export async function GET(req: Request) {
       totalMgmt: acc.totalMgmt + r.managementFee,
       buildingRent: acc.buildingRent + r.buildingRent,
       utilityExpense: acc.utilityExpense + r.utilityExpense,
+      opexExpense: acc.opexExpense + r.opexExpense,
       totalExpense: acc.totalExpense + r.totalExpense,
       profit: acc.profit + r.profit,
-    }), { tenantCount: 0, totalIncome: 0, totalRent: 0, totalMgmt: 0, buildingRent: 0, utilityExpense: 0, totalExpense: 0, profit: 0 })
+    }), { tenantCount: 0, totalIncome: 0, totalRent: 0, totalMgmt: 0, buildingRent: 0, utilityExpense: 0, opexExpense: 0, totalExpense: 0, profit: 0 })
 
     return NextResponse.json({ year, month, results, totals })
   } catch (e) {
