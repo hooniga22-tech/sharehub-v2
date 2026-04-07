@@ -45,10 +45,15 @@ export default function WorkerPortalPage() {
   const todayStr = today.toISOString().split('T')[0]
   const threeDaysLater = new Date(today.getTime() + 3 * 86400000).toISOString().split('T')[0]
 
-  const overdue = useMemo(() => schedules.filter(s => !s.isDone && s.date < todayStr), [schedules, todayStr])
-  const current = useMemo(() => schedules.filter(s => !s.isDone && s.date >= todayStr && s.date <= threeDaysLater), [schedules, todayStr, threeDaysLater])
-  const future = useMemo(() => schedules.filter(s => !s.isDone && s.date > threeDaysLater).sort((a, b) => a.date.localeCompare(b.date)), [schedules, threeDaysLater])
-  const done = useMemo(() => schedules.filter(s => s.isDone).sort((a, b) => b.date.localeCompare(a.date)), [schedules])
+  const monthSchedules = useMemo(() => {
+    const prefix = `${calMonth.year}-${String(calMonth.month + 1).padStart(2, '0')}`
+    return schedules.filter(s => s.date?.startsWith(prefix))
+  }, [schedules, calMonth])
+
+  const overdue = useMemo(() => monthSchedules.filter(s => !s.isDone && s.date < todayStr), [monthSchedules, todayStr])
+  const current = useMemo(() => monthSchedules.filter(s => !s.isDone && s.date >= todayStr && s.date <= threeDaysLater), [monthSchedules, todayStr, threeDaysLater])
+  const future = useMemo(() => monthSchedules.filter(s => !s.isDone && s.date > threeDaysLater).sort((a, b) => a.date.localeCompare(b.date)), [monthSchedules, threeDaysLater])
+  const done = useMemo(() => monthSchedules.filter(s => s.isDone).sort((a, b) => b.date.localeCompare(a.date)), [monthSchedules])
 
   const pending = [...overdue, ...current].sort((a, b) => a.date.localeCompare(b.date))
 
