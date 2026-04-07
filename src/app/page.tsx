@@ -309,7 +309,15 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* ⑥ Worker Summary */}
+            {/* ⑥ Schedule Calendar */}
+            <div className="rounded-2xl bg-[var(--card)] border border-[var(--border)] overflow-hidden">
+              <div className="px-4 pt-4 pb-1 flex items-center justify-between">
+                <p className="text-[15px] font-bold">이번달 스케줄</p>
+              </div>
+              <ScheduleCalendar />
+            </div>
+
+            {/* ⑦ Worker Summary */}
             <Link href="/workers">
               <Card className="p-4">
                 <div className="flex items-center gap-2 mb-3">
@@ -344,10 +352,6 @@ export default function DashboardPage() {
             </Link>
           </div>
         )}
-      </div>
-
-      <div className="max-w-[430px] mx-auto">
-        <ScheduleCalendar />
       </div>
 
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px]">

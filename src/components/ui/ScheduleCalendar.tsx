@@ -84,10 +84,10 @@ export default function ScheduleCalendar() {
   const selEvents = selDate ? (byDate[selDate] || []) : []
 
   return (
-    <div className="mt-6 mb-4">
-      <div className="rounded-2xl bg-[var(--card)] border border-[var(--border)] overflow-hidden">
+    <div className="px-4 pb-4">
+      <div>
         {/* Header */}
-        <div className="flex items-center justify-between px-4 pt-4 pb-2">
+        <div className="flex items-center justify-between pt-2 pb-2">
           <button onClick={() => setCur(p => ({ ...p, month: p.month - 1 < 0 ? 11 : p.month - 1, year: p.month - 1 < 0 ? p.year - 1 : p.year }))}>
             <ChevronLeft size={18} className="text-[var(--sub)]" />
           </button>
