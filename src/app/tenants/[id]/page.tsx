@@ -377,7 +377,7 @@ export default function TenantDetailPage() {
         )}
       </div>
 
-      {/* Bottom Fixed Button */}
+      {/* Bottom Fixed Buttons */}
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] p-4 bg-[var(--bg)]">
         {editing ? (
           <button onClick={handleSave} disabled={saving}
@@ -385,10 +385,16 @@ export default function TenantDetailPage() {
             <Save size={16} /> {saving ? '저장 중...' : '저장하기'}
           </button>
         ) : (
-          <button onClick={startEdit}
-            className="w-full py-3.5 rounded-xl text-[15px] font-semibold bg-[var(--blue)] text-white">
-            수정하기
-          </button>
+          <div className="flex gap-2">
+            <button onClick={startEdit}
+              className="flex-1 py-3.5 rounded-xl text-[15px] font-semibold bg-[var(--blue)] text-white">
+              수정하기
+            </button>
+            <a href={`/contract/${tenant.id}`} target="_blank" rel="noopener noreferrer"
+              className="flex-1 py-3.5 rounded-xl text-[15px] font-semibold bg-[var(--card)] border border-[var(--border)] text-[var(--foreground)] text-center flex items-center justify-center gap-1.5">
+              <FileText size={16} /> 계약서
+            </a>
+          </div>
         )}
       </div>
     </div>
