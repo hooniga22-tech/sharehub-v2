@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import ScheduleCalendar from '@/components/ui/ScheduleCalendar'
 import { Card } from '@/components/ui/Card'
 import { Chip } from '@/components/ui/Chip'
 import { BottomTab } from '@/components/ui/BottomTab'
@@ -343,6 +344,10 @@ export default function DashboardPage() {
             </Link>
           </div>
         )}
+      </div>
+
+      <div className="max-w-[430px] mx-auto">
+        <ScheduleCalendar />
       </div>
 
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px]">
