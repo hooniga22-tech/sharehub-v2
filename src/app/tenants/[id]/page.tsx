@@ -213,13 +213,13 @@ export default function TenantDetailPage() {
           )}
         </Card>
 
-        {/* 납부 정보 */}
-        <Card className="mt-3 p-4">
-          <div className="flex items-center gap-1.5 mb-3">
-            <CreditCard size={14} color="var(--blue)" />
-            <span className="text-[12px] font-bold text-[var(--sub)]">납부 정보</span>
-          </div>
-          {editing ? (
+        {/* 납부 정보 (편집 모드) */}
+        {editing && (
+          <Card className="mt-3 p-4">
+            <div className="flex items-center gap-1.5 mb-3">
+              <CreditCard size={14} color="var(--blue)" />
+              <span className="text-[12px] font-bold text-[var(--sub)]">납부 정보</span>
+            </div>
             <div className="space-y-3">
               {[
                 { key: 'rent' as const, label: '월세' },
@@ -233,37 +233,11 @@ export default function TenantDetailPage() {
                 </div>
               ))}
             </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="flex justify-between text-[13px]">
-                <span className="text-[var(--sub)]">월세</span>
-                <span className="font-semibold">{fmt(tenant.rent)}원</span>
-              </div>
-              <div className="flex justify-between text-[13px]">
-                <span className="text-[var(--sub)]">관리비</span>
-                <span className="font-semibold">{fmt(tenant.managementFee)}원</span>
-              </div>
-              <div className="flex justify-between text-[13px]">
-                <span className="text-[var(--sub)]">보증금</span>
-                <span className="font-semibold">{fmt(tenant.deposit)}원</span>
-              </div>
-              <div className="border-t border-[var(--border)] pt-2 mt-2 flex justify-between">
-                <span className="text-[13px] font-semibold text-[var(--blue)]">월 납부액</span>
-                <span className="text-[15px] font-bold text-[var(--blue)]">{fmt(monthlyTotal)}원</span>
-              </div>
-            </div>
-          )}
-        </Card>
+          </Card>
+        )}
 
         {/* 납부 타임라인 */}
-        <TimelineSection
-          payments={payments}
-          paymentsLoading={paymentsLoading}
-          showCompleted={showCompleted}
-          setShowCompleted={setShowCompleted}
-          onToggle={togglePayment}
-          onReset={resetAllTimelines}
-        />
+        {!editing && <PaymentTimeline tenant={tenant} />}
 
         {/* 연락처 */}
         <Card className="mt-5 p-4">
@@ -367,7 +341,211 @@ export default function TenantDetailPage() {
   )
 }
 
-/* ── Generate Local Timeline ── */
+/* ── Payment Timeline (Vertical) ── */
+function PaymentTimeline({ tenant }: { tenant: TenantData }) {
+  const [rentPaid, setRentPaid] = useState<Record<string, boolean>>({})
+  const [mgmtPaid, setMgmtPaid] = useState<Record<string, boolean>>({})
+  const [showHistory, setShowHistory] = useState(false)
+
+  if (!tenant.startDate || !tenant.endDate) return null
+
+  const startDate = new Date(tenant.startDate)
+  const endDate = new Date(tenant.endDate)
+  const daysInStartMonth = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0).getDate()
+  const remainDaysStart = daysInStartMonth - startDate.getDate() + 1
+  const proratedRent = Math.round((tenant.rent || 0) * remainDaysStart / daysInStartMonth)
+  const proratedMgmt = Math.round((tenant.managementFee || 0) * remainDaysStart / daysInStartMonth)
+  const balanceDeposit = (tenant.deposit || 2000000) - 500000
+  const firstTotal = balanceDeposit + proratedRent
+
+  const today = new Date()
+  const nextMonthDate = new Date(today.getFullYear(), today.getMonth() + 1, 1)
+  const dDay = Math.ceil((nextMonthDate.getTime() - today.getTime()) / 86400000)
+  const nextMonthNum = nextMonthDate.getMonth() + 1
+
+  const daysInEndMonth = new Date(endDate.getFullYear(), endDate.getMonth() + 1, 0).getDate()
+  const remainDaysEnd = endDate.getDate()
+  const lastRent = Math.round((tenant.rent || 0) * remainDaysEnd / daysInEndMonth)
+  const lastMgmt = Math.round((tenant.managementFee || 0) * remainDaysEnd / daysInEndMonth)
+
+  const startLabel = `${startDate.getMonth() + 1}/${startDate.getDate()}~${startDate.getMonth() + 1}/${daysInStartMonth}`
+  const endLabel = `${endDate.getMonth() + 1}/1~${endDate.getMonth() + 1}/${endDate.getDate()}`
+  const fmtD = (d: Date) => `${d.getFullYear()}. ${String(d.getMonth() + 1).padStart(2, '0')}. ${String(d.getDate()).padStart(2, '0')}`
+  const w = (n: number) => n.toLocaleString('ko-KR') + '원'
+  const monthly = (tenant.rent || 0) + (tenant.managementFee || 0)
+
+  // Past months
+  const pastMonths: { label: string; ym: string }[] = []
+  const cur = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 1)
+  const thisYM = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
+  while (`${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}` < thisYM) {
+    pastMonths.push({ label: `${cur.getMonth() + 1}월`, ym: `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}` })
+    cur.setMonth(cur.getMonth() + 1)
+  }
+
+  const GBadge = () => <span className="text-[10px] font-medium px-2 py-0.5 rounded-[5px]" style={{ background: '#EAF3DE', color: '#27500A' }}>완료</span>
+  const BBadge = () => <span className="text-[10px] font-medium px-2 py-0.5 rounded-[5px]" style={{ background: '#EBF3FE', color: '#0C447C' }}>납부예정</span>
+  const Div = () => <div className="h-[1px] bg-[var(--bg)]" />
+  const Dot = ({ color }: { color: string }) => (
+    <div className="absolute left-0 top-[14px] w-[15px] h-[15px] rounded-full border-2 border-white" style={{ background: color }} />
+  )
+
+  return (
+    <div className="mt-5">
+      <p className="text-[15px] font-bold mb-4">납부 내역</p>
+      <div className="relative">
+        <div className="absolute left-[7px] top-3 bottom-3 w-[1.5px] bg-[var(--border)]" />
+
+        {/* 1. 계약금 */}
+        <div className="relative pl-7 mb-3">
+          <Dot color="#639922" />
+          <div className="rounded-2xl bg-[var(--card)] overflow-hidden">
+            <div className="flex justify-between items-center px-4 py-3">
+              <div>
+                <p className="text-[12px] text-[var(--sub)] mb-1">계약금</p>
+                <p className="text-[16px] font-bold">{w(500000)}</p>
+                <p className="text-[11px] text-[var(--sub)] mt-1">{fmtD(startDate)}</p>
+              </div>
+              <GBadge />
+            </div>
+          </div>
+        </div>
+
+        {/* 2. 잔금+첫달 월세 */}
+        <div className="relative pl-7 mb-3">
+          <Dot color="#378ADD" />
+          <div className="rounded-2xl bg-[var(--card)] overflow-hidden" style={{ borderLeft: '2.5px solid #378ADD' }}>
+            <div className="flex justify-between items-center px-4 py-3">
+              <div>
+                <p className="text-[12px] mb-1" style={{ color: '#185FA5' }}>잔금 + 첫달 월세 · 월세통장</p>
+                <p className="text-[16px] font-bold">{w(firstTotal)}</p>
+                <p className="text-[11px] text-[var(--sub)] mt-1">{fmtD(startDate)}</p>
+              </div>
+              <GBadge />
+            </div>
+            <Div />
+            <div className="px-4 py-3">
+              <div className="flex justify-between text-[13px] py-0.5"><span className="text-[var(--sub)]">보증금 잔액</span><span className="font-bold">{w(balanceDeposit)}</span></div>
+              <div className="flex justify-between text-[13px] py-0.5"><span className="text-[var(--sub)]">월세 일할 ({remainDaysStart}일) {startLabel}</span><span className="font-bold">{w(proratedRent)}</span></div>
+            </div>
+            <Div />
+            <div className="px-4 py-3">
+              <p className="text-[11px] text-[var(--sub)] mb-1">월세 납입계좌</p>
+              <p className="text-[13px] font-bold">{tenant.houseName} (계약서 참조)</p>
+            </div>
+          </div>
+        </div>
+
+        {/* 3. 첫달 관리비 */}
+        <div className="relative pl-7 mb-3">
+          <Dot color="#EF9F27" />
+          <div className="rounded-2xl bg-[var(--card)] overflow-hidden" style={{ borderLeft: '2.5px solid #EF9F27' }}>
+            <div className="flex justify-between items-center px-4 py-3">
+              <div>
+                <p className="text-[12px] mb-1" style={{ color: '#854F0B' }}>첫달 관리비 · 관리비통장</p>
+                <p className="text-[16px] font-bold">{w(proratedMgmt)}</p>
+                <p className="text-[11px] text-[var(--sub)] mt-1">{startLabel} 일할계산</p>
+              </div>
+              <GBadge />
+            </div>
+            <Div />
+            <div className="px-4 py-3">
+              <p className="text-[11px] text-[var(--sub)] mb-1">관리비 납입계좌</p>
+              <p className="text-[13px] font-bold">K BANK 100-166-670094 유재훈</p>
+            </div>
+          </div>
+        </div>
+
+        {/* 4. 완료된 내역 */}
+        {pastMonths.length > 0 && (
+          <div className="relative pl-7 mb-3">
+            <Dot color="#888" />
+            <div className="rounded-2xl bg-[var(--card)] overflow-hidden">
+              <div onClick={() => setShowHistory(!showHistory)}
+                className="flex justify-between items-center px-4 py-3 cursor-pointer opacity-60">
+                <span className="text-[13px]">완료된 납부 내역</span>
+                <span className="text-[12px] text-[var(--sub)]">{pastMonths.length}건 · {showHistory ? '접기 ▲' : '펼치기 ▼'}</span>
+              </div>
+              {showHistory && pastMonths.map(pm => (
+                <div key={pm.ym}>
+                  <Div />
+                  <div className="flex justify-between items-center px-4 py-3">
+                    <div>
+                      <p className="text-[13px] font-medium">{pm.label} 월세·관리비</p>
+                      <p className="text-[11px] text-[var(--sub)]">{pm.ym}-01</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[13px] font-bold">{w(monthly)}</p>
+                      <GBadge />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 5. 이번달 납부 */}
+        <div className="relative pl-7 mb-3">
+          <div className="absolute left-0 top-[14px] w-[15px] h-[15px] rounded-full border-[3px] border-white" style={{ background: '#3182F6' }} />
+          <div className="rounded-2xl bg-[var(--card)] overflow-hidden" style={{ border: '1px solid #3182F6' }}>
+            <div className="flex justify-between items-center px-4 py-2.5" style={{ background: '#3182F6' }}>
+              <span className="text-[12px] font-bold text-white">{nextMonthNum}월 정상납부 · D-{dDay}</span>
+              <BBadge />
+            </div>
+            <div className="px-4 py-3">
+              {/* 월세 행 */}
+              <div className="flex items-center gap-3 py-2 border-b border-[var(--border)]">
+                <div onClick={() => setRentPaid(p => ({ ...p, [`${nextMonthNum}`]: !p[`${nextMonthNum}`] }))}
+                  className="w-[22px] h-[22px] rounded-full flex-shrink-0 flex items-center justify-center cursor-pointer"
+                  style={rentPaid[`${nextMonthNum}`] ? { background: '#3182F6' } : { border: '1.5px solid #ccc', background: 'var(--card)' }}>
+                  {rentPaid[`${nextMonthNum}`] && <Check size={12} color="white" strokeWidth={3} />}
+                </div>
+                <div className="flex-1">
+                  <div className={`text-[14px] ${rentPaid[`${nextMonthNum}`] ? 'line-through text-[var(--sub)]' : ''}`}>월세</div>
+                  <div className="text-[11px] text-[var(--sub)] mt-0.5">월세통장 · {tenant.houseName}</div>
+                </div>
+                <div className={`text-[14px] font-bold ${rentPaid[`${nextMonthNum}`] ? 'line-through text-[var(--sub)]' : 'text-[#0C447C]'}`}>{w(tenant.rent || 0)}</div>
+              </div>
+              {/* 관리비 행 */}
+              <div className="flex items-center gap-3 py-2">
+                <div onClick={() => setMgmtPaid(p => ({ ...p, [`${nextMonthNum}`]: !p[`${nextMonthNum}`] }))}
+                  className="w-[22px] h-[22px] rounded-full flex-shrink-0 flex items-center justify-center cursor-pointer"
+                  style={mgmtPaid[`${nextMonthNum}`] ? { background: '#3182F6' } : { border: '1.5px solid #ccc', background: 'var(--card)' }}>
+                  {mgmtPaid[`${nextMonthNum}`] && <Check size={12} color="white" strokeWidth={3} />}
+                </div>
+                <div className="flex-1">
+                  <div className={`text-[14px] ${mgmtPaid[`${nextMonthNum}`] ? 'line-through text-[var(--sub)]' : ''}`}>관리비</div>
+                  <div className="text-[11px] text-[var(--sub)] mt-0.5">관리비통장 · 유재훈</div>
+                </div>
+                <div className={`text-[14px] font-bold ${mgmtPaid[`${nextMonthNum}`] ? 'line-through text-[var(--sub)]' : 'text-[#0C447C]'}`}>{w(tenant.managementFee || 0)}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 6. 마지막달 */}
+        <div className="relative pl-7 mb-3 opacity-50">
+          <Dot color="#aaa" />
+          <div className="rounded-2xl bg-[var(--card)] overflow-hidden">
+            <div className="px-4 py-3">
+              <p className="text-[12px] text-[var(--sub)] mb-1">마지막달 · {endDate.getMonth() + 1}월 · 일할계산</p>
+              <p className="text-[15px] font-bold">{w(lastRent + lastMgmt)}</p>
+              <p className="text-[11px] text-[var(--sub)] mt-1">{endLabel} · {remainDaysEnd}일</p>
+            </div>
+            <Div />
+            <div className="px-4 py-3">
+              <div className="flex justify-between text-[13px] py-0.5"><span className="text-[var(--sub)]">월세 일할</span><span className="font-bold">{w(lastRent)}</span></div>
+              <div className="flex justify-between text-[13px] py-0.5"><span className="text-[var(--sub)]">관리비 일할</span><span className="font-bold">{w(lastMgmt)}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── (Legacy) Generate Local Timeline ── */
 function generateLocalTimeline(tenant: TenantData): PaymentItem[] {
   const records: PaymentItem[] = []
   const start = new Date(tenant.startDate)
