@@ -507,8 +507,15 @@ function PaymentHistory({ lang, tenant, house }: { lang: Lang; tenant: TenantDat
   const nextMonthLabel = `${nextMonth.getMonth() + 1}${lang === 'ko' ? '월' : ''}`
   const monthlyTotal = tenant.rent + tenant.managementFee
 
-  const rentAccount = house?.landlordName || (lang === 'ko' ? '별도 안내' : 'To be informed')
-  const mgmtAccount = 'K BANK 유재훈 100-166-670094'
+  // 월세 계좌: house.memo에서 계좌번호 파싱 시도, 없으면 landlordName 기반
+  const rentAccount = (() => {
+    if (house?.memo) {
+      const m = house.memo.match(/([\uAC00-\uD7A3]+은행|국민|신한|하나|우리|농협|기업|케이뱅크?|카카오뱅크?|토스)[^\d]*([\d\-]+)/i)
+      if (m) return `${m[1]} ${m[2]} ${house.landlordName || ''}`
+    }
+    return house?.landlordName ? `${house.landlordName} (${lang === 'ko' ? '계약서 참조' : 'See contract'})` : (lang === 'ko' ? '별도 안내' : 'To be informed')
+  })()
+  const mgmtAccount = 'K BANK 100-166-670094 유재훈'
   const startM = startDate.getMonth() + 1
   const endOfMonth = `${startM}/${daysInStartMonth}`
 
@@ -542,7 +549,7 @@ function PaymentHistory({ lang, tenant, house }: { lang: Lang; tenant: TenantDat
         {/* 잔금+첫달 월세 */}
         <div className="rounded-2xl bg-[var(--card)] border border-[var(--border)] overflow-hidden" style={{ borderLeft: '3px solid #378ADD' }}>
           <div className="flex items-center justify-between px-4 py-3">
-            <div><p className="text-[14px] font-bold">{lang === 'ko' ? '잔금 + 첫달 월세' : 'Balance + First Month Rent'}</p><p className="text-[11px] text-[var(--sub)]">{lang === 'ko' ? '월세통장으로 입금' : 'Transfer to rent account'}</p></div>
+            <div><p className="text-[14px] font-bold">{lang === 'ko' ? '잔금 + 첫달 월세' : 'Balance + First Month Rent'}</p><p className="text-[11px] text-[var(--sub)]">{lang === 'ko' ? '보증금 잔액 + 첫달 월세 → 월세통장' : 'Deposit balance + first rent → Rent account'}</p></div>
             <div className="text-right"><p className="text-[14px] font-bold">{w(firstRentTotal)}</p><Badge status="paid" /></div>
           </div>
           <div className="border-t border-[var(--border)] px-4 pb-4 pt-3">
@@ -595,7 +602,7 @@ function PaymentHistory({ lang, tenant, house }: { lang: Lang; tenant: TenantDat
               </div>
               <div className="flex-1 rounded-xl px-3 py-2" style={{ background: '#FAEEDA' }}>
                 <p className="text-[10px] font-bold" style={{ color: '#633806' }}>{lang === 'ko' ? '관리비계좌' : 'Mgmt'}</p>
-                <p className="text-[10px]" style={{ color: '#854F0B' }}>{lang === 'ko' ? '케이뱅크 유재훈' : 'K Bank Yoo'}</p>
+                <p className="text-[10px]" style={{ color: '#854F0B' }}>K BANK 100-166-670094</p>
               </div>
             </div>
           </div>
