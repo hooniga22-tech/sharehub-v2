@@ -37,30 +37,57 @@ export default function ScheduleCalendar() {
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 
   useEffect(() => {
-    const y = cur.year
-    const m = cur.month + 1
+    const y = cur.year, m = cur.month + 1
+    const evts: ScheduleEvent[] = []
+
     Promise.all([
-      fetch('/api/workers').then(r => r.json()).catch(() => []),
-      fetch('/api/issues').then(r => r.json()).catch(() => ({ issues: [] })),
-    ]).then(([workers, issueData]) => {
-      const evts: ScheduleEvent[] = []
-      if (Array.isArray(workers)) {
-        workers.forEach((w: { scheduledDate: string; taskType: string; name: string; houseName: string }) => {
-          if (!w.scheduledDate) return
-          const [wy, wm] = w.scheduledDate.split('-').map(Number)
-          if (wy === y && wm === m) {
-            const type = ['청소','정기청소','퇴실청소','입주청소'].includes(w.taskType) ? 'clean' : 'work'
-            evts.push({ date: w.scheduledDate, type, house: w.houseName || '', sub: `${w.name} · ${w.taskType}` })
-          }
-        })
-      }
-      const issues = issueData?.issues || (Array.isArray(issueData) ? issueData : [])
-      issues.forEach((i: { createdAt: string; houseName: string; title: string }) => {
-        if (!i.createdAt) return
-        const [iy, im] = i.createdAt.split('-').map(Number)
-        if (iy === y && im === m)
-          evts.push({ date: i.createdAt.split('T')[0], type: 'issue', house: i.houseName || '', sub: i.title || '' })
+      fetch('/api/sheets?sheet=용역').then(r => r.json()).catch(() => []),
+      fetch('/api/sheets?sheet=이슈').then(r => r.json()).catch(() => []),
+      fetch('/api/sheets?sheet=입주자').then(r => r.json()).catch(() => []),
+    ]).then(([workerRows, issueRows, tenantRows]) => {
+      const workers = Array.isArray(workerRows) ? workerRows : []
+      const issues = Array.isArray(issueRows) ? issueRows : []
+      const tenants = Array.isArray(tenantRows) ? tenantRows : []
+
+      // 용역: [0]ID [1]담당자명 [2]지점명 [3]종류 [4]날짜 [5]완료여부
+      workers.forEach((r: string[]) => {
+        const date = r[4]
+        if (!date) return
+        const [wy, wm] = date.split('-').map(Number)
+        if (wy !== y || wm !== m) return
+        const taskType = r[3] || ''
+        const type = taskType.includes('청소') ? 'clean' : 'work'
+        evts.push({ date, type, house: r[2] || '', sub: `${r[1]} · ${taskType}` })
       })
+
+      // 이슈: [0]ID [1]지점명 [2]방코드 [3]제목 [4]내용 [5]카테고리 [6]상태 [7]담당자 [8]등록일
+      issues.forEach((r: string[]) => {
+        const date = (r[8] || '').split('T')[0]
+        if (!date) return
+        const [iy, im] = date.split('-').map(Number)
+        if (iy !== y || im !== m) return
+        evts.push({ date, type: 'issue', house: r[1] || '', sub: r[3] || '' })
+      })
+
+      // 입주자: [0]ID [1]방ID [2]지점명 [3]방코드 [4]이름 ... [9]시작일 [10]종료일 [11]상태
+      tenants.forEach((r: string[]) => {
+        const name = r[4] || ''
+        const start = r[9] || ''
+        const end = r[10] || ''
+        const status = r[11] || ''
+
+        if (start) {
+          const [sy, sm] = start.split('-').map(Number)
+          if (sy === y && sm === m)
+            evts.push({ date: start, type: 'move', house: r[2] || '', sub: `${name} 입주` })
+        }
+        if (end && status !== '입주중') {
+          const [ey, em] = end.split('-').map(Number)
+          if (ey === y && em === m)
+            evts.push({ date: end, type: 'move', house: r[2] || '', sub: `${name} 퇴실` })
+        }
+      })
+
       setEvents(evts)
     })
   }, [cur])

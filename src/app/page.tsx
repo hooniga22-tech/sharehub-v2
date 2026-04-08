@@ -133,6 +133,8 @@ export default function DashboardPage() {
               </p>
             </div>
 
+            <ScheduleCalendar />
+
             {/* ② Status Grid 2x2 */}
             <div className="grid grid-cols-2 gap-3">
               <Link href="/tenants">
@@ -309,15 +311,7 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* ⑥ Schedule Calendar */}
-            <div className="rounded-2xl bg-[var(--card)] border border-[var(--border)] overflow-hidden">
-              <div className="px-4 pt-4 pb-1 flex items-center justify-between">
-                <p className="text-[15px] font-bold">이번달 스케줄</p>
-              </div>
-              <ScheduleCalendar />
-            </div>
-
-            {/* ⑦ Worker Summary */}
+            {/* ⑥ Worker Summary */}
             <Link href="/workers">
               <Card className="p-4">
                 <div className="flex items-center gap-2 mb-3">
