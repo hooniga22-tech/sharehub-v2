@@ -528,33 +528,33 @@ function PaymentHistory({ lang, tenant, house }: { lang: Lang; tenant: TenantDat
 
   return (
     <section className="bg-white rounded-2xl p-5 shadow-sm mb-4">
-      <h2 className="text-[15px] font-bold mb-3">{T.payHistory[lang]}</h2>
-      <div className="flex flex-col gap-2.5">
+      <h2 className="text-[15px] font-bold mb-4">{T.payHistory[lang]}</h2>
+      <div className="flex flex-col gap-3">
 
         {/* 계약금 */}
-        <div className="rounded-2xl border border-gray-100 overflow-hidden" style={{ borderLeft: '3px solid #639922' }}>
+        <div className="rounded-2xl bg-[var(--card)] border border-[var(--border)] overflow-hidden" style={{ borderLeft: '3px solid #639922' }}>
           <div className="flex items-center justify-between px-4 py-3">
-            <div><p className="text-[13px] font-bold">{lang === 'ko' ? '계약금' : 'Deposit'}</p><p className="text-[11px] text-gray-400">{fmtD(tenant.startDate)}</p></div>
-            <div className="text-right"><p className="text-[13px] font-bold">{w(contractDeposit)}</p><Badge status="paid" /></div>
+            <div><p className="text-[14px] font-bold">{lang === 'ko' ? '계약금' : 'Deposit'}</p><p className="text-[11px] text-[var(--sub)]">{fmtD(tenant.startDate)}</p></div>
+            <div className="text-right"><p className="text-[14px] font-bold">{w(contractDeposit)}</p><Badge status="paid" /></div>
           </div>
         </div>
 
         {/* 잔금+첫달 월세 */}
-        <div className="rounded-2xl border border-gray-100 overflow-hidden" style={{ borderLeft: '3px solid #378ADD' }}>
+        <div className="rounded-2xl bg-[var(--card)] border border-[var(--border)] overflow-hidden" style={{ borderLeft: '3px solid #378ADD' }}>
           <div className="flex items-center justify-between px-4 py-3">
-            <div><p className="text-[13px] font-bold">{lang === 'ko' ? '잔금 + 첫달 월세' : 'Balance + First Month Rent'}</p><p className="text-[11px] text-gray-400">{lang === 'ko' ? '월세통장으로 입금' : 'Transfer to rent account'}</p></div>
-            <div className="text-right"><p className="text-[13px] font-bold">{w(firstRentTotal)}</p><Badge status="paid" /></div>
+            <div><p className="text-[14px] font-bold">{lang === 'ko' ? '잔금 + 첫달 월세' : 'Balance + First Month Rent'}</p><p className="text-[11px] text-[var(--sub)]">{lang === 'ko' ? '월세통장으로 입금' : 'Transfer to rent account'}</p></div>
+            <div className="text-right"><p className="text-[14px] font-bold">{w(firstRentTotal)}</p><Badge status="paid" /></div>
           </div>
-          <div className="border-t border-gray-50 px-4 pb-4 pt-3">
-            <div className="flex justify-between text-[12px] mb-1.5">
-              <div><p className="font-medium">{lang === 'ko' ? '보증금 잔액' : 'Deposit Balance'}</p><p className="text-[10px] text-gray-400">{lang === 'ko' ? `보증금 ${Math.round(deposit / 10000)}만 − 계약금 50만` : `Deposit ${Math.round(deposit / 10000)}만 − Contract 50만`}</p></div>
+          <div className="border-t border-[var(--border)] px-4 pb-4 pt-3">
+            <div className="flex justify-between text-[12px] mb-2">
+              <div><p className="font-medium">{lang === 'ko' ? '보증금 잔액' : 'Deposit Balance'}</p><p className="text-[10px] text-[var(--sub)]">{lang === 'ko' ? `보증금 ${Math.round(deposit / 10000)}만 − 계약금 50만` : `Deposit ${Math.round(deposit / 10000)}만 − Contract 50만`}</p></div>
               <span className="font-bold">{w(balanceDeposit)}</span>
             </div>
-            <div className="flex justify-between text-[12px] mb-1.5">
-              <div><p className="font-medium">{lang === 'ko' ? `월세 일할 (${remainDays}일)` : `Rent prorated (${remainDays}d)`}</p><p className="text-[10px] text-gray-400">{startM}/{startDate.getDate()}~{endOfMonth} · {tenant.rent.toLocaleString()}{lang === 'ko' ? '원' : ''} × {remainDays}/{daysInStartMonth}</p></div>
+            <div className="flex justify-between text-[12px] mb-2">
+              <div><p className="font-medium">{lang === 'ko' ? `월세 일할 (${remainDays}일)` : `Rent prorated (${remainDays}d)`}</p><p className="text-[10px] text-[var(--sub)]">{startM}/{startDate.getDate()}~{endOfMonth} · {tenant.rent.toLocaleString()}{lang === 'ko' ? '원' : ''} × {remainDays}/{daysInStartMonth}</p></div>
               <span className="font-bold">{w(proratedRent)}</span>
             </div>
-            <div className="rounded-xl px-3 py-2 mt-3" style={{ background: '#EBF3FE' }}>
+            <div className="rounded-xl px-3 py-3 mt-3" style={{ background: '#EBF3FE' }}>
               <p className="text-[11px] font-bold" style={{ color: '#0C447C' }}>{lang === 'ko' ? '월세 납입계좌' : 'Rent Account'}</p>
               <p className="text-[11px]" style={{ color: '#185FA5' }}>{rentAccount}</p>
             </div>
@@ -562,17 +562,17 @@ function PaymentHistory({ lang, tenant, house }: { lang: Lang; tenant: TenantDat
         </div>
 
         {/* 첫달 관리비 */}
-        <div className="rounded-2xl border border-gray-100 overflow-hidden" style={{ borderLeft: '3px solid #EF9F27' }}>
+        <div className="rounded-2xl bg-[var(--card)] border border-[var(--border)] overflow-hidden" style={{ borderLeft: '3px solid #EF9F27' }}>
           <div className="flex items-center justify-between px-4 py-3">
-            <div><p className="text-[13px] font-bold">{lang === 'ko' ? '첫달 관리비' : 'First Month Mgmt Fee'}</p><p className="text-[11px] text-gray-400">{lang === 'ko' ? '관리비통장으로 입금' : 'Transfer to mgmt account'}</p></div>
-            <div className="text-right"><p className="text-[13px] font-bold">{w(proratedMgmt)}</p><Badge status="paid" /></div>
+            <div><p className="text-[14px] font-bold">{lang === 'ko' ? '첫달 관리비' : 'First Month Mgmt Fee'}</p><p className="text-[11px] text-[var(--sub)]">{lang === 'ko' ? '관리비통장으로 입금' : 'Transfer to mgmt account'}</p></div>
+            <div className="text-right"><p className="text-[14px] font-bold">{w(proratedMgmt)}</p><Badge status="paid" /></div>
           </div>
-          <div className="border-t border-gray-50 px-4 pb-4 pt-3">
+          <div className="border-t border-[var(--border)] px-4 pb-4 pt-3">
             <div className="flex justify-between text-[12px]">
-              <div><p className="font-medium">{lang === 'ko' ? `관리비 일할 (${remainDays}일)` : `Mgmt prorated (${remainDays}d)`}</p><p className="text-[10px] text-gray-400">{startM}/{startDate.getDate()}~{endOfMonth}</p></div>
+              <div><p className="font-medium">{lang === 'ko' ? `관리비 일할 (${remainDays}일)` : `Mgmt prorated (${remainDays}d)`}</p><p className="text-[10px] text-[var(--sub)]">{startM}/{startDate.getDate()}~{endOfMonth}</p></div>
               <span className="font-bold">{w(proratedMgmt)}</span>
             </div>
-            <div className="rounded-xl px-3 py-2 mt-3" style={{ background: '#FAEEDA' }}>
+            <div className="rounded-xl px-3 py-3 mt-3" style={{ background: '#FEF3E2' }}>
               <p className="text-[11px] font-bold" style={{ color: '#633806' }}>{lang === 'ko' ? '관리비 납입계좌' : 'Mgmt Account'}</p>
               <p className="text-[11px]" style={{ color: '#854F0B' }}>{mgmtAccount}</p>
             </div>
@@ -580,10 +580,10 @@ function PaymentHistory({ lang, tenant, house }: { lang: Lang; tenant: TenantDat
         </div>
 
         {/* 다음달 납부예정 */}
-        <div className="rounded-2xl overflow-hidden" style={{ borderLeft: '3px solid #378ADD', border: '1px solid #85B7EB' }}>
+        <div className="rounded-2xl bg-[var(--card)] overflow-hidden" style={{ borderLeft: '3px solid #378ADD', border: '1px solid #85B7EB' }}>
           <div className="flex items-center justify-between px-4 py-3">
-            <div><p className="text-[13px] font-bold">{nextMonthLabel} {lang === 'ko' ? '월세·관리비' : 'Rent & Mgmt'}</p><p className="text-[11px] text-gray-400">{nextMonth.getFullYear()}. {String(nextMonth.getMonth() + 1).padStart(2, '0')}. 01 · D-{dDay}</p></div>
-            <div className="text-right"><p className="text-[13px] font-bold">{w(monthlyTotal)}</p><Badge status="due" /></div>
+            <div><p className="text-[14px] font-bold" style={{ color: '#0C447C' }}>{nextMonthLabel} {lang === 'ko' ? '월세·관리비' : 'Rent & Mgmt'}</p><p className="text-[11px] text-[var(--sub)]">{nextMonth.getFullYear()}. {String(nextMonth.getMonth() + 1).padStart(2, '0')}. 01 · D-{dDay}</p></div>
+            <div className="text-right"><p className="text-[14px] font-bold">{w(monthlyTotal)}</p><Badge status="due" /></div>
           </div>
           <div className="border-t border-blue-100 px-4 pb-4 pt-3">
             <div className="flex justify-between text-[12px] mb-1"><span className="text-gray-500">{lang === 'ko' ? '월세' : 'Rent'}</span><span className="font-bold">{w(tenant.rent)}</span></div>
@@ -610,10 +610,10 @@ function PaymentHistory({ lang, tenant, house }: { lang: Lang; tenant: TenantDat
               <ChevronDown size={12} className={`transition-transform ${showPast ? 'rotate-180' : ''}`} />
             </button>
             {showPast && pastMonths.map(pm => (
-              <div key={pm.ym} className="rounded-2xl border border-gray-100 overflow-hidden opacity-70" style={{ borderLeft: '3px solid #639922' }}>
+              <div key={pm.ym} className="rounded-2xl bg-[var(--card)] border border-[var(--border)] overflow-hidden opacity-60" style={{ borderLeft: '3px solid #639922' }}>
                 <div className="flex items-center justify-between px-4 py-3">
-                  <div><p className="text-[13px] font-bold">{pm.label} {lang === 'ko' ? '월세·관리비' : 'Rent & Mgmt'}</p><p className="text-[11px] text-gray-400">{pm.ym}-01</p></div>
-                  <div className="text-right"><p className="text-[13px] font-bold">{w(monthlyTotal)}</p><Badge status="paid" /></div>
+                  <div><p className="text-[14px] font-bold">{pm.label} {lang === 'ko' ? '월세·관리비' : 'Rent & Mgmt'}</p><p className="text-[11px] text-[var(--sub)]">{pm.ym}-01</p></div>
+                  <div className="text-right"><p className="text-[14px] font-bold">{w(monthlyTotal)}</p><Badge status="paid" /></div>
                 </div>
               </div>
             ))}
