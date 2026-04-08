@@ -148,11 +148,14 @@ export default function WorkerPortalPage() {
               else if (hasDone) bg = 'bg-green-100'
               else if (hasFuture) bg = 'bg-blue-50'
               const names = daySchedules.map(s => s.houseName).join('·')
+              const firstEvtId = daySchedules[0]?.id
               return (
-                <div key={i} className={`h-10 rounded-lg flex flex-col items-center justify-center ${bg}`}>
+                <button key={i} onClick={() => {
+                  if (firstEvtId) document.getElementById(`card-${firstEvtId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                }} className={`h-10 rounded-lg flex flex-col items-center justify-center ${bg}`}>
                   <span className="text-[11px] text-gray-700">{day}</span>
                   {names && <span className="text-[7px] text-gray-500 truncate max-w-full px-0.5">{names}</span>}
-                </div>
+                </button>
               )
             })}
           </div>
@@ -168,7 +171,8 @@ export default function WorkerPortalPage() {
           <div className="mb-4">
             <p className="text-[15px] font-bold text-[#F04452] mb-2">❗ 지금 처리하세요</p>
             {pending.map(s => (
-              <div key={s.id} className="rounded-2xl bg-white border-l-4 border-l-[#F04452] p-5 mb-3">
+              <div key={s.id} id={`card-${s.id}`} className="rounded-2xl bg-white border-l-4 border-l-[#F04452] p-5 mb-3">
+                {s.memo && <MemoBubble text={s.memo} />}
                 <p className="text-[13px] font-bold text-[#F04452]">{s.date}</p>
                 <p className="text-[26px] font-bold mt-1">{s.houseName}</p>
                 <p className="text-[16px] text-gray-500">{s.type}</p>
@@ -203,7 +207,8 @@ export default function WorkerPortalPage() {
           <div className="mb-4">
             <p className="text-[15px] font-bold text-[#3182F6] mb-2">📅 앞으로 예정</p>
             {future.map(s => (
-              <div key={s.id} className="rounded-2xl bg-blue-50 p-4 mb-2">
+              <div key={s.id} id={`card-${s.id}`} className="rounded-2xl bg-blue-50 p-4 mb-2">
+                {s.memo && <MemoBubble text={s.memo} />}
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-[13px] text-[#3182F6] font-medium">{s.date}</p>
@@ -225,7 +230,8 @@ export default function WorkerPortalPage() {
           <div className="mb-4">
             <p className="text-[15px] font-bold text-gray-500 mb-2">✅ 완료한 일정</p>
             {done.map(s => (
-              <div key={s.id} className="rounded-2xl bg-white p-3.5 mb-2 opacity-65">
+              <div key={s.id} id={`card-${s.id}`} className="rounded-2xl bg-white p-3.5 mb-2 opacity-65">
+                {s.memo && <div className="mb-1.5 px-2 py-1 rounded bg-gray-50 text-[10px] text-gray-400">{s.memo}</div>}
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-[12px] text-gray-400">{s.date}</p>
@@ -253,6 +259,18 @@ export default function WorkerPortalPage() {
         <footer className="text-center py-4">
           <p className="text-[11px] text-gray-400">© 2026 ShareHub</p>
         </footer>
+      </div>
+    </div>
+  )
+}
+
+function MemoBubble({ text }: { text: string }) {
+  return (
+    <div className="mb-3 relative">
+      <div className="absolute top-0 left-0" style={{ width: 0, height: 0, borderRight: '8px solid #F7F8FA', borderBottom: '8px solid transparent' }} />
+      <div className="ml-2 px-3.5 py-3" style={{ background: '#F7F8FA', borderRadius: '0 14px 14px 14px', border: '0.5px solid var(--border, #e5e5e5)' }}>
+        <p className="text-[12px] text-gray-400 mb-1">운영자</p>
+        <p className="text-[16px] leading-[1.65]">{text}</p>
       </div>
     </div>
   )

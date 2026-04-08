@@ -211,6 +211,7 @@ export default function WorkersPage() {
                     <CheckCircle size={12} /> 완료 처리
                   </button>
                 )}
+                <MemoField workerId={w.id} memo={w.memo} onSaved={(memo) => setWorkers(prev => prev.map(x => x.id === w.id ? { ...x, memo } : x))} />
               </Card>
             ))}
           </div>
@@ -375,5 +376,56 @@ function CompleteModal({ worker, onClose, onDone }: {
         </div>
       </div>
     </div>
+  )
+}
+
+/* ── Memo Field ── */
+function MemoField({ workerId, memo, onSaved }: { workerId: string; memo: string; onSaved: (v: string) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [val, setVal] = useState(memo || '')
+  const [saving, setSaving] = useState(false)
+
+  async function save() {
+    setSaving(true)
+    await fetch(`/api/workers/schedule/${workerId}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ memo: val }),
+    }).catch(() => {})
+    setSaving(false)
+    setEditing(false)
+    onSaved(val)
+  }
+
+  if (editing) {
+    return (
+      <div className="mt-2">
+        <textarea value={val} onChange={e => setVal(e.target.value)} rows={2}
+          className="w-full px-3 py-2 rounded-lg bg-[var(--bg)] border border-[var(--border)] text-[12px] outline-none resize-none placeholder:text-[var(--sub)]"
+          placeholder="전달사항 입력" />
+        <div className="flex gap-1.5 mt-1">
+          <button onClick={save} disabled={saving} className="px-3 py-1 rounded-lg bg-[var(--blue)] text-white text-[10px] font-bold">
+            {saving ? '...' : '저장'}
+          </button>
+          <button onClick={() => { setEditing(false); setVal(memo || '') }} className="px-3 py-1 rounded-lg bg-gray-100 text-gray-500 text-[10px] font-bold">취소</button>
+        </div>
+      </div>
+    )
+  }
+
+  if (memo) {
+    return (
+      <button onClick={() => setEditing(true)}
+        className="mt-2 w-full text-left px-3 py-2 rounded-lg text-[11px]"
+        style={{ background: '#FEF3E2', color: '#633806' }}>
+        📝 {memo}
+      </button>
+    )
+  }
+
+  return (
+    <button onClick={() => setEditing(true)}
+      className="mt-2 text-[10px] text-[var(--sub)] underline">
+      전달사항 추가
+    </button>
   )
 }
