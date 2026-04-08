@@ -296,7 +296,7 @@ export default function TenantPortalPage() {
         </Section>
 
         {/* Section 2.5: Payment History */}
-        <PaymentHistory lang={lang} tenant={t} />
+        <PaymentHistory lang={lang} tenant={t} house={h} />
 
         {/* Section 3: Duty */}
         <Section title={T.duty[lang]}>
@@ -482,138 +482,144 @@ function GuideRow({ label, value, isEmpty, copyable, copied, onCopy, copiedText,
   )
 }
 
-/* ── Payment History ── */
-interface PayItem {
-  month: string; label: string; rentAmount: number; mgmtAmount: number;
-  dueDate: string; status: 'paid' | 'overdue' | 'due' | 'upcoming'; isProrated: boolean;
-}
+/* ── Payment History S2 ── */
+function PaymentHistory({ lang, tenant, house }: { lang: Lang; tenant: TenantData; house: { name: string; landlordName?: string; memo?: string } | null }) {
+  const [showPast, setShowPast] = useState(false)
 
-function generatePaymentSchedule(t: TenantData): PayItem[] {
-  if (!t.startDate || !t.endDate) return []
-  const start = new Date(t.startDate)
-  const end = new Date(t.endDate)
+  if (!tenant.startDate || !tenant.endDate) return null
+
+  const startDate = new Date(tenant.startDate)
+  const daysInStartMonth = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0).getDate()
+  const remainDays = daysInStartMonth - startDate.getDate() + 1
+  const proratedRent = Math.round(tenant.rent * remainDays / daysInStartMonth)
+  const proratedMgmt = Math.round(tenant.managementFee * remainDays / daysInStartMonth)
+  const contractDeposit = 500000
+  const deposit = tenant.deposit || 2000000
+  const balanceDeposit = deposit - contractDeposit
+  const firstRentTotal = balanceDeposit + proratedRent
+
+  const w = (n: number) => n.toLocaleString('ko-KR') + (lang === 'ko' ? '원' : ' KRW')
+  const fmtD = (d: string) => { const dt = new Date(d); return `${dt.getFullYear()}. ${String(dt.getMonth() + 1).padStart(2, '0')}. ${String(dt.getDate()).padStart(2, '0')}` }
+
   const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  const nextMonth = today.getMonth() === 11 ? new Date(today.getFullYear() + 1, 0, 1) : new Date(today.getFullYear(), today.getMonth() + 1, 1)
+  const dDay = Math.ceil((nextMonth.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+  const nextMonthLabel = `${nextMonth.getMonth() + 1}${lang === 'ko' ? '월' : ''}`
+  const monthlyTotal = tenant.rent + tenant.managementFee
+
+  const rentAccount = house?.landlordName || (lang === 'ko' ? '별도 안내' : 'To be informed')
+  const mgmtAccount = 'K BANK 유재훈 100-166-670094'
+  const startM = startDate.getMonth() + 1
+  const endOfMonth = `${startM}/${daysInStartMonth}`
+
+  // Past months (between first month+1 and current month)
+  const pastMonths: { label: string; ym: string }[] = []
+  const cur = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 1)
   const thisYM = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
-  const items: PayItem[] = []
-
-  // First month (prorated)
-  const dim = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate()
-  const remain = dim - start.getDate() + 1
-  const pRent = Math.round(t.rent * remain / dim)
-  const pMgmt = Math.round(t.managementFee * remain / dim)
-  const firstYM = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`
-  const firstDue = t.startDate
-  items.push({
-    month: firstYM, label: `${start.getMonth() + 1}월`, rentAmount: pRent, mgmtAmount: pMgmt,
-    dueDate: firstDue, isProrated: true,
-    status: firstDue < today.toISOString().split('T')[0] ? 'paid' : firstYM === thisYM ? 'due' : 'upcoming',
-  })
-
-  // Regular months
-  const cur = new Date(start.getFullYear(), start.getMonth() + 1, 1)
-  while (cur <= end) {
-    const ym = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`
-    const due = `${ym}-01`
-    let status: PayItem['status'] = 'upcoming'
-    if (due < today.toISOString().split('T')[0]) status = 'paid'
-    else if (ym === thisYM) status = 'due'
-    items.push({
-      month: ym, label: `${cur.getMonth() + 1}월`, rentAmount: t.rent, mgmtAmount: t.managementFee,
-      dueDate: due, isProrated: false, status,
-    })
+  while (`${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}` < thisYM) {
+    pastMonths.push({ label: `${cur.getMonth() + 1}월`, ym: `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}` })
     cur.setMonth(cur.getMonth() + 1)
   }
-  return items
-}
 
-function PaymentHistory({ lang, tenant }: { lang: Lang; tenant: TenantData }) {
-  const schedule = generatePaymentSchedule(tenant)
-  const [openMonths, setOpenMonths] = useState<Set<string>>(() => {
-    const s = new Set<string>()
-    schedule.forEach(p => { if (p.status === 'overdue' || p.status === 'due') s.add(p.month) })
-    return s
-  })
-
-  if (schedule.length === 0) return null
-
-  const overdue = schedule.filter(p => p.status === 'overdue')
-  const overdueTotal = overdue.reduce((s, p) => s + p.rentAmount + p.mgmtAmount, 0)
-
-  function toggle(m: string) {
-    setOpenMonths(prev => {
-      const next = new Set(prev)
-      next.has(m) ? next.delete(m) : next.add(m)
-      return next
-    })
+  const Badge = ({ status }: { status: 'paid' | 'due' | 'upcoming' }) => {
+    const s = { paid: { bg: '#EAF3DE', color: '#27500A', label: T.paid }, due: { bg: '#EBF3FE', color: '#0C447C', label: T.dueSoon }, upcoming: { bg: '#f2f2f2', color: '#888', label: T.scheduled } }[status]
+    return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ background: s.bg, color: s.color }}>{s.label[lang]}</span>
   }
-
-  const STATUS_BADGE: Record<string, { bg: string; color: string; label: Record<Lang, string> }> = {
-    paid: { bg: '#EAF3DE', color: '#27500A', label: T.paid },
-    overdue: { bg: '#FCEBEB', color: '#791F1F', label: T.unpaid },
-    due: { bg: '#EBF3FE', color: '#0C447C', label: T.dueSoon },
-    upcoming: { bg: '#f2f2f2', color: '#888', label: T.scheduled },
-  }
-  const BAR_COLOR: Record<string, string> = { paid: '#00C471', overdue: '#E24B4A', due: '#3182F6', upcoming: '#D3D1C7' }
 
   return (
     <section className="bg-white rounded-2xl p-5 shadow-sm mb-4">
       <h2 className="text-[15px] font-bold mb-3">{T.payHistory[lang]}</h2>
+      <div className="flex flex-col gap-2.5">
 
-      {overdue.length > 0 && (
-        <div className="rounded-xl px-4 py-3 mb-3" style={{ background: '#FCEBEB', border: '1px solid #F09595' }}>
-          <p className="text-[13px] font-bold" style={{ color: '#791F1F' }}>{T.overdue[lang]}</p>
-          <p className="text-[12px] mt-0.5" style={{ color: '#791F1F' }}>
-            {overdue.length}{T.overdueCount[lang]} · ₩{overdueTotal.toLocaleString()}
-          </p>
+        {/* 계약금 */}
+        <div className="rounded-2xl border border-gray-100 overflow-hidden" style={{ borderLeft: '3px solid #639922' }}>
+          <div className="flex items-center justify-between px-4 py-3">
+            <div><p className="text-[13px] font-bold">{lang === 'ko' ? '계약금' : 'Deposit'}</p><p className="text-[11px] text-gray-400">{fmtD(tenant.startDate)}</p></div>
+            <div className="text-right"><p className="text-[13px] font-bold">{w(contractDeposit)}</p><Badge status="paid" /></div>
+          </div>
         </div>
-      )}
 
-      <div className="flex flex-col gap-2">
-        {schedule.map(p => {
-          const isOpen = openMonths.has(p.month)
-          const sb = STATUS_BADGE[p.status]
-          const total = p.rentAmount + p.mgmtAmount
-          return (
-            <div key={p.month} className="rounded-xl border border-gray-100 overflow-hidden"
-              style={{ borderLeft: `3px solid ${BAR_COLOR[p.status]}` }}>
-              <button onClick={() => toggle(p.month)}
-                className="w-full flex items-center justify-between px-3.5 py-3 text-left">
-                <div className="flex items-center gap-2">
-                  <span className="text-[13px] font-bold">{p.label}</span>
-                  <span className="text-[12px] text-gray-500">₩{total.toLocaleString()}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="px-2 py-0.5 rounded-full text-[9px] font-bold" style={{ background: sb.bg, color: sb.color }}>
-                    {sb.label[lang]}
-                  </span>
-                  <ChevronDown size={14} className={`text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                </div>
-              </button>
-              {isOpen && (
-                <div className="px-3.5 pb-3 pt-0 border-t border-gray-50">
-                  <div className="flex items-center justify-between py-1.5">
-                    <span className="text-[12px] text-gray-500">{T.rentLabel[lang]}</span>
-                    <span className="text-[12px] font-medium">₩{p.rentAmount.toLocaleString()}</span>
-                  </div>
-                  {p.mgmtAmount > 0 && (
-                    <div className="flex items-center justify-between py-1.5">
-                      <span className="text-[12px] text-gray-500">{T.mgmtLabel[lang]}</span>
-                      <span className="text-[12px] font-medium">₩{p.mgmtAmount.toLocaleString()}</span>
-                    </div>
-                  )}
-                  {p.isProrated && (
-                    <p className="text-[10px] text-gray-400 mt-1">* {T.proratedNote[lang]}</p>
-                  )}
-                  <div className="flex items-center justify-between pt-2 mt-1 border-t border-gray-50">
-                    <span className="text-[11px] text-gray-400">{lang === 'ko' ? '납부일' : 'Due'}</span>
-                    <span className="text-[11px] text-gray-500">{p.dueDate}</span>
-                  </div>
-                </div>
-              )}
+        {/* 잔금+첫달 월세 */}
+        <div className="rounded-2xl border border-gray-100 overflow-hidden" style={{ borderLeft: '3px solid #378ADD' }}>
+          <div className="flex items-center justify-between px-4 py-3">
+            <div><p className="text-[13px] font-bold">{lang === 'ko' ? '잔금 + 첫달 월세' : 'Balance + First Month Rent'}</p><p className="text-[11px] text-gray-400">{lang === 'ko' ? '월세통장으로 입금' : 'Transfer to rent account'}</p></div>
+            <div className="text-right"><p className="text-[13px] font-bold">{w(firstRentTotal)}</p><Badge status="paid" /></div>
+          </div>
+          <div className="border-t border-gray-50 px-4 pb-4 pt-3">
+            <div className="flex justify-between text-[12px] mb-1.5">
+              <div><p className="font-medium">{lang === 'ko' ? '보증금 잔액' : 'Deposit Balance'}</p><p className="text-[10px] text-gray-400">{lang === 'ko' ? `보증금 ${Math.round(deposit / 10000)}만 − 계약금 50만` : `Deposit ${Math.round(deposit / 10000)}만 − Contract 50만`}</p></div>
+              <span className="font-bold">{w(balanceDeposit)}</span>
             </div>
-          )
-        })}
+            <div className="flex justify-between text-[12px] mb-1.5">
+              <div><p className="font-medium">{lang === 'ko' ? `월세 일할 (${remainDays}일)` : `Rent prorated (${remainDays}d)`}</p><p className="text-[10px] text-gray-400">{startM}/{startDate.getDate()}~{endOfMonth} · {tenant.rent.toLocaleString()}{lang === 'ko' ? '원' : ''} × {remainDays}/{daysInStartMonth}</p></div>
+              <span className="font-bold">{w(proratedRent)}</span>
+            </div>
+            <div className="rounded-xl px-3 py-2 mt-3" style={{ background: '#EBF3FE' }}>
+              <p className="text-[11px] font-bold" style={{ color: '#0C447C' }}>{lang === 'ko' ? '월세 납입계좌' : 'Rent Account'}</p>
+              <p className="text-[11px]" style={{ color: '#185FA5' }}>{rentAccount}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* 첫달 관리비 */}
+        <div className="rounded-2xl border border-gray-100 overflow-hidden" style={{ borderLeft: '3px solid #EF9F27' }}>
+          <div className="flex items-center justify-between px-4 py-3">
+            <div><p className="text-[13px] font-bold">{lang === 'ko' ? '첫달 관리비' : 'First Month Mgmt Fee'}</p><p className="text-[11px] text-gray-400">{lang === 'ko' ? '관리비통장으로 입금' : 'Transfer to mgmt account'}</p></div>
+            <div className="text-right"><p className="text-[13px] font-bold">{w(proratedMgmt)}</p><Badge status="paid" /></div>
+          </div>
+          <div className="border-t border-gray-50 px-4 pb-4 pt-3">
+            <div className="flex justify-between text-[12px]">
+              <div><p className="font-medium">{lang === 'ko' ? `관리비 일할 (${remainDays}일)` : `Mgmt prorated (${remainDays}d)`}</p><p className="text-[10px] text-gray-400">{startM}/{startDate.getDate()}~{endOfMonth}</p></div>
+              <span className="font-bold">{w(proratedMgmt)}</span>
+            </div>
+            <div className="rounded-xl px-3 py-2 mt-3" style={{ background: '#FAEEDA' }}>
+              <p className="text-[11px] font-bold" style={{ color: '#633806' }}>{lang === 'ko' ? '관리비 납입계좌' : 'Mgmt Account'}</p>
+              <p className="text-[11px]" style={{ color: '#854F0B' }}>{mgmtAccount}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* 다음달 납부예정 */}
+        <div className="rounded-2xl overflow-hidden" style={{ borderLeft: '3px solid #378ADD', border: '1px solid #85B7EB' }}>
+          <div className="flex items-center justify-between px-4 py-3">
+            <div><p className="text-[13px] font-bold">{nextMonthLabel} {lang === 'ko' ? '월세·관리비' : 'Rent & Mgmt'}</p><p className="text-[11px] text-gray-400">{nextMonth.getFullYear()}. {String(nextMonth.getMonth() + 1).padStart(2, '0')}. 01 · D-{dDay}</p></div>
+            <div className="text-right"><p className="text-[13px] font-bold">{w(monthlyTotal)}</p><Badge status="due" /></div>
+          </div>
+          <div className="border-t border-blue-100 px-4 pb-4 pt-3">
+            <div className="flex justify-between text-[12px] mb-1"><span className="text-gray-500">{lang === 'ko' ? '월세' : 'Rent'}</span><span className="font-bold">{w(tenant.rent)}</span></div>
+            <div className="flex justify-between text-[12px]"><span className="text-gray-500">{lang === 'ko' ? '관리비' : 'Mgmt'}</span><span className="font-bold">{w(tenant.managementFee)}</span></div>
+            <div className="flex gap-2 mt-3">
+              <div className="flex-1 rounded-xl px-3 py-2" style={{ background: '#EBF3FE' }}>
+                <p className="text-[10px] font-bold" style={{ color: '#0C447C' }}>{lang === 'ko' ? '월세계좌' : 'Rent'}</p>
+                <p className="text-[10px]" style={{ color: '#185FA5' }}>{rentAccount}</p>
+              </div>
+              <div className="flex-1 rounded-xl px-3 py-2" style={{ background: '#FAEEDA' }}>
+                <p className="text-[10px] font-bold" style={{ color: '#633806' }}>{lang === 'ko' ? '관리비계좌' : 'Mgmt'}</p>
+                <p className="text-[10px]" style={{ color: '#854F0B' }}>{lang === 'ko' ? '케이뱅크 유재훈' : 'K Bank Yoo'}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 이전 납부 내역 */}
+        {pastMonths.length > 0 && (
+          <>
+            <button onClick={() => setShowPast(!showPast)}
+              className="w-full flex items-center justify-center gap-1 py-2 rounded-xl bg-gray-50 text-[12px] font-semibold text-gray-500">
+              {lang === 'ko' ? `이전 납부 내역 ${pastMonths.length}건` : `${pastMonths.length} past payments`}
+              <ChevronDown size={12} className={`transition-transform ${showPast ? 'rotate-180' : ''}`} />
+            </button>
+            {showPast && pastMonths.map(pm => (
+              <div key={pm.ym} className="rounded-2xl border border-gray-100 overflow-hidden opacity-70" style={{ borderLeft: '3px solid #639922' }}>
+                <div className="flex items-center justify-between px-4 py-3">
+                  <div><p className="text-[13px] font-bold">{pm.label} {lang === 'ko' ? '월세·관리비' : 'Rent & Mgmt'}</p><p className="text-[11px] text-gray-400">{pm.ym}-01</p></div>
+                  <div className="text-right"><p className="text-[13px] font-bold">{w(monthlyTotal)}</p><Badge status="paid" /></div>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
       </div>
     </section>
   )
