@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { Chip } from '@/components/ui/Chip'
-import { Phone, Calendar, CreditCard, FileText, Save, Copy, Check, ExternalLink, Share2, Clock, AlertCircle, Loader2 } from 'lucide-react'
+import { Phone, Calendar, CreditCard, FileText, Save, Copy, Check, ExternalLink, Share2, Clock, AlertCircle, Loader2, Plus, X } from 'lucide-react'
 
 interface TenantData {
   id: string; roomId: string; houseName: string; roomCode: string;
@@ -347,6 +347,11 @@ function PaymentTimeline({ tenant }: { tenant: TenantData }) {
   const [showInitial, setShowInitial] = useState(false)
   const [rentPaid, setRentPaid] = useState(false)
   const [mgmtPaid, setMgmtPaid] = useState(false)
+  const [completedMonths, setCompletedMonths] = useState<string[]>([])
+  const [extraItems, setExtraItems] = useState<{id:string; name:string; amount:number; paid:boolean; createdAt:string}[]>([])
+  const [showExtraSheet, setShowExtraSheet] = useState(false)
+  const [extraName, setExtraName] = useState('')
+  const [extraAmount, setExtraAmount] = useState('')
 
   if (!tenant.startDate || !tenant.endDate) return null
 
@@ -367,9 +372,10 @@ function PaymentTimeline({ tenant }: { tenant: TenantData }) {
   const endLabel = `${endD.getMonth() + 1}/1~${endD.getMonth() + 1}/${remainEnd}`
 
   const today = new Date()
-  const nextM = new Date(today.getFullYear(), today.getMonth() + 1, 1)
-  const dDay = Math.ceil((nextM.getTime() - today.getTime()) / 86400000)
-  const nextMNum = nextM.getMonth() + 1
+  const currentMNum = today.getMonth() + 1
+  const nextM1st = new Date(today.getFullYear(), today.getMonth() + 1, 1)
+  const dDay = Math.ceil((nextM1st.getTime() - today.getTime()) / 86400000)
+  const isCurrentCompleted = completedMonths.includes(`${today.getFullYear()}-${currentMNum}`)
 
   const fmtD = (d: Date) => `${d.getFullYear()}. ${String(d.getMonth() + 1).padStart(2, '0')}. ${String(d.getDate()).padStart(2, '0')}`
   const w = (n: number) => n.toLocaleString('ko-KR') + '원'
@@ -412,16 +418,17 @@ function PaymentTimeline({ tenant }: { tenant: TenantData }) {
         </div>
 
         {/* 2. 이번달 납부 */}
+        {!isCurrentCompleted && (
         <div className="relative mb-3">
           <div className="absolute -left-[24px] top-[12px] w-[14px] h-[14px] rounded-full bg-[#3182F6]" style={{ border: '2.5px solid var(--bg)' }} />
           <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid #3182F6' }}>
             <div className="flex justify-between items-center px-4 py-2.5" style={{ background: '#3182F6' }}>
-              <span className="text-[12px] font-bold text-white">{nextMNum}월 정상납부 · D-{dDay}</span>
+              <span className="text-[12px] font-bold text-white">{currentMNum}월 정상납부 · D-{dDay}</span>
               <span className="text-[10px] font-medium px-2 py-0.5 rounded-[5px]" style={{ background: 'rgba(255,255,255,0.25)', color: 'white' }}>예정</span>
             </div>
             <div className="px-4 pt-3 pb-2 bg-[var(--card)]">
               <div className="flex items-center gap-3 py-2 border-b border-[var(--border)]">
-                <div onClick={() => setRentPaid(!rentPaid)} className="w-[22px] h-[22px] rounded-full flex-shrink-0 flex items-center justify-center cursor-pointer"
+                <div onClick={() => { const nv = !rentPaid; setRentPaid(nv); if (nv && mgmtPaid) setCompletedMonths(p => [...p, `${today.getFullYear()}-${currentMNum}`]) }} className="w-[22px] h-[22px] rounded-full flex-shrink-0 flex items-center justify-center cursor-pointer"
                   style={rentPaid ? { background: '#3182F6' } : { border: '1.5px solid #ccc', background: 'var(--card)' }}>
                   {rentPaid && <Check size={12} color="white" strokeWidth={3} />}
                 </div>
@@ -432,7 +439,7 @@ function PaymentTimeline({ tenant }: { tenant: TenantData }) {
                 <p className={`text-[14px] font-bold ${rentPaid ? 'line-through text-[var(--sub)]' : 'text-[#0C447C]'}`}>{w(tenant.rent || 0)}</p>
               </div>
               <div className="flex items-center gap-3 py-2">
-                <div onClick={() => setMgmtPaid(!mgmtPaid)} className="w-[22px] h-[22px] rounded-full flex-shrink-0 flex items-center justify-center cursor-pointer"
+                <div onClick={() => { const nv = !mgmtPaid; setMgmtPaid(nv); if (nv && rentPaid) setCompletedMonths(p => [...p, `${today.getFullYear()}-${currentMNum}`]) }} className="w-[22px] h-[22px] rounded-full flex-shrink-0 flex items-center justify-center cursor-pointer"
                   style={mgmtPaid ? { background: '#3182F6' } : { border: '1.5px solid #ccc', background: 'var(--card)' }}>
                   {mgmtPaid && <Check size={12} color="white" strokeWidth={3} />}
                 </div>
@@ -445,6 +452,7 @@ function PaymentTimeline({ tenant }: { tenant: TenantData }) {
             </div>
           </div>
         </div>
+        )}
 
         {/* 3. 완료된 월 납부 */}
         {historyMonths.length > 0 && (
@@ -513,6 +521,82 @@ function PaymentTimeline({ tenant }: { tenant: TenantData }) {
           </div>
         </div>
       </div>
+
+      {/* 추가 청구 */}
+      <div className="flex justify-between items-center mb-3 mt-6">
+        <p className="text-[14px] font-bold">추가 청구</p>
+        <button onClick={() => setShowExtraSheet(true)}
+          className="w-[30px] h-[30px] rounded-full bg-[#3182F6] flex items-center justify-center">
+          <Plus size={16} color="white" />
+        </button>
+      </div>
+
+      {extraItems.length === 0 ? (
+        <div className="rounded-2xl bg-[var(--card)] px-4 py-4 text-center opacity-50">
+          <p className="text-[13px] text-[var(--sub)]">추가 청구 항목이 없어요</p>
+          <p className="text-[12px] text-[var(--sub)] mt-1">방청소비, 에어컨 청소비 등을 등록하세요</p>
+        </div>
+      ) : (
+        <div className="rounded-2xl bg-[var(--card)] overflow-hidden">
+          {extraItems.map((item, i) => (
+            <div key={item.id}>
+              {i > 0 && <div className="h-[1px] bg-[var(--bg)]" />}
+              <div className="flex items-center gap-3 px-4 py-3" style={!item.paid ? { background: '#FFF8F8' } : { opacity: 0.55 }}>
+                <div onClick={() => setExtraItems(prev => prev.map(x => x.id === item.id ? { ...x, paid: !x.paid } : x))}
+                  className="w-[22px] h-[22px] rounded-full flex-shrink-0 flex items-center justify-center cursor-pointer"
+                  style={item.paid ? { background: '#3182F6' } : { border: '1.5px solid #ccc', background: 'var(--card)' }}>
+                  {item.paid && <Check size={12} color="white" strokeWidth={3} />}
+                </div>
+                <div className="flex-1">
+                  <p className={`text-[14px] ${item.paid ? 'line-through text-[var(--sub)]' : 'text-[#791F1F]'}`}>{item.name}</p>
+                  <p className="text-[11px] text-[var(--sub)] mt-0.5">{item.createdAt}</p>
+                </div>
+                <div className="text-right">
+                  <p className={`text-[14px] font-bold ${item.paid ? 'line-through text-[var(--sub)]' : 'text-[#791F1F]'}`}>{w(item.amount)}</p>
+                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-[5px]"
+                    style={item.paid ? { background: '#EAF3DE', color: '#27500A' } : { background: '#FCEBEB', color: '#791F1F' }}>
+                    {item.paid ? '완료' : '미납'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 추가 청구 바텀시트 */}
+      {showExtraSheet && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowExtraSheet(false)} />
+          <div className="relative w-full max-w-[430px] bg-[var(--bg)] rounded-t-2xl pb-8">
+            <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-[var(--border)]" /></div>
+            <div className="flex items-center justify-between px-5 py-3">
+              <h2 className="text-[17px] font-bold">추가 청구 등록</h2>
+              <button onClick={() => setShowExtraSheet(false)}><X size={20} color="var(--sub)" /></button>
+            </div>
+            <div className="px-5 flex flex-col gap-4">
+              <div>
+                <label className="text-[13px] font-semibold mb-1.5 block">항목명</label>
+                <input value={extraName} onChange={e => setExtraName(e.target.value)} placeholder="예: 방청소비, 에어컨 청소비"
+                  className="w-full px-4 py-3 rounded-xl bg-[var(--card)] border border-[var(--border)] text-[15px] outline-none placeholder:text-[var(--sub)]" />
+              </div>
+              <div>
+                <label className="text-[13px] font-semibold mb-1.5 block">금액 (원)</label>
+                <input type="number" value={extraAmount} onChange={e => setExtraAmount(e.target.value)} placeholder="0"
+                  className="w-full px-4 py-3 rounded-xl bg-[var(--card)] border border-[var(--border)] text-[15px] outline-none placeholder:text-[var(--sub)]" />
+              </div>
+              <button onClick={() => {
+                if (!extraName.trim() || !extraAmount) return
+                setExtraItems(prev => [{ id: Date.now().toString(), name: extraName.trim(), amount: Number(extraAmount), paid: false, createdAt: new Date().toISOString().split('T')[0] }, ...prev])
+                setExtraName(''); setExtraAmount(''); setShowExtraSheet(false)
+              }} disabled={!extraName.trim() || !extraAmount}
+                className="w-full py-4 rounded-xl bg-[#3182F6] text-white text-[15px] font-bold disabled:opacity-40">
+                등록하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
