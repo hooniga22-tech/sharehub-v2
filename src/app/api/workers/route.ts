@@ -4,19 +4,17 @@ import { getSheetData, appendRow } from '@/lib/sheets'
 export async function GET() {
   try {
     const rows = await getSheetData('용역')
+    // 헤더: ID[0] 날짜[1] 하우스명[2] 담당자[3] 종류[4] 비용[5] 메모[6] 완료여부[7]
     const workers = rows.map((row, index) => ({
       _rowIndex: index,
       id: row[0] || '',
-      name: row[1] || '',
+      scheduledDate: row[1] || '',
       houseName: row[2] || '',
-      taskType: row[3] || '',
-      scheduledDate: row[4] || '',
-      isDone: row[5] || 'N',
-      payment: Number(row[6]) || 0,
-      issueId: row[7] || '',
-      memo: row[8] || '',
-      token: row[9] || '',
-      createdAt: row[10] || '',
+      name: row[3] || '',
+      taskType: row[4] || '',
+      payment: Number(row[5]) || 0,
+      memo: row[6] || '',
+      isDone: row[7] || 'N',
     }))
     return NextResponse.json(workers)
   } catch (e) {
@@ -30,18 +28,16 @@ export async function POST(req: Request) {
     const id = `worker_${Date.now()}`
     const token = Math.random().toString(36).slice(2, 10)
     const today = new Date().toISOString().split('T')[0]
+    // 헤더: ID[0] 날짜[1] 하우스명[2] 담당자[3] 종류[4] 비용[5] 메모[6] 완료여부[7]
     await appendRow('용역', [
       id,
-      body.name || '',
+      body.scheduledDate || today,
       body.houseName || '',
+      body.name || '',
       body.taskType || '',
-      body.scheduledDate || '',
-      'N',
       body.payment || 0,
-      body.issueId || '',
       body.memo || '',
-      token,
-      today,
+      'N',
     ])
     return NextResponse.json({ ok: true, id, token })
   } catch (e) {
