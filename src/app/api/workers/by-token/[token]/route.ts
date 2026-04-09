@@ -1,42 +1,54 @@
 import { NextResponse } from 'next/server'
-import { getSheetData } from '@/lib/sheets'
+import { google } from 'googleapis'
 
-export async function GET(_: Request, { params }: { params: Promise<{ token: string }> }) {
+const WORKERS: Record<string, string> = {
+  'b775a18c876534ee': '이인실',
+  '4b594c769b0aa6ab': '이미경',
+  'e8f27ed8eab30c68': '이한나',
+  '2d79c5c07cfb8e4c': '진진수',
+  '9a495582ad427525': '김기진',
+}
+
+export async function GET(
+  req: Request,
+  { params }: { params: { token: string } }
+) {
   try {
-    const { token } = await params
-    const workers = await getSheetData('용역담당자')
-    const worker = workers.find(r => r[6] === token)
-    if (!worker) return NextResponse.json({ error: 'not found' }, { status: 404 })
+    const workerName = WORKERS[params.token]
+    if (!workerName) {
+      return NextResponse.json({ error: 'invalid token' }, { status: 404 })
+    }
 
-    const workerName = worker[1]?.trim()
-    const schedules = await getSheetData('용역')
-
-    // row: [0]ID [1]담당자명 [2]지점명 [3]작업종류 [4]예정일 [5]완료여부 [6]정산금액 [7]이슈ID [8]메모 [9]링크토큰 [10]등록일
-    const mySchedules = schedules
-      .filter(r => r[1]?.trim() === workerName)
-      .map((r, i) => ({
-        _rowIndex: i,
-        id: r[0] || '',
-        workerName: r[1] || '',
-        houseName: r[2] || '',
-        type: r[3] || '',
-        date: r[4] || '',
-        isDone: r[5] === 'Y',
-        amount: Number(r[6]) || 0,
-        issueId: r[7] || '',
-        memo: r[8] || '',
-      }))
-      .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
-
-    return NextResponse.json({
-      worker: {
-        id: worker[0], name: worker[1], phone: worker[2], account: worker[3],
-        field: worker[4], type: worker[5], token: worker[6],
-        defaultAmount: Number(worker[7]) || 55000,
+    const auth = new google.auth.GoogleAuth({
+      credentials: {
+        client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        private_key: (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
       },
-      schedules: mySchedules,
+      scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly']
     })
-  } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 500 })
+    const sheets = google.sheets({ version: 'v4', auth })
+
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.GOOGLE_SHEETS_ID,
+      range: '용역!A:H'
+    })
+
+    const rows = res.data.values || []
+    const schedules = rows.slice(1)
+      .map(r => ({
+        id: r[0] || '',
+        scheduledDate: r[1] || '',
+        houseName: r[2] || '',
+        name: r[3] || '',
+        taskType: r[4] || '',
+        cost: Number(r[5]) || 0,
+        memo: r[6] || '',
+        isDone: r[7] === 'Y',
+      }))
+      .filter(s => s.name === workerName)
+
+    return NextResponse.json({ name: workerName, schedules })
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
