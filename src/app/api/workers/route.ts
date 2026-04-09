@@ -8,7 +8,7 @@ export async function GET() {
       scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly']
     })
     const sheets = google.sheets({ version: 'v4', auth })
-    const spreadsheetId = process.env.GOOGLE_SHEET_ID
+    const spreadsheetId = process.env.GOOGLE_SHEETS_ID
 
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId,
