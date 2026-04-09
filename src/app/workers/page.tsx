@@ -4,8 +4,17 @@ import { useState, useEffect, useMemo } from 'react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Chip } from '@/components/ui/Chip'
 import { Card } from '@/components/ui/Card'
-import { X, Plus, Calendar, CheckCircle, Loader2, Copy, Check, ExternalLink } from 'lucide-react'
+import { X, Plus, Calendar, CheckCircle, Loader2 } from 'lucide-react'
 import WorkerCalendar from '@/components/ui/WorkerCalendar'
+import Link from 'next/link'
+
+const WORKERS = [
+  { name: '이인실', token: 'b775a18c876534ee', role: '청소' },
+  { name: '이미경', token: '4b594c769b0aa6ab', role: '청소' },
+  { name: '이한나', token: 'e8f27ed8eab30c68', role: '청소' },
+  { name: '진진수', token: '2d79c5c07cfb8e4c', role: '수리' },
+  { name: '김기진', token: '9a495582ad427525', role: '수리' },
+]
 
 interface WorkerItem {
   _rowIndex: number; id: string; name: string; houseName: string;
@@ -34,8 +43,6 @@ export default function WorkersPage() {
   const [taskFilter, setTaskFilter] = useState('전체')
   const [showCreate, setShowCreate] = useState(false)
   const [completeTarget, setCompleteTarget] = useState<WorkerItem | null>(null)
-  const [portalWorkers, setPortalWorkers] = useState<{ name: string; token: string }[]>([])
-  const [linkCopied, setLinkCopied] = useState('')
 
   function fetchWorkers() {
     setLoading(true)
@@ -49,14 +56,6 @@ export default function WorkersPage() {
   useEffect(() => {
     fetchWorkers()
     fetch('/api/workers/by-token/list-all').catch(() => {})
-    // Fetch portal workers
-    fetch('/api/sheets?sheet=용역담당자')
-      .then(r => r.json())
-      .then(d => {
-        const rows = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : [])
-        setPortalWorkers(rows.map((r: string[]) => ({ name: r[1]?.trim() || '', token: r[6] || '' })).filter((w: { token: string }) => w.token))
-      })
-      .catch(() => {})
     fetch('/api/sheets?sheet=지점')
       .then(r => r.json())
       .then(d => {
@@ -108,6 +107,21 @@ export default function WorkersPage() {
         }
       />
 
+      <div className="grid grid-cols-2 gap-3 mb-4 px-5 mt-3">
+        {WORKERS.map(w => (
+          <Link key={w.token} href={`/worker/${w.token}`}
+            className="bg-[var(--card)] rounded-2xl px-4 py-3 flex items-center gap-3 border border-[var(--border)]">
+            <div className="w-10 h-10 rounded-full bg-[#EBF3FE] flex items-center justify-center text-[15px] font-bold text-[#0C447C]">
+              {w.name[0]}
+            </div>
+            <div>
+              <p className="text-[14px] font-bold">{w.name}</p>
+              <p className="text-[12px] text-[var(--sub)]">{w.role}</p>
+            </div>
+          </Link>
+        ))}
+      </div>
+
       <WorkerCalendar />
 
       <div className="flex-1 overflow-y-auto px-5 pb-8">
@@ -122,34 +136,6 @@ export default function WorkersPage() {
             <p className="text-[22px] font-bold text-[var(--blue)] mt-0.5">{toMan(thisMonthPayment)}원</p>
           </div>
         </div>
-
-        {/* Worker Portal Links */}
-        {portalWorkers.length > 0 && (
-          <div className="mt-4">
-            <p className="text-[13px] font-bold text-[var(--foreground)] mb-2">담당자 개인 페이지</p>
-            <div className="grid grid-cols-2 gap-2">
-              {portalWorkers.map(pw => (
-                <div key={pw.token} className="rounded-2xl bg-[var(--card)] border border-[var(--border)] p-3.5 flex flex-col gap-2.5">
-                  <p className="text-[15px] font-bold">{pw.name}</p>
-                  <div className="flex gap-1.5">
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(`${window.location.origin}/worker/${pw.token}`)
-                        setLinkCopied(pw.token); setTimeout(() => setLinkCopied(''), 2000)
-                      }}
-                      className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-[12px] font-bold transition-colors ${linkCopied === pw.token ? 'bg-[var(--green-light)] text-[var(--green)]' : 'bg-[var(--blue-light)] text-[var(--blue)]'}`}>
-                      {linkCopied === pw.token ? <><Check size={12} />복사됨</> : <><Copy size={12} />링크복사</>}
-                    </button>
-                    <a href={`/worker/${pw.token}`} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-1 px-3 py-2 rounded-xl bg-[var(--border)] text-[var(--sub)] text-[12px] font-bold">
-                      <ExternalLink size={12} />열기
-                    </a>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Done Filter */}
         <div className="flex gap-2 mt-4 overflow-x-auto no-scrollbar">
