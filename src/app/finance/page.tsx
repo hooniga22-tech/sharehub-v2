@@ -87,94 +87,61 @@ export default function FinancePage() {
       <PageHeader title="관리" />
 
       <div className="flex-1 overflow-y-auto px-5 pb-24">
-        {/* Utility Link */}
-        <Link href="/utility" className="flex items-center gap-3 px-4 py-3 mt-3 rounded-xl bg-[var(--card)] border border-[var(--border)]">
-          <div className="w-9 h-9 rounded-xl bg-[var(--amber-light)] flex items-center justify-center">
-            <Receipt size={18} color="var(--amber)" />
-          </div>
-          <div className="flex-1">
-            <p className="text-[14px] font-semibold">공과금 관리</p>
-            <p className="text-[11px] text-[var(--sub)]">지점별 월별 공과금 입력 및 조회</p>
-          </div>
+
+        {/* ─── 운영 관리 ─── */}
+        <p className="text-[13px] font-bold text-[var(--sub)] mt-4 mb-2">운영 관리</p>
+
+        <Link href="/vacancy" className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--card)] border border-[var(--border)]">
+          <div className="w-9 h-9 rounded-xl bg-[var(--red-light)] flex items-center justify-center"><Home size={18} color="var(--red)" /></div>
+          <div className="flex-1"><p className="text-[14px] font-semibold">공실 관리</p><p className="text-[11px] text-[var(--sub)]">지역별 공실 및 예정 현황</p></div>
           <ChevronRight size={16} color="var(--sub)" />
         </Link>
 
-        {/* Worker Link */}
         <Link href="/workers" className="flex items-center gap-3 px-4 py-3 mt-2 rounded-xl bg-[var(--card)] border border-[var(--border)]">
-          <div className="w-9 h-9 rounded-xl bg-[var(--blue-light)] flex items-center justify-center">
-            <Wrench size={18} color="var(--blue)" />
-          </div>
-          <div className="flex-1">
-            <p className="text-[14px] font-semibold">용역 관리</p>
-            <p className="text-[11px] text-[var(--sub)]">청소/수리 일정 등록 및 정산</p>
-          </div>
+          <div className="w-9 h-9 rounded-xl bg-[var(--blue-light)] flex items-center justify-center"><Wrench size={18} color="var(--blue)" /></div>
+          <div className="flex-1"><p className="text-[14px] font-semibold">용역 관리</p><p className="text-[11px] text-[var(--sub)]">청소/수리 일정 등록 및 정산</p></div>
           <div className="flex items-center gap-2">
-            {pendingWorkers > 0 && (
-              <span className="px-2 py-0.5 rounded-full bg-[var(--amber-light)] text-[var(--amber)] text-[11px] font-bold">
-                {pendingWorkers}건
-              </span>
-            )}
+            {pendingWorkers > 0 && <span className="px-2 py-0.5 rounded-full bg-[var(--amber-light)] text-[var(--amber)] text-[11px] font-bold">{pendingWorkers}건</span>}
             <ChevronRight size={16} color="var(--sub)" />
           </div>
         </Link>
 
-        {/* Opex Link */}
-        <Link href="/opex" className="flex items-center gap-3 px-4 py-3 mt-2 rounded-xl bg-[var(--card)] border border-[var(--border)]">
-          <div className="w-9 h-9 rounded-xl bg-[var(--red-light)] flex items-center justify-center">
-            <Wallet size={18} color="var(--red)" />
-          </div>
-          <div className="flex-1">
-            <p className="text-[14px] font-semibold">지출 관리</p>
-            <p className="text-[11px] text-[var(--sub)]">공과금 + 기타지출 통합 관리</p>
-          </div>
-          <ChevronRight size={16} color="var(--sub)" />
-        </Link>
-
-        {/* Duty Link */}
         <Link href="/duty" className="flex items-center gap-3 px-4 py-3 mt-2 rounded-xl bg-[var(--card)] border border-[var(--border)]">
-          <div className="w-9 h-9 rounded-xl bg-[#F3EAFF] flex items-center justify-center">
-            <Sparkles size={18} color="#7C3AED" />
-          </div>
-          <div className="flex-1">
-            <p className="text-[14px] font-semibold">당번 관리</p>
-            <p className="text-[11px] text-[var(--sub)]">지점별 청소 당번 배정 및 벌금</p>
-          </div>
+          <div className="w-9 h-9 rounded-xl bg-[#F3EAFF] flex items-center justify-center"><Sparkles size={18} color="#7C3AED" /></div>
+          <div className="flex-1"><p className="text-[14px] font-semibold">당번 관리</p><p className="text-[11px] text-[var(--sub)]">지점별 청소 당번 배정 및 벌금</p></div>
           <ChevronRight size={16} color="var(--sub)" />
         </Link>
 
-        {/* Investor Link */}
-        <Link href="/investors" className="flex items-center gap-3 px-4 py-3 mt-2 rounded-xl bg-[var(--card)] border border-[var(--border)]">
-          <div className="w-9 h-9 rounded-xl bg-[var(--green-light)] flex items-center justify-center">
-            <TrendingUp size={18} color="var(--green)" />
-          </div>
-          <div className="flex-1">
-            <p className="text-[14px] font-semibold">투자자 관리</p>
-            <p className="text-[11px] text-[var(--sub)]">투자자별 수익 현황 링크 관리</p>
-          </div>
-          <ChevronRight size={16} color="var(--sub)" />
-        </Link>
-
-        {/* Applications Link */}
         <Link href="/applications" className="flex items-center gap-3 px-4 py-3 mt-2 rounded-xl bg-[var(--card)] border border-[var(--border)]">
-          <div className="w-9 h-9 rounded-xl bg-[#E8F8EE] flex items-center justify-center">
-            <ClipboardList size={18} color="#27500A" />
-          </div>
-          <div className="flex-1">
-            <p className="text-[14px] font-semibold">신청 관리</p>
-            <p className="text-[11px] text-[var(--sub)]">투어 신청 내역 확인 및 상태 관리</p>
-          </div>
+          <div className="w-9 h-9 rounded-xl bg-[#E8F8EE] flex items-center justify-center"><ClipboardList size={18} color="#27500A" /></div>
+          <div className="flex-1"><p className="text-[14px] font-semibold">신청 관리</p><p className="text-[11px] text-[var(--sub)]">투어 신청 내역 확인 및 상태 관리</p></div>
           <ChevronRight size={16} color="var(--sub)" />
         </Link>
 
-        {/* Vacancy Link */}
-        <Link href="/vacancy" className="flex items-center gap-3 px-4 py-3 mt-2 rounded-xl bg-[var(--card)] border border-[var(--border)]">
-          <div className="w-9 h-9 rounded-xl bg-[var(--red-light)] flex items-center justify-center">
-            <Home size={18} color="var(--red)" />
-          </div>
-          <div className="flex-1">
-            <p className="text-[14px] font-semibold">공실 관리</p>
-            <p className="text-[11px] text-[var(--sub)]">지역별 공실 및 예정 현황</p>
-          </div>
+        <Link href="/investors" className="flex items-center gap-3 px-4 py-3 mt-2 rounded-xl bg-[var(--card)] border border-[var(--border)]">
+          <div className="w-9 h-9 rounded-xl bg-[var(--green-light)] flex items-center justify-center"><TrendingUp size={18} color="var(--green)" /></div>
+          <div className="flex-1"><p className="text-[14px] font-semibold">투자자 관리</p><p className="text-[11px] text-[var(--sub)]">투자자별 수익 현황 링크 관리</p></div>
+          <ChevronRight size={16} color="var(--sub)" />
+        </Link>
+
+        {/* ─── 정산 관리 ─── */}
+        <p className="text-[13px] font-bold text-[var(--sub)] mt-5 mb-2">정산 관리</p>
+
+        <Link href="/finance/profit" className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--card)] border border-[var(--border)]">
+          <div className="w-9 h-9 rounded-xl bg-[var(--blue-light)] flex items-center justify-center"><TrendingUp size={18} color="var(--blue)" /></div>
+          <div className="flex-1"><p className="text-[14px] font-semibold">매출 · 순이익</p><p className="text-[11px] text-[var(--sub)]">월별 수입 및 순이익 현황</p></div>
+          <ChevronRight size={16} color="var(--sub)" />
+        </Link>
+
+        <Link href="/opex" className="flex items-center gap-3 px-4 py-3 mt-2 rounded-xl bg-[var(--card)] border border-[var(--border)]">
+          <div className="w-9 h-9 rounded-xl bg-[var(--red-light)] flex items-center justify-center"><Wallet size={18} color="var(--red)" /></div>
+          <div className="flex-1"><p className="text-[14px] font-semibold">지출 관리</p><p className="text-[11px] text-[var(--sub)]">공과금 + 기타지출 통합 관리</p></div>
+          <ChevronRight size={16} color="var(--sub)" />
+        </Link>
+
+        <Link href="/utility" className="flex items-center gap-3 px-4 py-3 mt-2 rounded-xl bg-[var(--card)] border border-[var(--border)]">
+          <div className="w-9 h-9 rounded-xl bg-[var(--amber-light)] flex items-center justify-center"><Receipt size={18} color="var(--amber)" /></div>
+          <div className="flex-1"><p className="text-[14px] font-semibold">공과금 관리</p><p className="text-[11px] text-[var(--sub)]">지점별 월별 공과금 입력 및 조회</p></div>
           <ChevronRight size={16} color="var(--sub)" />
         </Link>
 

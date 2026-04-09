@@ -128,10 +128,10 @@ export default function DashboardPage() {
             <div className="rounded-2xl bg-[#3182F6] p-5">
               <p className="text-[13px] text-white/70">{f!.year}년 {f!.month}월 순이익</p>
               <p className="text-[30px] font-bold text-white mt-1">{toMan(f!.totalProfit)}원</p>
-              <p className="text-[12px] text-white/60 mt-2">
-                수입 {toMan(f!.totalIncome)} / 지출 {toMan(f!.totalExpense)}
-              </p>
             </div>
+
+            {/* ①-b Today's Schedule */}
+            <TodaySchedule />
 
             <ScheduleCalendar />
 
@@ -351,6 +351,60 @@ export default function DashboardPage() {
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px]">
         <BottomTab />
       </div>
+    </div>
+  )
+}
+
+function TodaySchedule() {
+  const [items, setItems] = useState<{ type: string; label: string; sub: string; color: string }[]>([])
+  const todayStr = new Date().toISOString().split('T')[0]
+  const d = new Date()
+  const todayLabel = `${d.getMonth() + 1}월 ${d.getDate()}일 ${'일월화수목금토'[d.getDay()]}요일`
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/workers').then(r => r.json()).catch(() => []),
+      fetch('/api/issues').then(r => r.json()).catch(() => ({ issues: [] })),
+    ]).then(([wRes, iRes]) => {
+      const all: typeof items = []
+      const workers = Array.isArray(wRes) ? wRes : []
+      const issues = (iRes?.issues || (Array.isArray(iRes) ? iRes : [])) as { houseName: string; title: string; status: string }[]
+
+      workers.forEach((w: { scheduledDate?: string; houseName?: string; name?: string; taskType?: string }) => {
+        if ((w.scheduledDate || '').startsWith(todayStr))
+          all.push({ type: 'work', label: `${w.houseName} · ${w.name}`, sub: `${w.taskType} · 용역`, color: '#3182F6' })
+      })
+      issues.forEach(i => {
+        if (i.status === '접수' || i.status === '진행중')
+          all.push({ type: 'issue', label: `${i.houseName} · ${i.title}`, sub: `${i.status} · 미처리`, color: '#E24B4A' })
+      })
+      setItems(all)
+    })
+  }, [])
+
+  return (
+    <div className="rounded-2xl bg-[var(--card)] overflow-hidden">
+      <div className="flex justify-between items-center px-4 py-3.5 border-b border-[var(--border)]">
+        <span className="text-[14px] font-bold">오늘의 일정</span>
+        <span className="text-[12px] text-[var(--sub)]">{todayLabel}</span>
+      </div>
+      {items.length === 0 ? (
+        <div className="px-4 py-5 text-center">
+          <p className="text-[13px] text-[var(--sub)]">오늘 예정된 일정이 없어요</p>
+        </div>
+      ) : (
+        <div className="px-4 py-2">
+          {items.map((item, i) => (
+            <div key={i} className={`flex items-center gap-3 py-3 ${i < items.length - 1 ? 'border-b border-[var(--border)]' : ''}`}>
+              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: item.color }} />
+              <div className="flex-1 min-w-0">
+                <p className="text-[14px] truncate">{item.label}</p>
+                <p className="text-[11px] text-[var(--sub)] mt-0.5">{item.sub}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
