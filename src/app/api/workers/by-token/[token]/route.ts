@@ -34,20 +34,25 @@ export async function GET(
     })
 
     const rows = res.data.values || []
+    // 헤더: ID(0) 날짜(1) 하우스명(2) 담당자(3) 종류(4) 비용(5) 메모(6) 완료여부(7)
     const schedules = rows.slice(1)
       .map(r => ({
         id: r[0] || '',
-        scheduledDate: r[1] || '',
+        date: r[1] || '',
         houseName: r[2] || '',
-        name: r[3] || '',
-        taskType: r[4] || '',
-        cost: Number(r[5]) || 0,
+        workerName: r[3] || '',
+        type: r[4] || '',
+        amount: Number(r[5]) || 0,
         memo: r[6] || '',
         isDone: r[7] === 'Y',
       }))
-      .filter(s => s.name === workerName)
+      .filter(s => s.workerName === workerName)
+      .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
 
-    return NextResponse.json({ name: workerName, schedules })
+    return NextResponse.json({
+      worker: { name: workerName, token: params.token },
+      schedules,
+    })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
