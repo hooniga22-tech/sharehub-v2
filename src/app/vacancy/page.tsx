@@ -1,151 +1,209 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { PageHeader } from '@/components/ui/PageHeader'
+import { useRouter } from 'next/navigation'
+import { ChevronLeft } from 'lucide-react'
 
-interface TenantRow { houseName: string; roomCode: string; name: string; endDate: string; status: string }
-interface HouseRow { name: string; district: string }
+interface Tenant {
+  id: string; houseName: string; roomCode: string; name: string;
+  status: string; endDate: string; startDate: string;
+}
+interface House {
+  id: string; name: string; address: string; district: string;
+}
 
 export default function VacancyPage() {
-  const [tenants, setTenants] = useState<TenantRow[]>([])
-  const [houses, setHouses] = useState<HouseRow[]>([])
+  const router = useRouter()
+  const [tenants, setTenants] = useState<Tenant[]>([])
+  const [houses, setHouses] = useState<House[]>([])
   const [loading, setLoading] = useState(true)
-  const [districtFilter, setDistrictFilter] = useState('전체')
+  const [district, setDistrict] = useState('전체')
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/sheets?sheet=입주자').then(r => r.json()).catch(() => []),
+      fetch('/api/tenants').then(r => r.json()).catch(() => []),
       fetch('/api/houses').then(r => r.json()).catch(() => []),
-    ]).then(([tRows, hRows]) => {
-      const ts = Array.isArray(tRows) ? tRows : []
-      setTenants(ts.map((r: string[]) => ({
-        houseName: r[2]?.trim() || '', roomCode: r[3] || '', name: r[4] || '',
-        endDate: r[10] || '', status: r[11] || '',
-      })))
-      if (Array.isArray(hRows)) setHouses(hRows.map((h: { name: string; district: string }) => ({ name: h.name, district: h.district })))
+    ]).then(([t, h]) => {
+      if (Array.isArray(t)) setTenants(t)
+      if (Array.isArray(h)) setHouses(h)
     }).finally(() => setLoading(false))
   }, [])
 
   const today = new Date()
-  const districts = useMemo(() => ['전체', ...new Set(houses.map(h => h.district).filter(Boolean))], [houses])
+  today.setHours(0, 0, 0, 0)
 
-  // 현재 공실: 퇴실 또는 공실 상태
-  const vacant = useMemo(() => {
-    return tenants
-      .filter(t => t.status === '퇴실' || t.status === '공실')
-      .filter(t => districtFilter === '전체' || houses.find(h => h.name === t.houseName)?.district === districtFilter)
-      .map(t => {
-        const h = houses.find(x => x.name === t.houseName)
-        const vacantDays = t.endDate ? Math.max(0, Math.ceil((today.getTime() - new Date(t.endDate).getTime()) / 86400000)) : 0
-        return { ...t, district: h?.district || '', vacantDays }
-      })
-  }, [tenants, houses, districtFilter])
+  // 공실: status가 '공실' '퇴실' '미입주' 인 경우
+  const vacancies = useMemo(() =>
+    tenants.filter(t => {
+      const s = t.status || ''
+      return s === '공실' || s === '퇴실' || s === '미입주'
+    }), [tenants])
 
-  // 공실 예정: 입주중 + 30일 이내 만료
-  const upcoming = useMemo(() => {
-    return tenants
-      .filter(t => {
-        if (t.status !== '입주중' || !t.endDate) return false
-        const dDay = Math.ceil((new Date(t.endDate).getTime() - today.getTime()) / 86400000)
-        return dDay >= 0 && dDay <= 30
-      })
-      .filter(t => districtFilter === '전체' || houses.find(h => h.name === t.houseName)?.district === districtFilter)
-      .map(t => {
-        const h = houses.find(x => x.name === t.houseName)
-        const dDay = Math.ceil((new Date(t.endDate).getTime() - today.getTime()) / 86400000)
-        return { ...t, district: h?.district || '', dDay }
-      })
-      .sort((a, b) => a.dDay - b.dDay)
-  }, [tenants, houses, districtFilter])
+  // 공실예정: 입주중이고 30일 이내 퇴실
+  const soonVacancies = useMemo(() =>
+    tenants.filter(t => {
+      if (t.status !== '입주중') return false
+      if (!t.endDate) return false
+      const end = new Date(t.endDate)
+      const diff = Math.ceil((end.getTime() - today.getTime()) / 86400000)
+      return diff >= 0 && diff <= 30
+    }).sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime()),
+    [tenants, today])
+
+  // 지역 목록 추출
+  const districts = useMemo(() => {
+    const set = new Set<string>()
+    tenants.forEach(t => {
+      const h = houses.find(h => h.name === t.houseName)
+      const addr = h?.address || h?.district || ''
+      const match = addr.match(/([가-힣]+구)/)
+      if (match) set.add(match[1])
+    })
+    return ['전체', ...Array.from(set).sort()]
+  }, [tenants, houses])
+
+  function getDistrict(houseName: string) {
+    const h = houses.find(h => h.name === houseName)
+    const addr = h?.address || ''
+    const match = addr.match(/([가-힣]+구)/)
+    return match ? match[1] : ''
+  }
+
+  const filteredVacancies = district === '전체'
+    ? vacancies
+    : vacancies.filter(t => getDistrict(t.houseName) === district)
+
+  const filteredSoon = district === '전체'
+    ? soonVacancies
+    : soonVacancies.filter(t => getDistrict(t.houseName) === district)
+
+  function vacancyDays(t: Tenant) {
+    if (!t.endDate) return 0
+    const end = new Date(t.endDate)
+    return Math.max(0, Math.ceil((today.getTime() - end.getTime()) / 86400000))
+  }
+
+  function dDay(endDate: string) {
+    const end = new Date(endDate)
+    return Math.ceil((end.getTime() - today.getTime()) / 86400000)
+  }
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#F9FAFB]">
-      <PageHeader title="공실 관리" />
+    <div className="min-h-screen bg-[var(--bg)]">
 
-      {/* Blue Header */}
-      <div className="px-4 pt-5 pb-4" style={{ background: '#3182F6' }}>
-        <p className="text-[13px] text-white/80 mb-3">공실 현황</p>
-        <div className="flex items-center">
+      {/* 파란 헤더 */}
+      <div style={{background:'#3182F6'}}>
+        <div className="flex items-center gap-2 px-4 pt-12 pb-4">
+          <button onClick={() => router.back()}>
+            <ChevronLeft size={22} color="white" />
+          </button>
+          <span className="text-[17px] font-bold text-white">공실 관리</span>
+        </div>
+
+        {/* 요약 숫자 */}
+        <div className="flex items-center px-4 pb-4 gap-0">
           <div className="flex-1 text-center">
-            <p className="text-[26px] font-bold text-white">{vacant.length}</p>
-            <p className="text-[11px] text-white/70">현재 공실</p>
+            <div className="text-[26px] font-bold text-white">{loading ? '-' : filteredVacancies.length}</div>
+            <div className="text-[11px] text-white/70 mt-0.5">현재 공실</div>
           </div>
           <div className="w-[1px] h-8 bg-white/20" />
           <div className="flex-1 text-center">
-            <p className="text-[26px] font-bold text-white">{upcoming.length}</p>
-            <p className="text-[11px] text-white/70">30일내 예정</p>
+            <div className="text-[26px] font-bold text-white">{loading ? '-' : filteredSoon.length}</div>
+            <div className="text-[11px] text-white/70 mt-0.5">30일내 예정</div>
           </div>
           <div className="w-[1px] h-8 bg-white/20" />
           <div className="flex-1 text-center">
-            <p className="text-[26px] font-bold text-white">{houses.length}</p>
-            <p className="text-[11px] text-white/70">전체 지점</p>
+            <div className="text-[26px] font-bold text-white">{houses.length}</div>
+            <div className="text-[11px] text-white/70 mt-0.5">전체 지점</div>
           </div>
         </div>
-        <div className="flex gap-1.5 mt-4 overflow-x-auto no-scrollbar">
+
+        {/* 지역 필터 */}
+        <div className="flex gap-2 px-4 pb-4 overflow-x-auto no-scrollbar">
           {districts.map(d => (
-            <button key={d} onClick={() => setDistrictFilter(d)}
-              className="shrink-0 px-3 py-1 rounded-full text-[11px] font-semibold transition-colors"
-              style={districtFilter === d
-                ? { background: '#fff', color: '#191F28', fontWeight: 700 }
-                : { border: '1px solid rgba(255,255,255,0.3)', color: 'rgba(255,255,255,0.75)' }
-              }>{d}</button>
+            <button key={d} onClick={() => setDistrict(d)}
+              className="shrink-0 text-[12px] px-3.5 py-1.5 rounded-full transition-colors"
+              style={d === district
+                ? {background:'white', color:'#191F28', fontWeight:600}
+                : {border:'1px solid rgba(255,255,255,0.35)', color:'rgba(255,255,255,0.8)'}
+              }>
+              {d}
+            </button>
           ))}
         </div>
       </div>
 
-      <div className="flex-1 px-4 py-4 flex flex-col gap-5">
-        {loading ? (
-          <p className="text-[13px] text-gray-400 text-center py-8">불러오는 중...</p>
-        ) : (
-          <>
-            {/* 현재 공실 */}
-            <div>
-              <p className="text-[14px] font-bold mb-2">현재 공실</p>
-              {vacant.length === 0 ? (
-                <div className="rounded-2xl bg-[var(--card)] px-4 py-6 text-center">
-                  <p className="text-[14px] text-[var(--sub)]">현재 공실 없음</p>
-                </div>
-              ) : (
-                <div className="rounded-2xl bg-[var(--card)] overflow-hidden">
-                  {vacant.map((v, i) => (
-                    <div key={i} className={`flex justify-between items-center px-4 py-3.5 ${i > 0 ? 'border-t border-[var(--border)]' : ''}`}>
-                      <div>
-                        <p className="text-[15px] font-bold">{v.houseName} · {v.roomCode}</p>
-                        <p className="text-[12px] text-[var(--sub)] mt-1">{v.district} · {v.vacantDays}일째 공실</p>
-                      </div>
-                      <span className="text-[11px] font-medium px-2 py-1 rounded-[6px]" style={{ background: '#FCEBEB', color: '#791F1F' }}>공실</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+      {/* 본문 */}
+      <div className="px-4 py-5 flex flex-col gap-4">
 
-            {/* 공실 예정 */}
-            <div>
-              <p className="text-[14px] font-bold mb-2">공실 예정</p>
-              {upcoming.length === 0 ? (
-                <div className="rounded-2xl bg-[var(--card)] px-4 py-6 text-center">
-                  <p className="text-[14px] text-[var(--sub)]">30일 이내 공실 예정 없음</p>
-                </div>
-              ) : (
-                <div className="rounded-2xl bg-[var(--card)] overflow-hidden">
-                  {upcoming.map((u, i) => (
-                    <div key={i} className={`flex justify-between items-center px-4 py-3.5 ${i > 0 ? 'border-t border-[var(--border)]' : ''}`}>
-                      <div>
-                        <p className="text-[15px] font-bold">{u.houseName} · {u.roomCode} · {u.name}</p>
-                        <p className="text-[12px] text-[var(--sub)] mt-1">{u.district} · {u.endDate} 퇴실</p>
-                      </div>
-                      <span className="text-[11px] font-medium px-2 py-1 rounded-[6px]"
-                        style={u.dDay <= 7 ? { background: '#FCEBEB', color: '#791F1F' } : { background: '#FEF3E2', color: '#633806' }}>
-                        D-{u.dDay}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
+        {/* 현재 공실 */}
+        <div>
+          <p className="text-[14px] font-bold mb-2">현재 공실</p>
+          {loading ? (
+            <div className="rounded-2xl bg-[var(--card)] px-4 py-6 text-center">
+              <p className="text-[13px] text-[var(--sub)]">불러오는 중...</p>
             </div>
-          </>
-        )}
+          ) : filteredVacancies.length === 0 ? (
+            <div className="rounded-2xl bg-[var(--card)] px-4 py-6 text-center">
+              <p className="text-[14px] text-[var(--sub)]">현재 공실 없음</p>
+            </div>
+          ) : (
+            <div className="rounded-2xl bg-[var(--card)] overflow-hidden">
+              {filteredVacancies.map((t, i) => (
+                <div key={t.id}
+                  className={`px-4 py-3.5 flex items-center justify-between ${i < filteredVacancies.length - 1 ? 'border-b border-[var(--border)]' : ''}`}>
+                  <div>
+                    <p className="text-[15px] font-bold">{t.houseName} · {t.roomCode}</p>
+                    <p className="text-[12px] text-[var(--sub)] mt-1">
+                      {getDistrict(t.houseName)}{getDistrict(t.houseName) ? ' · ' : ''}{vacancyDays(t) > 0 ? `${vacancyDays(t)}일째 공실` : '공실'}
+                    </p>
+                  </div>
+                  <span className="text-[11px] font-medium px-2 py-1 rounded-[6px] bg-[#FCEBEB] text-[#791F1F]">공실</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* 공실 예정 */}
+        <div>
+          <p className="text-[14px] font-bold mb-2">공실 예정</p>
+          {loading ? (
+            <div className="rounded-2xl bg-[var(--card)] px-4 py-6 text-center">
+              <p className="text-[13px] text-[var(--sub)]">불러오는 중...</p>
+            </div>
+          ) : filteredSoon.length === 0 ? (
+            <div className="rounded-2xl bg-[var(--card)] px-4 py-6 text-center">
+              <p className="text-[14px] text-[var(--sub)]">30일 이내 공실 예정 없음</p>
+            </div>
+          ) : (
+            <div className="rounded-2xl bg-[var(--card)] overflow-hidden">
+              {filteredSoon.map((t, i) => {
+                const d = dDay(t.endDate)
+                const urgent = d <= 7
+                return (
+                  <div key={t.id}
+                    className={`px-4 py-3.5 flex items-center justify-between ${i < filteredSoon.length - 1 ? 'border-b border-[var(--border)]' : ''}`}>
+                    <div>
+                      <p className="text-[15px] font-bold">{t.houseName} · {t.roomCode} · {t.name}</p>
+                      <p className="text-[12px] text-[var(--sub)] mt-1">
+                        {getDistrict(t.houseName)}{getDistrict(t.houseName) ? ' · ' : ''}{t.endDate} 퇴실
+                      </p>
+                    </div>
+                    <span className="text-[11px] font-medium px-2 py-1 rounded-[6px]"
+                      style={urgent
+                        ? {background:'#FCEBEB', color:'#791F1F'}
+                        : {background:'#FEF3E2', color:'#633806'}
+                      }>
+                      D-{d}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   )

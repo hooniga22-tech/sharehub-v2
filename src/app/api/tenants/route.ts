@@ -1,5 +1,20 @@
 import { NextResponse } from 'next/server'
-import { appendRow } from '@/lib/sheets'
+import { getSheetData, appendRow } from '@/lib/sheets'
+
+export async function GET() {
+  try {
+    const rows = await getSheetData('입주자')
+    return NextResponse.json(rows.map((r, i) => ({
+      _rowIndex: i, id: r[0] || '', roomId: r[1] || '', houseName: r[2] || '',
+      roomCode: r[3] || '', name: r[4] || '', phone: r[5] || '',
+      rent: Number(r[6]) || 0, managementFee: Number(r[7]) || 0,
+      deposit: Number(r[8]) || 0, startDate: r[9] || '', endDate: r[10] || '',
+      status: r[11] || '', nationality: r[12] || '', memo: r[13] || '', token: r[14] || '',
+    })))
+  } catch (e) {
+    return NextResponse.json({ error: String(e) }, { status: 500 })
+  }
+}
 
 export async function POST(req: Request) {
   try {
