@@ -10,7 +10,7 @@ const tabs = [
   { href: '/tenants', label: '입주자', icon: Users },
   { href: '/issues', label: '이슈', icon: AlertCircle },
   { href: '/houses', label: '지점', icon: Building2 },
-  { href: '/finance', label: '정산', icon: BarChart2 },
+  { href: '/finance', label: '관리', icon: BarChart2 },
 ]
 
 export function BottomTab() {

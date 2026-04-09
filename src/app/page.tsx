@@ -148,7 +148,7 @@ export default function DashboardPage() {
                   <p className="text-[20px] font-bold text-[var(--green)]">{s!.activeTenants}명</p>
                 </Card>
               </Link>
-              <Link href="/tenants">
+              <Link href="/vacancy">
                 <Card className="p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-7 h-7 rounded-lg bg-[var(--red-light)] flex items-center justify-center">

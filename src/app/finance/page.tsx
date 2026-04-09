@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { Chip } from '@/components/ui/Chip'
 import { BottomTab } from '@/components/ui/BottomTab'
-import { ChevronLeft, ChevronRight, ChevronDown, Receipt, AlertTriangle, Wrench, TrendingUp, Wallet, Sparkles, ClipboardList } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, Receipt, AlertTriangle, Wrench, TrendingUp, Wallet, Sparkles, ClipboardList, Home } from 'lucide-react'
 import Link from 'next/link'
 
 interface HouseResult {
@@ -84,7 +84,7 @@ export default function FinancePage() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <PageHeader title="정산" />
+      <PageHeader title="관리" />
 
       <div className="flex-1 overflow-y-auto px-5 pb-24">
         {/* Utility Link */}
@@ -162,6 +162,18 @@ export default function FinancePage() {
           <div className="flex-1">
             <p className="text-[14px] font-semibold">신청 관리</p>
             <p className="text-[11px] text-[var(--sub)]">투어 신청 내역 확인 및 상태 관리</p>
+          </div>
+          <ChevronRight size={16} color="var(--sub)" />
+        </Link>
+
+        {/* Vacancy Link */}
+        <Link href="/vacancy" className="flex items-center gap-3 px-4 py-3 mt-2 rounded-xl bg-[var(--card)] border border-[var(--border)]">
+          <div className="w-9 h-9 rounded-xl bg-[var(--red-light)] flex items-center justify-center">
+            <Home size={18} color="var(--red)" />
+          </div>
+          <div className="flex-1">
+            <p className="text-[14px] font-semibold">공실 관리</p>
+            <p className="text-[11px] text-[var(--sub)]">지역별 공실 및 예정 현황</p>
           </div>
           <ChevronRight size={16} color="var(--sub)" />
         </Link>
