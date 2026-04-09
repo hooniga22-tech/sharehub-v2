@@ -124,13 +124,7 @@ export default function DashboardPage() {
           <p className="text-[13px] text-[var(--sub)] py-16 text-center">데이터를 불러올 수 없어요</p>
         ) : (
           <div className="px-5 flex flex-col gap-6 mt-4">
-            {/* ① Profit Main Card */}
-            <div className="rounded-2xl bg-[#3182F6] p-5">
-              <p className="text-[13px] text-white/70">{f!.year}년 {f!.month}월 순이익</p>
-              <p className="text-[30px] font-bold text-white mt-1">{toMan(f!.totalProfit)}원</p>
-            </div>
-
-            {/* ①-b Today's Schedule */}
+            {/* ① Today's Schedule */}
             <TodaySchedule />
 
             <ScheduleCalendar />
@@ -356,7 +350,7 @@ export default function DashboardPage() {
 }
 
 function TodaySchedule() {
-  const [items, setItems] = useState<{ type: string; label: string; sub: string; color: string }[]>([])
+  const [items, setItems] = useState<{ type: string; label: string; sub: string; color: string; href: string }[]>([])
   const todayStr = new Date().toISOString().split('T')[0]
   const d = new Date()
   const todayLabel = `${d.getMonth() + 1}월 ${d.getDate()}일 ${'일월화수목금토'[d.getDay()]}요일`
@@ -368,15 +362,15 @@ function TodaySchedule() {
     ]).then(([wRes, iRes]) => {
       const all: typeof items = []
       const workers = Array.isArray(wRes) ? wRes : []
-      const issues = (iRes?.issues || (Array.isArray(iRes) ? iRes : [])) as { houseName: string; title: string; status: string }[]
+      const issues = (iRes?.issues || (Array.isArray(iRes) ? iRes : [])) as { id: string; houseName: string; title: string; status: string }[]
 
       workers.forEach((w: { scheduledDate?: string; houseName?: string; name?: string; taskType?: string }) => {
         if ((w.scheduledDate || '').startsWith(todayStr))
-          all.push({ type: 'work', label: `${w.houseName} · ${w.name}`, sub: `${w.taskType} · 용역`, color: '#3182F6' })
+          all.push({ type: 'work', label: `${w.houseName} · ${w.name}`, sub: `${w.taskType} · 용역`, color: '#3182F6', href: '/workers' })
       })
       issues.forEach(i => {
         if (i.status === '접수' || i.status === '진행중')
-          all.push({ type: 'issue', label: `${i.houseName} · ${i.title}`, sub: `${i.status} · 미처리`, color: '#E24B4A' })
+          all.push({ type: 'issue', label: `${i.houseName} · ${i.title}`, sub: `${i.status} · 미처리`, color: '#E24B4A', href: `/issues/${i.id}` })
       })
       setItems(all)
     })
@@ -395,13 +389,15 @@ function TodaySchedule() {
       ) : (
         <div className="px-4 py-2">
           {items.map((item, i) => (
-            <div key={i} className={`flex items-center gap-3 py-3 ${i < items.length - 1 ? 'border-b border-[var(--border)]' : ''}`}>
+            <Link key={i} href={item.href}
+              className={`flex items-center gap-3 py-3 ${i < items.length - 1 ? 'border-b border-[var(--border)]' : ''}`}>
               <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: item.color }} />
               <div className="flex-1 min-w-0">
                 <p className="text-[14px] truncate">{item.label}</p>
                 <p className="text-[11px] text-[var(--sub)] mt-0.5">{item.sub}</p>
               </div>
-            </div>
+              <ChevronRight size={16} color="var(--sub)" />
+            </Link>
           ))}
         </div>
       )}
