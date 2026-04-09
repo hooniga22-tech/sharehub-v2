@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import AIAssistant from '@/components/ui/AIAssistant'
 
 export const metadata: Metadata = {
   title: '쉐어하우스 관리',
@@ -13,6 +14,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="max-w-[430px] mx-auto min-h-screen bg-[var(--bg)] relative">
           {children}
         </div>
+        <AIAssistant />
       </body>
     </html>
   )
