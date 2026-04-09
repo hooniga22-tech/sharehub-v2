@@ -3,8 +3,15 @@ import { google } from 'googleapis'
 
 export async function GET() {
   try {
+    const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
+      ? JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY)
+      : {
+          client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+          private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        }
+
     const auth = new google.auth.GoogleAuth({
-      credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY || '{}'),
+      credentials: serviceAccountKey,
       scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly']
     })
     const sheets = google.sheets({ version: 'v4', auth })
