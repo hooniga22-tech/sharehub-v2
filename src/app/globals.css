@@ -1,24 +1,36 @@
-@import "tailwindcss";
-
-:root {
-  --blue: #3182F6;
-  --blue-light: #EBF3FE;
-  --green: #00B33C;
-  --green-light: #E8F8EE;
-  --red: #F04452;
-  --red-light: #FEF0F0;
-  --amber: #F5A623;
-  --amber-light: #FFF8E6;
-  --bg: #F9FAFB;
-  --card: #ffffff;
-  --text: #191919;
-  --sub: #888888;
-  --border: #F2F2F2;
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-body {
-  background: var(--bg);
-  font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
-  color: var(--text);
+html, body {
+  font-family: inherit;
   -webkit-font-smoothing: antialiased;
+  color: #191919;
+  background: #e8e8e8;
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* 기본 링크 스타일 제거 */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+input {
+  border: none;
+  outline: none;
+  font: inherit;
 }

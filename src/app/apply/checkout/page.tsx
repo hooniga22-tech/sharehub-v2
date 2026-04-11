@@ -1,152 +1,201 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { useLang } from '@/hooks/useLang'
-import LangToggle from '@/components/ui/LangToggle'
-import { Check, Loader2 } from 'lucide-react'
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function CheckoutApplyPage() {
-  const { lang, toggle, t } = useLang()
-  const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [houseName, setHouseName] = useState('')
-  const [roomCode, setRoomCode] = useState('')
-  const [checkoutDate, setCheckoutDate] = useState('')
-  const [refundAccount, setRefundAccount] = useState('')
-  const [reason, setReason] = useState('')
-  const [memo, setMemo] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [done, setDone] = useState(false)
+const BANKS = ['카카오뱅크','국민은행','신한은행','우리은행','하나은행','농협','기업은행','케이뱅크','토스뱅크','SC제일은행','대구은행','부산은행','경남은행','광주은행','전북은행','제주은행','수협','신협','우체국','새마을금고'];
 
-  async function handleSubmit() {
-    if (!name.trim() || !phone.trim() || !houseName.trim() || !roomCode.trim() || !checkoutDate) return
-    setSubmitting(true)
-    await fetch('/api/apply/checkout', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name.trim(), phone: phone.trim(), houseName, roomCode, checkoutDate, refundAccount, reason, memo }),
-    })
-    setSubmitting(false)
-    setDone(true)
-  }
+const t = {
+  ko: {
+    title: '퇴실 신청',
+    deadline: '신청 기한', deadlineVal: '퇴실 14일 전',
+    checkoutTime: '퇴실 시간', checkoutTimeVal: '계약 종료일 오전 11시까지',
+    checkoutFee: '퇴실비', deposit: '보증금 환급', depositVal: '점검 후 최대 7일 이내',
+    step1Title: '쓰레기·짐·청소',
+    step1_1: '개인 쓰레기는 종량제 봉투 직접 구매해 배출',
+    step1_2: '대형 폐기물은 재활용센터 신고 후 신고번호 부착',
+    step2Title: '사진 전송 (필수)',
+    step2_warn: '미전송 시 확인 인력 투입 → 5만원 청구',
+    step2_1: '필수: 책상·침대 매트리스·침대 밑·서랍장 안·바닥 (최소 5장)',
+    step2_2: '화장실·부엌 수납장·냉장고·신발장·방키·에어컨 리모컨',
+    step3Title: '집기 상태 확인',
+    step3_1: '가구 이상 시 사진과 함께 전달',
+    step3_2: '매트리스·벽지·장판 오염·파손 시 비용 청구 가능',
+    step4Title: '하우스 단톡 퇴실',
+    step4_1: '퇴실 즉시 단톡에서도 퇴실',
+    step4_2: '미퇴실 시 강퇴 처리',
+    warning: '보증금 환급 계좌는 입주자 본인 명의만 가능. 해외송금 시 수수료 발생 가능',
+    thanks: '함께해주셔서 진심으로 감사해요 😄',
+    name: '이름', namePh: '이름을 입력하세요', room: '호실',
+    checkoutDate: '퇴실 희망일',
+    reason: '퇴실 사유', reasonPh: '사유를 선택하세요',
+    reason1: '계약만료', reason2: '개인사정', reason3: '직장/학교 이동', reason4: '기타',
+    bankAccount: '보증금 환급 계좌',
+    bank: '은행', bankPh: '은행 선택',
+    accountNum: '계좌번호', accountNumPh: '계좌번호 입력 (숫자만)',
+    holder: '예금주', holderPh: '예금주명 입력',
+    memo: '전달사항 (선택)', memoPh: '전달하실 내용이 있다면 적어주세요',
+    submit: '퇴실 신청하기',
+    vName: '이름을 입력해주세요.', vDate: '퇴실 희망일을 선택해주세요.',
+    vReason: '퇴실 사유를 선택해주세요.', vBank: '환급 계좌 정보를 모두 입력해주세요.',
+    done: '신청이 완료되었어요!',
+  },
+  en: {
+    title: 'Checkout Request',
+    deadline: 'Deadline', deadlineVal: '14 days before checkout',
+    checkoutTime: 'Checkout Time', checkoutTimeVal: 'By 11:00 AM on contract end date',
+    checkoutFee: 'Checkout Fee', deposit: 'Deposit Refund', depositVal: 'Within 7 days after inspection',
+    step1Title: 'Trash & Cleaning',
+    step1_1: 'Purchase volume-rate bags for personal trash disposal',
+    step1_2: 'Report large waste to recycling center, attach report number',
+    step2Title: 'Photo Submission (Required)',
+    step2_warn: 'If not submitted: inspection staff dispatched → 50,000 KRW charge',
+    step2_1: 'Required: desk, mattress, under bed, drawer interior, floor (min. 5 photos)',
+    step2_2: 'Bathroom, kitchen cabinet, fridge, shoe rack, room key, AC remote',
+    step3Title: 'Furniture Condition',
+    step3_1: 'Report any furniture damage with photos',
+    step3_2: 'Mattress, wallpaper, flooring stain/damage may incur charges',
+    step4Title: 'Leave Group Chat',
+    step4_1: 'Leave the house group chat immediately upon checkout',
+    step4_2: 'Forced removal if not done',
+    warning: "Deposit refund account must be in tenant's own name. Overseas transfer may incur fees.",
+    thanks: 'Thank you sincerely for staying with us 😄',
+    name: 'Name', namePh: 'Enter your name', room: 'Room',
+    checkoutDate: 'Preferred Checkout Date',
+    reason: 'Reason for Leaving', reasonPh: 'Select reason',
+    reason1: 'Contract expiry', reason2: 'Personal reasons', reason3: 'Job/School relocation', reason4: 'Other',
+    bankAccount: 'Deposit Refund Account',
+    bank: 'Bank', bankPh: 'Select bank',
+    accountNum: 'Account Number', accountNumPh: 'Numbers only',
+    holder: 'Account Holder', holderPh: 'Enter account holder name',
+    memo: 'Additional Notes (Optional)', memoPh: "Anything you'd like to communicate?",
+    submit: 'Submit Checkout Request',
+    vName: 'Please enter your name.', vDate: 'Please select checkout date.',
+    vReason: 'Please select a reason.', vBank: 'Please fill in all bank details.',
+    done: 'Request submitted!',
+  },
+};
 
-  if (done) return (
-    <div className="min-h-screen bg-[#F9FAFB] flex flex-col items-center justify-center px-8 text-center">
-      <div className="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center mb-4"><Check size={32} className="text-green-600" /></div>
-      <h2 className="text-[20px] font-bold">{t('퇴실 신청이 완료됐어요!', 'Check-out request submitted!')}</h2>
-      <p className="text-[13px] text-gray-500 mt-2 leading-relaxed">{t('함께해주셔서 진심으로 감사합니다.\n항상 응원하겠습니다.', 'Thank you so much for staying with us.\nWe wish you all the best.')}</p>
-    </div>
-  )
+const inputStyle: React.CSSProperties = { width:'100%', padding:'12px 14px', border:'1px solid #E8E8E8', borderRadius:10, fontSize:14, fontFamily:'inherit', boxSizing:'border-box', outline:'none' };
+const selectStyle: React.CSSProperties = { ...inputStyle, background:'#fff', appearance:'none', WebkitAppearance:'none', backgroundImage:"url(\"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%23999'/></svg>\")", backgroundRepeat:'no-repeat', backgroundPosition:'right 14px center' };
+const labelStyle: React.CSSProperties = { fontSize:13, fontWeight:600, color:'#333', display:'block', marginBottom:6 };
 
-  const REASONS = [
-    { ko: '계약만료', en: 'Contract end' },
-    { ko: '개인사정', en: 'Personal' },
-    { ko: '이사', en: 'Moving' },
-    { ko: '기타', en: 'Other' },
-  ]
+const steps = [
+  { num: 1, icon: '🗑️', titleKey: 'step1Title' as const, items: ['step1_1','step1_2'] as const },
+  { num: 2, icon: '📷', titleKey: 'step2Title' as const, items: ['step2_1','step2_2'] as const, warnKey: 'step2_warn' as const },
+  { num: 3, icon: '🧰', titleKey: 'step3Title' as const, items: ['step3_1','step3_2'] as const },
+  { num: 4, icon: '💬', titleKey: 'step4Title' as const, items: ['step4_1','step4_2'] as const },
+];
+
+export default function CheckoutPage() {
+  const router = useRouter();
+  const [lang, setLang] = useState<'ko'|'en'>('ko');
+  const [name, setName] = useState('');
+  const [date, setDate] = useState('');
+  const [reason, setReason] = useState('');
+  const [bank, setBank] = useState('');
+  const [account, setAccount] = useState('');
+  const [holder, setHolder] = useState('');
+  const T = t[lang];
+
+  const handleSubmit = () => {
+    if (!name) { alert(T.vName); return; }
+    if (!date) { alert(T.vDate); return; }
+    if (!reason) { alert(T.vReason); return; }
+    if (!bank || !account || !holder) { alert(T.vBank); return; }
+    alert(T.done); router.push('/apply');
+  };
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB]">
-      <div className="max-w-[480px] mx-auto px-5 py-6 pb-32">
-        <div className="flex items-start justify-between mb-5">
-          <div>
-            <p className="text-[13px] text-gray-400 font-medium">ShareHub</p>
-            <h1 className="text-[22px] font-bold mt-1">{t('퇴실 신청', 'Check-out Request')}</h1>
-          </div>
-          <LangToggle lang={lang} toggle={toggle} />
+    <div style={{ maxWidth:480, margin:'0 auto', minHeight:'100vh', background:'#F7F8FA' }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 20px', background:'#fff', borderBottom:'1px solid #F0F0F0', position:'sticky', top:0, zIndex:10 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          <button onClick={() => router.push('/apply')} style={{ background:'none', border:'none', fontSize:18, cursor:'pointer', padding:4, color:'#191919' }}>←</button>
+          <span style={{ fontSize:16, fontWeight:700 }}>{T.title}</span>
         </div>
+        <button onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')} style={{ background:'#F0F0F0', border:'none', borderRadius:8, padding:'6px 12px', fontSize:12, fontWeight:600, cursor:'pointer', color:'#555' }}>{lang === 'ko' ? 'EN' : 'KO'}</button>
+      </div>
 
-        {/* Checklist */}
-        <div className="rounded-xl bg-blue-50 border border-blue-200 p-4 mb-3">
-          <p className="text-[13px] font-bold text-blue-800 mb-2">{t('퇴실 체크리스트 (4가지 필수)', 'Check-out Checklist (4 required)')}</p>
-          <ol className="text-[11px] text-blue-700 space-y-2 list-decimal pl-4">
-            <li>{t('쓰레기·짐·가구 정리 + 청소', 'Dispose trash, remove belongings & clean')}<br /><span className="text-blue-500">{t('→ 개인 쓰레기는 종량제 봉투 구매 후 직접 배출', '→ Use your own trash bags')}</span></li>
-            <li>{t('사진 전송 필수 (미전송 시 5만원 청구)', 'Photos required (KRW 50,000 fee if not sent)')}<br /><span className="text-blue-500">{t('→ 방·화장실·냉장고·분리수거 공간 등 최소 5장', '→ Min. 5 photos: room, bathroom, fridge, trash area')}</span></li>
-            <li>{t('집기 상태 확인 (파손·오염 사진 포함)', 'Check item condition (include damage photos)')}</li>
-            <li>{t('하우스 단톡방 퇴실', 'Leave the group chat')}</li>
-          </ol>
-        </div>
-
-        {/* Checkout Fee */}
-        <div className="rounded-xl bg-red-50 border border-red-200 p-4 mb-3">
-          <p className="text-[13px] font-bold text-red-800 mb-1">{t('퇴실비', 'Check-out Fee')}</p>
-          <p className="text-[12px] text-red-700">{t('퇴실비 30,000원 (계약서에 따름)', 'Check-out fee: KRW 30,000 (as per contract)')}</p>
-          <p className="text-[11px] text-red-600 mt-1">{t('하우스 리프레쉬(시설 유지·교체·AS)에 사용됩니다.', 'Used for house refresh (maintenance, replacement, repairs).')}</p>
-        </div>
-
-        {/* Deposit Refund */}
-        <div className="rounded-xl bg-green-50 border border-green-200 p-4 mb-3">
-          <p className="text-[13px] font-bold text-green-800 mb-1">{t('보증금 환불', 'Deposit Refund')}</p>
-          <div className="text-[11px] text-green-700 space-y-1">
-            <p>{t('퇴실 확인 후 최대 7일 이내 환불', 'Refunded within 7 days after inspection')}</p>
-            <p>{t('환불 전 금액과 내역을 먼저 안내드립니다.', 'Refund amount shared in advance.')}</p>
-            <p>{t('본인 명의 계좌만 가능 (한국 계좌 또는 해외송금)', 'Must be under your name (Korean or international)')}</p>
+      <div style={{ padding:20 }}>
+        {/* Info Card */}
+        <div style={{ background:'#fff', borderRadius:14, padding:20, marginBottom:16 }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            <div style={{ display:'flex', justifyContent:'space-between' }}><span style={{ fontSize:13, color:'#666' }}>{T.deadline}</span><span style={{ fontSize:13, fontWeight:700, color:'#E53E3E' }}>{T.deadlineVal}</span></div>
+            <div style={{ display:'flex', justifyContent:'space-between' }}><span style={{ fontSize:13, color:'#666' }}>{T.checkoutTime}</span><span style={{ fontSize:13, fontWeight:500 }}>{T.checkoutTimeVal}</span></div>
+            <div style={{ display:'flex', justifyContent:'space-between' }}><span style={{ fontSize:13, color:'#666' }}>{T.checkoutFee}</span><span style={{ fontSize:13, fontWeight:700, color:'#E53E3E' }}>30,000원</span></div>
+            <div style={{ display:'flex', justifyContent:'space-between' }}><span style={{ fontSize:13, color:'#666' }}>{T.deposit}</span><span style={{ fontSize:13, fontWeight:500 }}>{T.depositVal}</span></div>
           </div>
         </div>
 
-        {/* Checkout Time */}
-        <div className="rounded-xl bg-gray-100 p-4 mb-5 text-[11px] text-gray-500 space-y-1">
-          <p>{t('계약 종료일 오전 11시', 'Check-out by 11am on contract end date')}</p>
-          <p>{t('11시까지 어렵다면 최소 7일 전 매니저와 상의', 'Contact manager at least 7 days in advance if unable')}</p>
+        {/* Step Cards */}
+        <div style={{ display:'flex', flexDirection:'column', gap:12, marginBottom:16 }}>
+          {steps.map(s => (
+            <div key={s.num} style={{ background:'#fff', borderRadius:14, padding:'16px 20px' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
+                <span style={{ background:'#3182F6', color:'#fff', width:22, height:22, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, flexShrink:0 }}>{s.num}</span>
+                <span style={{ fontSize:14, fontWeight:600 }}>{s.icon} {T[s.titleKey]}</span>
+              </div>
+              {s.warnKey && (
+                <div style={{ background:'#FFF5F5', borderRadius:8, padding:'8px 12px', marginBottom:8 }}>
+                  <span style={{ fontSize:12, color:'#E53E3E', fontWeight:600 }}>{T[s.warnKey]}</span>
+                </div>
+              )}
+              <ul style={{ margin:0, paddingLeft:20, display:'flex', flexDirection:'column', gap:4 }}>
+                {s.items.map(k => <li key={k} style={{ fontSize:12, color:'#555', lineHeight:1.5 }}>{T[k]}</li>)}
+              </ul>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ background:'#FFF5F5', borderRadius:12, padding:'14px 16px', marginBottom:12 }}>
+          <p style={{ fontSize:12, color:'#E53E3E', margin:0, lineHeight:1.5 }}>⚠️ {T.warning}</p>
+        </div>
+        <div style={{ background:'#F0FFF4', borderRadius:12, padding:'14px 16px', marginBottom:20 }}>
+          <p style={{ fontSize:12, color:'#276749', margin:0, lineHeight:1.5 }}>{T.thanks}</p>
         </div>
 
         {/* Form */}
-        <div className="rounded-xl bg-white border border-[#F2F2F2] p-5 space-y-4">
-          <F label={t('이름', 'Name')} required value={name} onChange={setName} />
-          <F label={t('연락처', 'Phone')} required value={phone} onChange={setPhone} type="tel" />
-          <F label={t('지점명', 'House Name')} required value={houseName} onChange={setHouseName} />
-          <F label={t('방 코드', 'Room Code')} required value={roomCode} onChange={setRoomCode} placeholder="A-1" />
-          <div>
-            <label className="text-[12px] font-semibold mb-1.5 block">{t('퇴실 예정일', 'Check-out Date')} <span className="text-red-500">*</span></label>
-            <input type="date" value={checkoutDate} onChange={e => setCheckoutDate(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-[#F9FAFB] border border-[#F2F2F2] text-[14px] outline-none" />
+        <div style={{ background:'#fff', borderRadius:14, padding:20 }}>
+          <div style={{ marginBottom:16 }}>
+            <label style={labelStyle}>{T.name}</label>
+            <input value={name} onChange={e => setName(e.target.value)} type="text" placeholder={T.namePh} style={inputStyle} />
           </div>
-          <div>
-            <label className="text-[12px] font-semibold mb-1.5 block">{t('보증금 환불 계좌', 'Refund Account')}</label>
-            <input value={refundAccount} onChange={e => setRefundAccount(e.target.value)}
-              placeholder={t('은행명 + 계좌번호 + 예금주', 'Bank + Account number + Holder')}
-              className="w-full px-4 py-3 rounded-xl bg-[#F9FAFB] border border-[#F2F2F2] text-[14px] outline-none placeholder:text-gray-300" />
-            <p className="text-[10px] text-gray-400 mt-1">{t('반드시 본인 명의 계좌를 입력해주세요', 'Must be under your name')}</p>
+          <div style={{ marginBottom:16 }}>
+            <label style={labelStyle}>{T.room}</label>
+            <input type="text" readOnly style={{ ...inputStyle, background:'#F7F8FA', color:'#666' }} />
           </div>
-          <div>
-            <label className="text-[12px] font-semibold block mb-1.5">{t('퇴실 사유', 'Reason')}</label>
-            <div className="grid grid-cols-2 gap-2">
-              {REASONS.map(r => (
-                <button key={r.ko} onClick={() => setReason(r.ko)}
-                  className={`py-2.5 rounded-xl text-[12px] font-semibold border transition-colors ${
-                    reason === r.ko ? 'border-[#3182F6] bg-blue-50 text-[#3182F6]' : 'border-[#F2F2F2] text-gray-500'
-                  }`}>{t(r.ko, r.en)}</button>
-              ))}
+          <div style={{ marginBottom:16 }}>
+            <label style={labelStyle}>{T.checkoutDate}</label>
+            <input value={date} onChange={e => setDate(e.target.value)} type="date" style={inputStyle} />
+          </div>
+          <div style={{ marginBottom:16 }}>
+            <label style={labelStyle}>{T.reason}</label>
+            <select value={reason} onChange={e => setReason(e.target.value)} style={selectStyle}>
+              <option value="">{T.reasonPh}</option>
+              <option value="contract">{T.reason1}</option>
+              <option value="personal">{T.reason2}</option>
+              <option value="relocation">{T.reason3}</option>
+              <option value="other">{T.reason4}</option>
+            </select>
+          </div>
+          <div style={{ marginBottom:16 }}>
+            <label style={{ ...labelStyle, marginBottom:10 }}>{T.bankAccount}</label>
+            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              <select value={bank} onChange={e => setBank(e.target.value)} style={selectStyle}>
+                <option value="">{T.bankPh}</option>
+                {BANKS.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+              <input value={account} onChange={e => setAccount(e.target.value)} type="text" placeholder={T.accountNumPh} style={inputStyle} />
+              <input value={holder} onChange={e => setHolder(e.target.value)} type="text" placeholder={T.holderPh} style={inputStyle} />
             </div>
           </div>
-          <div>
-            <label className="text-[12px] font-semibold block mb-1.5">{t('추가 메모', 'Additional Notes')}</label>
-            <textarea value={memo} onChange={e => setMemo(e.target.value)} rows={2} placeholder={t('선택사항', 'Optional')}
-              className="w-full px-4 py-3 rounded-xl bg-[#F9FAFB] border border-[#F2F2F2] text-[14px] outline-none resize-none placeholder:text-gray-300" />
+          <div style={{ marginBottom:20 }}>
+            <label style={labelStyle}>{T.memo}</label>
+            <textarea placeholder={T.memoPh} rows={3} style={{ ...inputStyle, resize:'none' }} />
           </div>
+          <button onClick={handleSubmit} style={{ width:'100%', padding:14, border:'none', borderRadius:12, background:'#191919', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>{T.submit}</button>
         </div>
       </div>
-
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] px-5 pb-8 pt-3 bg-[#F9FAFB]">
-        <button onClick={handleSubmit} disabled={!name.trim() || !phone.trim() || !houseName.trim() || !roomCode.trim() || !checkoutDate || submitting}
-          className={`w-full py-3.5 rounded-xl text-[14px] font-semibold flex items-center justify-center gap-2 ${
-            name.trim() && phone.trim() && houseName.trim() && roomCode.trim() && checkoutDate ? 'bg-[#3182F6] text-white' : 'bg-gray-200 text-gray-400'
-          }`}>
-          {submitting ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-          {t('퇴실 신청하기', 'Submit Check-out Request')}
-        </button>
-      </div>
     </div>
-  )
-}
-
-function F({ label, value, onChange, placeholder = '', type = 'text', required }: {
-  label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string; required?: boolean;
-}) {
-  return (
-    <div>
-      <label className="text-[12px] font-semibold mb-1.5 block">{label} {required && <span className="text-red-500">*</span>}</label>
-      <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-        className="w-full px-4 py-3 rounded-xl bg-[#F9FAFB] border border-[#F2F2F2] text-[14px] outline-none placeholder:text-gray-300" />
-    </div>
-  )
+  );
 }

@@ -1,152 +1,137 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { useLang } from '@/hooks/useLang'
-import LangToggle from '@/components/ui/LangToggle'
-import { Check, Copy, Loader2 } from 'lucide-react'
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function AirconApplyPage() {
-  const { lang, toggle, t } = useLang()
-  const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [houseName, setHouseName] = useState('')
-  const [roomCode, setRoomCode] = useState('')
-  const [roomType, setRoomType] = useState('')
-  const [acLocation, setAcLocation] = useState('')
-  const [request, setRequest] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [done, setDone] = useState(false)
-  const [copied, setCopied] = useState(false)
+const t = {
+  ko: {
+    title: '에어컨 청소 신청', pricing: '청소 비용',
+    single: '1인실', double1: '2인실 (1명)', double2: '2인실 (2명/인)',
+    normalPrice: '일반 가격: 80,000~100,000원',
+    account: '입금 계좌', depositor: '입금자명',
+    depositorEx: '홍길동(에어컨청소) 형식',
+    schedule: '청소 일정', scheduleDesc: '기사님 스케줄에 맞춰 진행',
+    info: '에어컨 없는 방은 신청 불필요. 관리비에 미포함',
+    name: '이름', namePh: '이름을 입력하세요', room: '호실',
+    roomType: '방 유형', roomTypePh: '방 유형을 선택하세요',
+    opt1: '1인실', opt2: '2인실 (1명 사용)', opt3: '2인실 (2명 사용)',
+    request: '요청사항 (선택)', requestPh: '특별히 요청할 사항이 있다면 적어주세요',
+    submit: '신청하기', copied: '복사됨!',
+    validName: '이름을 입력해주세요.', validType: '방 유형을 선택해주세요.',
+    done: '신청이 완료되었어요!',
+  },
+  en: {
+    title: 'AC Cleaning Request', pricing: 'Cleaning Fee',
+    single: 'Single Room', double1: 'Double (1 person)', double2: 'Double (2 persons/each)',
+    normalPrice: 'Normal price: 80,000~100,000 KRW',
+    account: 'Bank Account', depositor: 'Depositor Name',
+    depositorEx: 'Format: Name(ACCleaning)',
+    schedule: 'Schedule', scheduleDesc: 'Based on technician availability',
+    info: 'No need to apply if room has no AC. Not included in maintenance fee.',
+    name: 'Name', namePh: 'Enter your name', room: 'Room',
+    roomType: 'Room Type', roomTypePh: 'Select room type',
+    opt1: 'Single Room', opt2: 'Double (1 person)', opt3: 'Double (2 persons)',
+    request: 'Request (Optional)', requestPh: 'Any special requests?',
+    submit: 'Submit', copied: 'Copied!',
+    validName: 'Please enter your name.', validType: 'Please select room type.',
+    done: 'Request submitted!',
+  },
+};
 
-  async function handleSubmit() {
-    if (!name.trim() || !phone.trim() || !houseName.trim()) return
-    setSubmitting(true)
-    await fetch('/api/apply/aircon', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name.trim(), phone: phone.trim(), houseName, roomCode, roomType, acLocation, request }),
-    })
-    setSubmitting(false)
-    setDone(true)
-  }
+const inputStyle: React.CSSProperties = { width:'100%', padding:'12px 14px', border:'1px solid #E8E8E8', borderRadius:10, fontSize:14, fontFamily:'inherit', boxSizing:'border-box', outline:'none' };
+const selectStyle: React.CSSProperties = { ...inputStyle, background:'#fff', appearance:'none', WebkitAppearance:'none', backgroundImage:"url(\"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%23999'/></svg>\")", backgroundRepeat:'no-repeat', backgroundPosition:'right 14px center' };
+const labelStyle: React.CSSProperties = { fontSize:13, fontWeight:600, color:'#333', display:'block', marginBottom:6 };
 
-  if (done) return (
-    <div className="min-h-screen bg-[#F9FAFB] flex flex-col items-center justify-center px-8 text-center">
-      <div className="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center mb-4"><Check size={32} className="text-green-600" /></div>
-      <h2 className="text-[20px] font-bold">{t('에어컨 청소 신청 완료!', 'AC cleaning request submitted!')}</h2>
-      <p className="text-[13px] text-gray-500 mt-2">{t('입금 확인 후 일정을 안내드립니다.', 'Schedule shared after payment verification.')}</p>
-    </div>
-  )
+export default function AirconPage() {
+  const router = useRouter();
+  const [lang, setLang] = useState<'ko'|'en'>('ko');
+  const [copied, setCopied] = useState(false);
+  const [name, setName] = useState('');
+  const [roomType, setRoomType] = useState('');
+  const T = t[lang];
 
-  const ROOM_TYPES = [
-    { ko: '1인실', en: 'Single' },
-    { ko: '2인실(혼자)', en: 'Double(solo)' },
-    { ko: '2인실(2명)', en: 'Double(both)' },
-  ]
-  const AC_LOC = [
-    { ko: '방 안', en: 'In Room' },
-    { ko: '거실(공용)', en: 'Living Room' },
-  ]
+  const copyAccount = () => {
+    navigator.clipboard.writeText('100166670094');
+    setCopied(true); setTimeout(() => setCopied(false), 1500);
+  };
+
+  const handleSubmit = () => {
+    if (!name) { alert(T.validName); return; }
+    if (!roomType) { alert(T.validType); return; }
+    alert(T.done); router.push('/apply');
+  };
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB]">
-      <div className="max-w-[480px] mx-auto px-5 py-6 pb-32">
-        <div className="flex items-start justify-between mb-5">
-          <div>
-            <p className="text-[13px] text-gray-400 font-medium">ShareHub</p>
-            <h1 className="text-[22px] font-bold mt-1">{t('에어컨 청소 신청', 'AC Cleaning Request')}</h1>
-          </div>
-          <LangToggle lang={lang} toggle={toggle} />
+    <div style={{ maxWidth:480, margin:'0 auto', minHeight:'100vh', background:'#F7F8FA' }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 20px', background:'#fff', borderBottom:'1px solid #F0F0F0', position:'sticky', top:0, zIndex:10 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          <button onClick={() => router.push('/apply')} style={{ background:'none', border:'none', fontSize:18, cursor:'pointer', padding:4, color:'#191919' }}>←</button>
+          <span style={{ fontSize:16, fontWeight:700 }}>{T.title}</span>
         </div>
-
-        {/* Discount Box */}
-        <div className="rounded-xl bg-blue-50 border border-blue-200 p-4 mb-3">
-          <p className="text-[13px] font-bold text-blue-800 mb-2">{t('얼리 신청 할인', 'Early Sign-up Discount')}</p>
-          <div className="text-[12px] text-blue-700 space-y-1">
-            <p>{t('1인실', 'Single')}: 40,000{t('원', ' KRW')}</p>
-            <p>{t('2인실 혼자', 'Double (solo)')}: 30,000{t('원', ' KRW')}</p>
-            <p>{t('2인실 2명 함께', 'Double (both)')}: {t('각 20,000원', 'KRW 20,000 each')}</p>
-            <p className="text-blue-500 mt-1">{t('일반 업체 비용 8~10만원 대비 대폭 할인!', 'Much cheaper than regular services (KRW 80,000-100,000)!')}</p>
-          </div>
-        </div>
-
-        {/* Notice */}
-        <div className="rounded-xl bg-gray-100 p-4 mb-3 text-[11px] text-gray-500 space-y-1">
-          <p>{t('방에 에어컨이 없는 경우 신청하지 않아도 됩니다.', 'If your room has no AC, you do not need to apply.')}</p>
-          <p>{t('관리비에는 에어컨 청소 비용이 포함되어 있지 않습니다.', 'AC cleaning is not included in the maintenance fee.')}</p>
-          <p>{t('청소 일정은 신청 후 운영진이 연락드립니다.', 'The cleaning schedule will be arranged by management.')}</p>
-        </div>
-
-        {/* Payment */}
-        <div className="rounded-xl bg-[#FFF3E4] border border-[#FAC775] p-4 mb-5">
-          <p className="text-[13px] font-bold text-[#633806] mb-2">{t('입금 안내', 'Payment')}</p>
-          <p className="text-[11px] text-[#8B5E0F] mb-2">{t('신청서 작성과 동시에 입금해주세요.', 'Please pay at the same time as submitting.')}</p>
-          <p className="text-[11px] text-[#8B5E0F] mb-2">{t('입금자명: 홍길동(에어컨청소)', 'Sender name: Name(ACcleaning)')}</p>
-          <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-2">
-            <div className="flex-1"><p className="text-[10px] text-gray-400">{t('케이뱅크 유재훈', 'K-Bank Yoo Jaehoon')}</p><p className="text-[13px] font-bold">100-166-670094</p></div>
-            <button onClick={() => { navigator.clipboard.writeText('100-166-670094'); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
-              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold ${copied ? 'bg-green-50 text-green-600' : 'bg-blue-50 text-blue-600'}`}>
-              {copied ? <><Check size={10} className="inline mr-0.5" />{t('복사됨', 'Copied')}</> : <><Copy size={10} className="inline mr-0.5" />{t('복사', 'Copy')}</>}
-            </button>
-          </div>
-        </div>
-
-        {/* Form */}
-        <div className="rounded-xl bg-white border border-[#F2F2F2] p-5 space-y-4">
-          <F label={t('이름', 'Name')} required value={name} onChange={setName} />
-          <F label={t('연락처', 'Phone')} required value={phone} onChange={setPhone} type="tel" />
-          <F label={t('지점명', 'House Name')} required value={houseName} onChange={setHouseName} />
-          <F label={t('방 코드', 'Room Code')} value={roomCode} onChange={setRoomCode} placeholder="A-1" />
-          <div>
-            <label className="text-[12px] font-semibold block mb-1.5">{t('방 타입', 'Room Type')}</label>
-            <div className="flex gap-2">
-              {ROOM_TYPES.map(r => (
-                <button key={r.ko} onClick={() => setRoomType(r.ko)}
-                  className={`flex-1 py-2.5 rounded-xl text-[11px] font-semibold border transition-colors ${
-                    roomType === r.ko ? 'border-[#3182F6] bg-blue-50 text-[#3182F6]' : 'border-[#F2F2F2] text-gray-500'
-                  }`}>{t(r.ko, r.en)}</button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="text-[12px] font-semibold block mb-1.5">{t('에어컨 위치', 'AC Location')}</label>
-            <div className="flex gap-2">
-              {AC_LOC.map(a => (
-                <button key={a.ko} onClick={() => setAcLocation(a.ko)}
-                  className={`flex-1 py-2.5 rounded-xl text-[12px] font-semibold border transition-colors ${
-                    acLocation === a.ko ? 'border-[#3182F6] bg-blue-50 text-[#3182F6]' : 'border-[#F2F2F2] text-gray-500'
-                  }`}>{t(a.ko, a.en)}</button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="text-[12px] font-semibold block mb-1.5">{t('추가 요청사항', 'Additional Requests')}</label>
-            <textarea value={request} onChange={e => setRequest(e.target.value)} rows={2} placeholder={t('선택사항', 'Optional')}
-              className="w-full px-4 py-3 rounded-xl bg-[#F9FAFB] border border-[#F2F2F2] text-[14px] outline-none resize-none placeholder:text-gray-300" />
-          </div>
-        </div>
+        <button onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')} style={{ background:'#F0F0F0', border:'none', borderRadius:8, padding:'6px 12px', fontSize:12, fontWeight:600, cursor:'pointer', color:'#555' }}>{lang === 'ko' ? 'EN' : 'KO'}</button>
       </div>
 
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] px-5 pb-8 pt-3 bg-[#F9FAFB]">
-        <button onClick={handleSubmit} disabled={!name.trim() || !phone.trim() || !houseName.trim() || submitting}
-          className={`w-full py-3.5 rounded-xl text-[14px] font-semibold flex items-center justify-center gap-2 ${
-            name.trim() && phone.trim() && houseName.trim() ? 'bg-[#3182F6] text-white' : 'bg-gray-200 text-gray-400'
-          }`}>
-          {submitting ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-          {t('신청하기 (동시 입금 필수)', 'Submit (Payment required simultaneously)')}
-        </button>
+      <div style={{ padding:20 }}>
+        <div style={{ background:'#fff', borderRadius:14, padding:20, marginBottom:16 }}>
+          <div style={{ fontSize:13, fontWeight:600, color:'#333', marginBottom:12 }}>{T.pricing}</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:10 }}>
+            {[{l:T.single,p:'40,000원'},{l:T.double1,p:'30,000원'},{l:T.double2,p:'20,000원'}].map(r => (
+              <div key={r.l} style={{ display:'flex', justifyContent:'space-between' }}>
+                <span style={{ fontSize:13, color:'#666' }}>{r.l}</span>
+                <span style={{ fontSize:14, fontWeight:700, color:'#3182F6' }}>{r.p}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize:12, color:'#999', marginBottom:16 }}>{T.normalPrice}</div>
+          <div style={{ borderTop:'1px solid #F0F0F0', paddingTop:12, display:'flex', flexDirection:'column', gap:10 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <span style={{ fontSize:13, color:'#666' }}>{T.account}</span>
+              <div style={{ display:'flex', alignItems:'center', gap:6, position:'relative' }}>
+                <span style={{ fontSize:13, fontWeight:500 }}>케이뱅크 유재훈 100-166-670094</span>
+                <button onClick={copyAccount} style={{ background:'#F5F5F5', border:'none', borderRadius:6, width:24, height:24, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12 }}>📋</button>
+                {copied && <span style={{ position:'absolute', right:0, top:-24, background:'#333', color:'#fff', padding:'3px 8px', borderRadius:6, fontSize:11, whiteSpace:'nowrap' }}>{T.copied}</span>}
+              </div>
+            </div>
+            <div style={{ display:'flex', justifyContent:'space-between' }}>
+              <span style={{ fontSize:13, color:'#666' }}>{T.depositor}</span>
+              <span style={{ fontSize:13, fontWeight:500, color:'#E67E22' }}>{T.depositorEx}</span>
+            </div>
+            <div style={{ display:'flex', justifyContent:'space-between' }}>
+              <span style={{ fontSize:13, color:'#666' }}>{T.schedule}</span>
+              <span style={{ fontSize:13, color:'#333' }}>{T.scheduleDesc}</span>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ background:'#EBF8FF', borderRadius:12, padding:'14px 16px', marginBottom:20 }}>
+          <p style={{ fontSize:12, color:'#2B6CB0', margin:0, lineHeight:1.5 }}>ℹ️ {T.info}</p>
+        </div>
+
+        <div style={{ background:'#fff', borderRadius:14, padding:20 }}>
+          <div style={{ marginBottom:16 }}>
+            <label style={labelStyle}>{T.name}</label>
+            <input value={name} onChange={e => setName(e.target.value)} type="text" placeholder={T.namePh} style={inputStyle} />
+          </div>
+          <div style={{ marginBottom:16 }}>
+            <label style={labelStyle}>{T.room}</label>
+            <input type="text" readOnly style={{ ...inputStyle, background:'#F7F8FA', color:'#666' }} />
+          </div>
+          <div style={{ marginBottom:16 }}>
+            <label style={labelStyle}>{T.roomType}</label>
+            <select value={roomType} onChange={e => setRoomType(e.target.value)} style={selectStyle}>
+              <option value="">{T.roomTypePh}</option>
+              <option value="single">{T.opt1}</option>
+              <option value="double1">{T.opt2}</option>
+              <option value="double2">{T.opt3}</option>
+            </select>
+          </div>
+          <div style={{ marginBottom:20 }}>
+            <label style={labelStyle}>{T.request}</label>
+            <textarea placeholder={T.requestPh} rows={3} style={{ ...inputStyle, resize:'none' }} />
+          </div>
+          <button onClick={handleSubmit} style={{ width:'100%', padding:14, border:'none', borderRadius:12, background:'#3182F6', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>{T.submit}</button>
+        </div>
       </div>
     </div>
-  )
-}
-
-function F({ label, value, onChange, placeholder = '', type = 'text', required }: {
-  label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string; required?: boolean;
-}) {
-  return (
-    <div>
-      <label className="text-[12px] font-semibold mb-1.5 block">{label} {required && <span className="text-red-500">*</span>}</label>
-      <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-        className="w-full px-4 py-3 rounded-xl bg-[#F9FAFB] border border-[#F2F2F2] text-[14px] outline-none placeholder:text-gray-300" />
-    </div>
-  )
+  );
 }

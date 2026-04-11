@@ -11,10 +11,11 @@ const WORKERS: Record<string, string> = {
 
 export async function GET(
   req: Request,
-  { params }: { params: { token: string } }
+  { params }: { params: Promise<{ token: string }> }
 ) {
   try {
-    const workerName = WORKERS[params.token]
+    const { token } = await params
+    const workerName = WORKERS[token]
     if (!workerName) {
       return NextResponse.json({ error: 'invalid token' }, { status: 404 })
     }
@@ -50,7 +51,7 @@ export async function GET(
       .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
 
     return NextResponse.json({
-      worker: { name: workerName, token: params.token },
+      worker: { name: workerName, token },
       schedules,
     })
   } catch (e: any) {

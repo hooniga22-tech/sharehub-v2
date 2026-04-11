@@ -1,210 +1,230 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { PageHeader } from '@/components/ui/PageHeader'
-import { Card } from '@/components/ui/Card'
-import { Chip } from '@/components/ui/Chip'
-import { useParams, useRouter } from 'next/navigation'
-import { CheckCircle, Play, Pause, RotateCcw, Loader2 } from 'lucide-react'
+import { useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { issues } from '@/lib/mockData';
+import { ChevronLeft, MoreVertical, ClipboardList, Sun, CheckCircle2 } from 'lucide-react';
 
-interface IssueDetail {
-  rowIndex: number; id: string; houseName: string; roomCode: string;
-  title: string; content: string; category: string; status: string;
-  assignee: string; createdAt: string; completedAt: string; cost: number; memo: string;
-}
+type IssueStatus = 'waiting' | 'inprogress' | 'done';
 
-const statusVariant: Record<string, 'red' | 'amber' | 'green' | 'gray'> = {
-  '접수': 'red', '진행중': 'amber', '완료': 'green', '보류': 'gray',
-}
-const categoryVariant: Record<string, 'blue' | 'green' | 'amber' | 'gray'> = {
-  '수리': 'blue', '청소': 'green', '민원': 'amber', '교체': 'blue', '기타': 'gray',
-}
-
-const WORKFLOW: Record<string, { label: string; next: string; icon: typeof CheckCircle; color: string; bg: string }[]> = {
-  '접수': [
-    { label: '진행 시작', next: '진행중', icon: Play, color: 'var(--blue)', bg: 'var(--blue-light)' },
-    { label: '보류', next: '보류', icon: Pause, color: 'var(--sub)', bg: '#F2F2F2' },
-    { label: '바로 해결', next: '완료', icon: CheckCircle, color: 'var(--green)', bg: 'var(--green-light)' },
-  ],
-  '진행중': [
-    { label: '해결 완료', next: '완료', icon: CheckCircle, color: 'var(--green)', bg: 'var(--green-light)' },
-    { label: '보류', next: '보류', icon: Pause, color: 'var(--sub)', bg: '#F2F2F2' },
-  ],
-  '보류': [
-    { label: '재개', next: '진행중', icon: Play, color: 'var(--blue)', bg: 'var(--blue-light)' },
-    { label: '해결 완료', next: '완료', icon: CheckCircle, color: 'var(--green)', bg: 'var(--green-light)' },
-  ],
-  '완료': [
-    { label: '재오픈', next: '접수', icon: RotateCcw, color: 'var(--red)', bg: 'var(--red-light)' },
-  ],
-}
+const statusSteps: { key: IssueStatus; label: string; icon: typeof ClipboardList }[] = [
+  { key: 'waiting', label: '접수', icon: ClipboardList },
+  { key: 'inprogress', label: '처리중', icon: Sun },
+  { key: 'done', label: '완료', icon: CheckCircle2 },
+];
 
 export default function IssueDetailPage() {
-  const params = useParams()
-  const router = useRouter()
-  const id = params.id as string
-  const [issue, setIssue] = useState<IssueDetail | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [updating, setUpdating] = useState(false)
-  const [editMemo, setEditMemo] = useState(false)
-  const [memo, setMemo] = useState('')
-  const [editCost, setEditCost] = useState(false)
-  const [costVal, setCostVal] = useState('')
+  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const issue = issues.find((i) => i.id === Number(id));
 
-  useEffect(() => {
-    fetch(`/api/issues/${id}`)
-      .then(r => r.json())
-      .then(d => {
-        if (d.error) { setIssue(null); return }
-        setIssue(d)
-        setMemo(d.memo || '')
-        setCostVal(String(d.cost || ''))
-      })
-      .catch(() => setIssue(null))
-      .finally(() => setLoading(false))
-  }, [id])
+  const [status, setStatus] = useState<IssueStatus>(issue?.status || 'waiting');
+  const [showMenu, setShowMenu] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  async function changeStatus(next: string) {
-    if (!issue || updating) return
-    setUpdating(true)
-    await fetch(`/api/issues/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: next }),
-    })
-    setIssue({ ...issue, status: next, completedAt: next === '완료' ? new Date().toISOString().slice(0, 10) : issue.completedAt })
-    setUpdating(false)
+  if (!issue) {
+    return (
+      <div style={{ background: '#F7F8FA', minHeight: '100vh' }}>
+        <header style={{ display: 'flex', alignItems: 'center', padding: '0 16px', height: 52, background: '#fff', borderBottom: '1px solid #F0F0F0' }}>
+          <button onClick={() => router.push('/issues')}><ChevronLeft size={24} color="#191919" /></button>
+          <span style={{ flex: 1, textAlign: 'center', fontSize: 16, fontWeight: 700 }}>이슈 상세</span>
+          <div style={{ width: 24 }} />
+        </header>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 0' }}>
+          <p style={{ color: '#BBBBBB', fontSize: 14 }}>이슈를 찾을 수 없어요</p>
+        </div>
+      </div>
+    );
   }
 
-  async function saveMemo() {
-    if (!issue) return
-    await fetch(`/api/issues/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ memo }),
-    })
-    setIssue({ ...issue, memo })
-    setEditMemo(false)
-  }
+  const isDone = status === 'done';
+  const elapsedColor = issue.elapsed >= 3 ? '#F04452' : issue.elapsed >= 1 ? '#F59E0B' : '#888888';
 
-  async function saveCost() {
-    if (!issue) return
-    const val = Number(costVal) || 0
-    await fetch(`/api/issues/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cost: val }),
-    })
-    setIssue({ ...issue, cost: val })
-    setEditCost(false)
-  }
-
-  if (loading) return (
-    <div className="flex flex-col min-h-screen">
-      <PageHeader title="이슈 상세" />
-      <p className="text-[13px] text-[var(--sub)] py-8 text-center">불러오는 중...</p>
-    </div>
-  )
-
-  if (!issue) return (
-    <div className="flex flex-col min-h-screen">
-      <PageHeader title="이슈 상세" />
-      <p className="text-[13px] text-[var(--sub)] py-8 text-center">이슈를 찾을 수 없습니다</p>
-    </div>
-  )
-
-  const actions = WORKFLOW[issue.status] || []
+  const infoRows = [
+    { label: '지점', value: issue.place, link: `/houses/${issue.houseId}`, color: '#3182F6' },
+    { label: '유형', value: issue.type },
+    { label: '접수일', value: issue.date },
+    { label: '경과일', value: `${issue.elapsed}일`, color: elapsedColor },
+    { label: '담당자', value: issue.manager },
+  ];
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <PageHeader title="이슈 상세" />
-
-      <div className="flex-1 overflow-y-auto px-5 pb-8">
-        {/* Status + Category */}
-        <div className="flex items-center gap-2 mt-4">
-          <Chip label={issue.status} variant={statusVariant[issue.status] || 'gray'} />
-          <Chip label={issue.category} variant={categoryVariant[issue.category] || 'gray'} />
+    <div style={{ background: '#F7F8FA', minHeight: '100vh', paddingBottom: 100 }}>
+      {/* 상단 헤더 */}
+      <header style={{
+        position: 'sticky', top: 0, zIndex: 20,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 16px', height: 52, background: '#fff', borderBottom: '1px solid #F0F0F0',
+      }}>
+        <button onClick={() => router.push('/issues')} style={{ padding: 4, marginLeft: -4 }}>
+          <ChevronLeft size={24} color="#191919" />
+        </button>
+        <span style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', fontSize: 16, fontWeight: 700, color: '#191919' }}>
+          이슈 상세
+        </span>
+        <div style={{ position: 'relative' }}>
+          <button onClick={() => setShowMenu(!showMenu)} style={{ padding: 4 }}>
+            <MoreVertical size={20} color="#191919" />
+          </button>
+          {showMenu && (
+            <>
+              <div style={{ position: 'fixed', inset: 0, zIndex: 10 }} onClick={() => setShowMenu(false)} />
+              <div style={{
+                position: 'absolute', right: 0, top: 32, zIndex: 11,
+                background: '#fff', borderRadius: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
+                overflow: 'hidden', minWidth: 120,
+              }}>
+                <button
+                  style={{ display: 'block', width: '100%', padding: '12px 16px', fontSize: 14, fontWeight: 500, color: '#191919', textAlign: 'left' }}
+                  onClick={() => setShowMenu(false)}
+                >
+                  수정
+                </button>
+                <div style={{ height: 1, background: '#F5F5F5' }} />
+                <button
+                  style={{ display: 'block', width: '100%', padding: '12px 16px', fontSize: 14, fontWeight: 500, color: '#F04452', textAlign: 'left' }}
+                  onClick={() => { setShowMenu(false); setShowDeleteModal(true); }}
+                >
+                  삭제
+                </button>
+              </div>
+            </>
+          )}
         </div>
+      </header>
 
-        {/* Title */}
-        <h1 className="text-[20px] font-bold mt-3">{issue.title}</h1>
-
-        {/* Meta */}
-        <div className="flex items-center gap-2 mt-2 text-[12px] text-[var(--sub)]">
-          <span>{issue.houseName} {issue.roomCode}</span>
-          {issue.assignee && <span>· 담당: {issue.assignee}</span>}
-          <span>· {issue.createdAt}</span>
-        </div>
-
-        {/* Content */}
-        {issue.content && (
-          <Card className="mt-4 px-4 py-3.5">
-            <p className="text-[13px] font-semibold text-[var(--sub)] mb-1">내용</p>
-            <p className="text-[14px] whitespace-pre-wrap">{issue.content}</p>
-          </Card>
+      {/* 히어로 */}
+      <div style={{ background: '#fff', padding: '20px 16px', borderBottom: '8px solid #F7F8FA' }}>
+        {/* 긴급 배지 */}
+        {issue.urgent && (
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            padding: '4px 10px', borderRadius: 8, marginBottom: 10,
+            background: '#FFF0F0', color: '#F04452', fontSize: 12, fontWeight: 600,
+          }}>
+            긴급 · {issue.elapsed}일 경과
+          </div>
         )}
 
-        {/* Cost */}
-        <Card className="mt-3 px-4 py-3.5">
-          <div className="flex items-center justify-between">
-            <p className="text-[13px] font-semibold text-[var(--sub)]">처리 비용</p>
-            {!editCost ? (
-              <button onClick={() => setEditCost(true)} className="text-[12px] text-[var(--blue)] font-semibold">수정</button>
-            ) : (
-              <button onClick={saveCost} className="text-[12px] text-[var(--blue)] font-semibold">저장</button>
-            )}
-          </div>
-          {editCost ? (
-            <input type="number" value={costVal} onChange={e => setCostVal(e.target.value)}
-              className="w-full mt-1 px-3 py-2 rounded-lg bg-[var(--bg)] border border-[var(--border)] text-[14px] outline-none" />
-          ) : (
-            <p className="text-[16px] font-bold mt-0.5">{(issue.cost || 0).toLocaleString()}원</p>
-          )}
-        </Card>
+        <h2 style={{ fontSize: 17, fontWeight: 700, color: '#191919', marginBottom: 4 }}>{issue.title}</h2>
+        <p style={{ fontSize: 13, color: '#888888' }}>{issue.place} · {issue.date}</p>
 
-        {/* Memo */}
-        <Card className="mt-3 px-4 py-3.5">
-          <div className="flex items-center justify-between">
-            <p className="text-[13px] font-semibold text-[var(--sub)]">메모</p>
-            {!editMemo ? (
-              <button onClick={() => setEditMemo(true)} className="text-[12px] text-[var(--blue)] font-semibold">수정</button>
-            ) : (
-              <button onClick={saveMemo} className="text-[12px] text-[var(--blue)] font-semibold">저장</button>
-            )}
-          </div>
-          {editMemo ? (
-            <textarea value={memo} onChange={e => setMemo(e.target.value)} rows={3}
-              className="w-full mt-1 px-3 py-2 rounded-lg bg-[var(--bg)] border border-[var(--border)] text-[14px] outline-none resize-none" />
-          ) : (
-            <p className="text-[14px] mt-0.5">{issue.memo || '-'}</p>
-          )}
-        </Card>
-
-        {/* Completion info */}
-        {issue.completedAt && (
-          <p className="text-[12px] text-[var(--sub)] mt-3 text-center">완료일: {issue.completedAt}</p>
-        )}
-
-        {/* Workflow Actions */}
-        <div className="flex flex-col gap-2 mt-5">
-          {actions.map(a => {
-            const Icon = a.icon
+        {/* 상태 버튼 3개 */}
+        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+          {statusSteps.map((step) => {
+            const Icon = step.icon;
+            const isSelected = status === step.key;
             return (
-              <button key={a.next} onClick={() => changeStatus(a.next)} disabled={updating}
-                className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl font-semibold text-[14px] transition-colors"
-                style={{ backgroundColor: a.bg, color: a.color }}>
-                {updating ? <Loader2 size={16} className="animate-spin" /> : <Icon size={16} />}
-                {a.label}
+              <button
+                key={step.key}
+                onClick={() => setStatus(step.key)}
+                style={{
+                  flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                  padding: '10px 4px', borderRadius: 10,
+                  border: isSelected ? '1.5px solid #3182F6' : '1.5px solid #E5E5E5',
+                  background: isSelected ? '#EEF3FF' : '#fff',
+                  cursor: 'pointer',
+                }}
+              >
+                <Icon size={18} color={isSelected ? '#3182F6' : '#BBBBBB'} />
+                <span style={{ fontSize: 12, fontWeight: 600, color: isSelected ? '#3182F6' : '#BBBBBB' }}>
+                  {step.label}
+                </span>
               </button>
-            )
+            );
           })}
         </div>
+      </div>
 
-        <button onClick={() => router.push('/issues')}
-          className="w-full mt-3 py-3 rounded-xl text-[13px] font-medium text-[var(--sub)] bg-[var(--card)] border border-[var(--border)]">
-          목록으로
+      {/* 이슈 정보 리스트 */}
+      <div style={{ background: '#fff', marginBottom: 8 }}>
+        {infoRows.map((row, i) => (
+          <div key={row.label}>
+            {i > 0 && <div style={{ height: 1, background: '#F5F5F5', margin: '0 16px' }} />}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px' }}>
+              <span style={{ fontSize: 12, color: '#888888' }}>{row.label}</span>
+              {row.link ? (
+                <Link href={row.link} style={{ fontSize: 13, fontWeight: 500, color: row.color || '#191919' }}>
+                  {row.value}
+                </Link>
+              ) : (
+                <span style={{ fontSize: 13, fontWeight: 500, color: row.color || '#191919' }}>{row.value}</span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* 처리 메모 카드 */}
+      <div style={{ margin: '0 16px 16px', background: '#fff', borderRadius: 14, padding: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#191919' }}>처리 메모</span>
+          <button style={{ fontSize: 12, fontWeight: 500, color: '#3182F6' }}>편집</button>
+        </div>
+        {issue.memo ? (
+          <>
+            <p style={{ fontSize: 14, color: '#191919', lineHeight: 1.6 }}>{issue.memo}</p>
+            {issue.memoDate && (
+              <p style={{ fontSize: 10, color: '#BBBBBB', marginTop: 8 }}>마지막 수정 {issue.memoDate}</p>
+            )}
+          </>
+        ) : (
+          <p style={{ fontSize: 14, color: '#BBBBBB' }}>처리 내용을 입력해주세요</p>
+        )}
+      </div>
+
+      {/* 하단 버튼 2개 */}
+      <div style={{ margin: '0 16px', display: 'flex', gap: 8 }}>
+        <button
+          onClick={() => setShowDeleteModal(true)}
+          style={{
+            flex: 1, padding: '14px 0', borderRadius: 14,
+            border: '1.5px solid #FEE2E2', background: '#fff',
+            fontSize: 15, fontWeight: 700, color: '#F04452',
+            cursor: 'pointer',
+          }}
+        >
+          삭제
+        </button>
+        <button
+          onClick={() => { if (!isDone) setStatus('done'); }}
+          disabled={isDone}
+          style={{
+            flex: 2, padding: '14px 0', borderRadius: 14, border: 'none',
+            background: isDone ? '#F5F5F5' : '#3182F6',
+            color: isDone ? '#BBBBBB' : '#fff',
+            fontSize: 15, fontWeight: 700,
+            cursor: isDone ? 'default' : 'pointer',
+          }}
+        >
+          {isDone ? '처리 완료됨' : '처리 완료'}
         </button>
       </div>
+
+      {/* 삭제 확인 모달 */}
+      {showDeleteModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', background: 'rgba(0,0,0,0.4)' }}>
+          <div style={{ width: '100%', maxWidth: 430, background: '#fff', padding: '24px 16px 32px', borderRadius: '20px 20px 0 0' }}>
+            <p style={{ textAlign: 'center', fontSize: 16, fontWeight: 700, marginBottom: 8 }}>이슈를 삭제할까요?</p>
+            <p style={{ textAlign: 'center', fontSize: 13, color: '#888888', marginBottom: 24 }}>삭제된 이슈는 복구할 수 없습니다</p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                style={{ flex: 1, padding: 14, borderRadius: 12, background: '#F5F5F5', fontSize: 15, fontWeight: 600, color: '#191919', border: 'none', cursor: 'pointer' }}
+                onClick={() => setShowDeleteModal(false)}
+              >
+                취소
+              </button>
+              <button
+                style={{ flex: 1, padding: 14, borderRadius: 12, background: '#F04452', fontSize: 15, fontWeight: 600, color: '#fff', border: 'none', cursor: 'pointer' }}
+                onClick={() => { setShowDeleteModal(false); router.push('/issues'); }}
+              >
+                삭제
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
-  )
+  );
 }
