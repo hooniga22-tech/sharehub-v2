@@ -15,7 +15,7 @@ async function getChannelToken() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, phone } = await req.json()
+    const { name, phone, houseName } = await req.json()
     if (!name || !phone) {
       return NextResponse.json({ error: '이름과 연락처가 필요합니다' }, { status: 400 })
     }
@@ -34,14 +34,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '채널톡에서 고객을 찾을 수 없습니다. 먼저 채팅을 시작한 고객만 가능합니다.' }, { status: 404 })
     }
 
-    // 태그 추가
+    // 기존 태그 유지 + 입주자 + 하우스명 추가
+    const existingTags = user.tags || []
+    const newTags = Array.from(new Set([...existingTags, '입주자', ...(houseName ? [houseName] : [])]))
+
     await fetch(`https://api.channel.io/public/v1/users/${user.id}/tags`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'x-access-token': token },
-      body: JSON.stringify({ tags: [...(user.tags || []), '입주자'] }),
+      body: JSON.stringify({ tags: newTags }),
     })
 
-    return NextResponse.json({ success: true, userId: user.id, name: user.name })
+    return NextResponse.json({ success: true, userId: user.id, name: user.name, tags: newTags })
   } catch (e) {
     return NextResponse.json({ error: '서버 오류' }, { status: 500 })
   }
