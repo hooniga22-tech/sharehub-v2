@@ -1,277 +1,293 @@
-'use client'
+'use client';
 
-import { useState, useEffect, useMemo } from 'react'
-import { useParams } from 'next/navigation'
-import { ChevronLeft, ChevronRight, Loader2, Check, RotateCcw, Pencil } from 'lucide-react'
+import { useState, useMemo } from 'react';
+import { useParams } from 'next/navigation';
+import { mockWorkers, mockTasks as initialTasks, TYPE_COLOR, STATUS_COLOR, fmt, type WorkTask } from '@/../data/mockWorkers';
+import { ChevronDown, ChevronUp, Pencil, Check, Undo2, X } from 'lucide-react';
 
-interface Schedule {
-  id: string; workerName: string; houseName: string; type: string;
-  date: string; isDone: boolean; amount: number; memo: string;
-}
-interface WorkerInfo {
-  id: string; name: string; phone: string; account: string;
-  field: string; type: string; token: string; defaultAmount: number;
-}
+const BLUE = '#3182f6', GREEN = '#00c471', GRAY = '#8b95a1';
 
-function fmt(n: number) { return n.toLocaleString() }
+function getFirstDay(y: number, m: number) { return new Date(y, m - 1, 1).getDay(); }
+function getDaysInMonth(y: number, m: number) { return new Date(y, m, 0).getDate(); }
 
-export default function WorkerPortalPage() {
-  const params = useParams()
-  const token = params.token as string
-  const [worker, setWorker] = useState<WorkerInfo | null>(null)
-  const [schedules, setSchedules] = useState<Schedule[]>([])
-  const [loading, setLoading] = useState(true)
-  const [notFound, setNotFound] = useState(false)
-  const [calMonth, setCalMonth] = useState(() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() } })
-  const [editingAmount, setEditingAmount] = useState<string | null>(null)
-  const [amountVal, setAmountVal] = useState('')
+export default function WorkerTokenPage() {
+  const { token } = useParams<{ token: string }>();
+  const worker = mockWorkers.find(w => w.token === token);
 
-  function fetchData() {
-    fetch(`/api/workers/by-token/${token}`)
-      .then(r => r.json())
-      .then(d => {
-        if (d.error) { setNotFound(true); return }
-        setWorker(d.worker)
-        setSchedules(d.schedules)
-      })
-      .catch(() => setNotFound(true))
-      .finally(() => setLoading(false))
+  const [myTasks, setMyTasks] = useState<WorkTask[]>(() => initialTasks.filter(t => t.workerId === worker?.id));
+  const [viewMode, setViewMode] = useState<'month' | 'year'>('month');
+  const [month, setMonth] = useState(6);
+  const [year] = useState(2025);
+  const [editId, setEditId] = useState<number | null>(null);
+  const [editAmt, setEditAmt] = useState('');
+  const [openMonths, setOpenMonths] = useState<Record<string, boolean>>({});
+  const [confirmId, setConfirmId] = useState<number | null>(null);
+  const [toast, setToast] = useState('');
+
+  if (!worker) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#F7F8FA', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <p style={{ color: '#BBB', fontSize: 15 }}>존재하지 않는 페이지입니다</p>
+      </div>
+    );
   }
 
-  useEffect(() => { fetchData() }, [token])
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2200); };
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const todayStr = today.toISOString().split('T')[0]
-  const threeDaysLater = new Date(today.getTime() + 3 * 86400000).toISOString().split('T')[0]
+  const monthTasks = myTasks.filter(t => t.month === month && t.year === year);
+  const pendingTasks = monthTasks.filter(t => t.status === '예정' || t.status === '진행중');
+  const completedTasks = monthTasks.filter(t => t.status === '완료');
+  const completedTotal = completedTasks.reduce((s, t) => s + t.amount, 0);
+  const remainCount = pendingTasks.length;
+  const doneCount = completedTasks.length;
+  const monthIncome = completedTasks.reduce((s, t) => s + t.amount, 0);
 
-  const monthSchedules = useMemo(() => {
-    const prefix = `${calMonth.year}-${String(calMonth.month + 1).padStart(2, '0')}`
-    return schedules.filter(s => s.date?.startsWith(prefix))
-  }, [schedules, calMonth])
+  const prevMonths = useMemo(() => {
+    const months: Record<string, WorkTask[]> = {};
+    for (const t of myTasks) {
+      if (t.month === month && t.year === year) continue;
+      const key = `${t.year}.${String(t.month).padStart(2, '0')}`;
+      if (!months[key]) months[key] = [];
+      months[key].push(t);
+    }
+    return Object.entries(months).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [myTasks, month, year]);
 
-  const overdue = useMemo(() => monthSchedules.filter(s => !s.isDone && s.date < todayStr), [monthSchedules, todayStr])
-  const current = useMemo(() => monthSchedules.filter(s => !s.isDone && s.date >= todayStr && s.date <= threeDaysLater), [monthSchedules, todayStr, threeDaysLater])
-  const future = useMemo(() => monthSchedules.filter(s => !s.isDone && s.date > threeDaysLater).sort((a, b) => a.date.localeCompare(b.date)), [monthSchedules, threeDaysLater])
-  const done = useMemo(() => monthSchedules.filter(s => s.isDone).sort((a, b) => b.date.localeCompare(a.date)), [monthSchedules])
+  const yearData = useMemo(() => {
+    const data: Record<string, { tasks: WorkTask[]; total: number; done: number }> = {};
+    for (const t of myTasks) {
+      if (t.year !== year) continue;
+      const key = `${t.month}월`;
+      if (!data[key]) data[key] = { tasks: [], total: 0, done: 0 };
+      data[key].tasks.push(t);
+      data[key].total += t.amount;
+      if (t.status === '완료') data[key].done++;
+    }
+    return Object.entries(data).sort((a, b) => parseInt(b[0]) - parseInt(a[0]));
+  }, [myTasks, year]);
 
-  const pending = [...overdue, ...current].sort((a, b) => a.date.localeCompare(b.date))
+  const markComplete = (taskId: number) => {
+    setMyTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: '완료' as const } : t));
+    showToast('완료 처리되었어요!');
+  };
 
-  const thisMonthDone = useMemo(() => {
-    const y = today.getFullYear(), m = today.getMonth()
-    return schedules.filter(s => s.isDone && new Date(s.date).getFullYear() === y && new Date(s.date).getMonth() === m)
-  }, [schedules])
-  const monthTotal = thisMonthDone.reduce((s, x) => s + x.amount, 0)
+  const undoComplete = (taskId: number) => {
+    setMyTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: '예정' as const } : t));
+    setConfirmId(null);
+    showToast('완료가 취소되었어요');
+  };
 
-  async function toggleDone(id: string, isDone: boolean) {
-    if (!isDone && !confirm('완료를 취소할까요? 운영지출에서도 제거됩니다.')) return
-    await fetch(`/api/workers/schedule/${id}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isDone }),
-    })
-    setSchedules(prev => prev.map(s => s.id === id ? { ...s, isDone } : s))
-  }
+  const saveEdit = (taskId: number) => {
+    const amt = parseInt(editAmt);
+    if (isNaN(amt) || amt <= 0) return;
+    setMyTasks(prev => prev.map(t => t.id === taskId ? { ...t, amount: amt } : t));
+    setEditId(null);
+    showToast('금액이 수정되었어요');
+  };
 
-  async function saveAmount(id: string) {
-    const val = Number(amountVal) || 0
-    await fetch(`/api/workers/schedule/${id}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount: val }),
-    })
-    setSchedules(prev => prev.map(s => s.id === id ? { ...s, amount: val } : s))
-    setEditingAmount(null)
-  }
+  const toggleMonth = (key: string) => setOpenMonths(prev => ({ ...prev, [key]: !prev[key] }));
 
-  // Calendar
-  const calDays = useMemo(() => {
-    const { year, month } = calMonth
-    const first = new Date(year, month, 1)
-    const last = new Date(year, month + 1, 0)
-    const startDay = first.getDay()
-    const days: (number | null)[] = Array(startDay).fill(null)
-    for (let d = 1; d <= last.getDate(); d++) days.push(d)
-    while (days.length % 7 !== 0) days.push(null)
-    return days
-  }, [calMonth])
+  const firstDay = getFirstDay(year, month);
+  const daysCount = getDaysInMonth(year, month);
+  const calendarCells: (number | null)[] = [];
+  for (let i = 0; i < firstDay; i++) calendarCells.push(null);
+  for (let d = 1; d <= daysCount; d++) calendarCells.push(d);
+  const today = new Date();
+  const isToday = (d: number) => today.getFullYear() === year && today.getMonth() + 1 === month && today.getDate() === d;
 
-  const schedulesByDate = useMemo(() => {
-    const map: Record<string, Schedule[]> = {}
-    schedules.forEach(s => {
-      if (!s.date) return
-      if (!map[s.date]) map[s.date] = []
-      map[s.date].push(s)
-    })
-    return map
-  }, [schedules])
-
-  if (loading) return <div className="min-h-screen bg-[#F0F0F0] flex items-center justify-center"><Loader2 size={24} className="animate-spin text-gray-400" /></div>
-  if (notFound || !worker) return (
-    <div className="min-h-screen bg-[#F0F0F0] flex flex-col items-center justify-center px-8 text-center">
-      <p className="text-[18px] font-bold text-gray-600">유효하지 않은 링크입니다</p>
-      <p className="text-[14px] text-gray-400 mt-1">운영자에게 문의해주세요</p>
-    </div>
-  )
+  const months4to6 = [4, 5, 6];
 
   return (
-    <div className="min-h-screen bg-[#F0F0F0]">
-      <div className="max-w-[480px] mx-auto px-4 py-5">
-        {/* Header */}
-        <div className="rounded-2xl bg-[#3182F6] p-5 mb-4">
-          <p className="text-[22px] font-bold text-white">{worker.name}님 👋</p>
-          <div className="flex gap-4 mt-3 text-[13px] text-white/80">
-            <span>완료 <span className="font-bold text-white">{done.length}건</span></span>
-            <span>미완료 <span className="font-bold text-white">{pending.length}건</span></span>
-            <span>이번달 <span className="font-bold text-white">{fmt(monthTotal)}원</span></span>
-          </div>
+    <div style={{ minHeight: '100vh', background: '#F7F8FA' }}>
+      <div style={{ background: BLUE, padding: '24px 20px 20px', color: '#fff' }}>
+        <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>{worker.name} 님 👋</div>
+        <div style={{ fontSize: 13, opacity: 0.8, marginBottom: 16 }}>{worker.role} 담당 · 정규</div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          {[{ label: '완료', value: `${doneCount}건` }, { label: '남은 일정', value: `${remainCount}건` }, { label: '이달 수입', value: fmt(monthIncome) }].map(k => (
+            <div key={k.label} style={{ flex: 1, background: 'rgba(255,255,255,0.15)', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>{k.value}</div>
+              <div style={{ fontSize: 10, opacity: 0.8, marginTop: 2 }}>{k.label}</div>
+            </div>
+          ))}
         </div>
+      </div>
 
-        {/* Calendar */}
-        <div className="rounded-2xl bg-white p-4 mb-4">
-          <div className="flex items-center justify-between mb-3">
-            <button onClick={() => setCalMonth(p => ({ ...p, month: p.month - 1 < 0 ? 11 : p.month - 1, year: p.month - 1 < 0 ? p.year - 1 : p.year }))}><ChevronLeft size={18} className="text-gray-500" /></button>
-            <span className="text-[15px] font-bold">{calMonth.year}년 {calMonth.month + 1}월</span>
-            <button onClick={() => setCalMonth(p => ({ ...p, month: p.month + 1 > 11 ? 0 : p.month + 1, year: p.month + 1 > 11 ? p.year + 1 : p.year }))}><ChevronRight size={18} className="text-gray-500" /></button>
-          </div>
-          <div className="grid grid-cols-7 text-center text-[10px] text-gray-400 mb-1">
-            {['일', '월', '화', '수', '목', '금', '토'].map(d => <span key={d}>{d}</span>)}
-          </div>
-          <div className="grid grid-cols-7 gap-0.5">
-            {calDays.map((day, i) => {
-              if (day === null) return <div key={i} className="h-10" />
-              const dateStr = `${calMonth.year}-${String(calMonth.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-              const daySchedules = schedulesByDate[dateStr] || []
-              const hasDone = daySchedules.some(s => s.isDone)
-              const hasUndone = daySchedules.some(s => !s.isDone && dateStr <= todayStr)
-              const hasFuture = daySchedules.some(s => !s.isDone && dateStr > todayStr)
-              let bg = ''
-              if (hasUndone) bg = 'bg-red-100'
-              else if (hasDone) bg = 'bg-green-100'
-              else if (hasFuture) bg = 'bg-blue-50'
-              const names = daySchedules.map(s => s.houseName).join('·')
-              const firstEvtId = daySchedules[0]?.id
-              return (
-                <button key={i} onClick={() => {
-                  if (firstEvtId) document.getElementById(`card-${firstEvtId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                }} className={`h-10 rounded-lg flex flex-col items-center justify-center ${bg}`}>
-                  <span className="text-[11px] text-gray-700">{day}</span>
-                  {names && <span className="text-[7px] text-gray-500 truncate max-w-full px-0.5">{names}</span>}
-                </button>
-              )
-            })}
-          </div>
-          <div className="flex gap-3 mt-2 text-[9px] text-gray-400">
-            <span><span className="inline-block w-2 h-2 rounded-full bg-green-300 mr-0.5" />완료</span>
-            <span><span className="inline-block w-2 h-2 rounded-full bg-red-300 mr-0.5" />미완료</span>
-            <span><span className="inline-block w-2 h-2 rounded-full bg-blue-200 mr-0.5" />예정</span>
-          </div>
+      <div style={{ background: '#fff', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #F0F0F0' }}>
+        <div style={{ display: 'flex', gap: 0, background: '#F2F4F6', borderRadius: 8, padding: 2 }}>
+          {(['month', 'year'] as const).map(v => (
+            <button key={v} onClick={() => setViewMode(v)}
+              style={{ padding: '6px 14px', borderRadius: 6, border: 'none', fontSize: 12, fontWeight: viewMode === v ? 700 : 400, background: viewMode === v ? '#fff' : 'transparent', color: viewMode === v ? '#191919' : GRAY, cursor: 'pointer', fontFamily: 'inherit', boxShadow: viewMode === v ? '0 1px 2px rgba(0,0,0,.06)' : 'none' }}>
+              {v === 'month' ? '월별' : '연간'}
+            </button>
+          ))}
         </div>
+        {viewMode === 'month' && (
+          <div style={{ display: 'flex', gap: 4 }}>
+            {months4to6.map(m => (
+              <button key={m} onClick={() => setMonth(m)}
+                style={{ padding: '6px 12px', borderRadius: 16, border: `1px solid ${month === m ? BLUE : '#E8E8E8'}`, background: month === m ? '#EBF4FF' : '#fff', color: month === m ? BLUE : '#666', fontSize: 12, fontWeight: month === m ? 600 : 400, cursor: 'pointer', fontFamily: 'inherit' }}>
+                {m}월
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
-        {/* Section 1: Pending */}
-        {pending.length > 0 && (
-          <div className="mb-4">
-            <p className="text-[15px] font-bold text-[#F04452] mb-2">❗ 지금 처리하세요</p>
-            {pending.map(s => (
-              <div key={s.id} id={`card-${s.id}`} className="rounded-2xl bg-white border-l-4 border-l-[#F04452] p-5 mb-3">
-                {s.memo && <MemoBubble text={s.memo} />}
-                <p className="text-[13px] font-bold text-[#F04452]">{s.date}</p>
-                <p className="text-[26px] font-bold mt-1">{s.houseName}</p>
-                <p className="text-[16px] text-gray-500">{s.type}</p>
-                <div className="flex items-center gap-2 mt-2">
-                  {editingAmount === s.id ? (
-                    <div className="flex items-center gap-2 flex-1">
-                      <input type="number" value={amountVal} onChange={e => setAmountVal(e.target.value)}
-                        className="flex-1 px-3 py-2 rounded-xl border border-gray-300 text-[18px] font-bold outline-none" />
-                      <button onClick={() => saveAmount(s.id)} className="px-3 py-2 rounded-xl bg-[#3182F6] text-white text-[14px] font-bold">저장</button>
+      <div style={{ padding: 16 }}>
+        {viewMode === 'month' ? (
+          <>
+            {/* Calendar */}
+            <div style={{ background: '#fff', borderRadius: 14, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, textAlign: 'center' }}>{year}년 {month}월</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0, textAlign: 'center' }}>
+                {['일','월','화','수','목','금','토'].map(d => (
+                  <div key={d} style={{ fontSize: 11, color: GRAY, padding: '4px 0', fontWeight: 600 }}>{d}</div>
+                ))}
+                {calendarCells.map((d, i) => {
+                  if (d === null) return <div key={`e${i}`} style={{ padding: '8px 0' }} />;
+                  const dayTasks = monthTasks.filter(t => t.day === d);
+                  return (
+                    <div key={d} style={{ padding: '4px 0' }}>
+                      <div style={{ width: 28, height: 28, margin: '0 auto', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: isToday(d) ? 700 : 400, border: isToday(d) ? `2px solid ${BLUE}` : 'none', color: isToday(d) ? BLUE : '#333' }}>{d}</div>
+                      {dayTasks.length > 0 && (
+                        <div style={{ fontSize: 8, marginTop: 1, color: dayTasks[0].status === '완료' ? GREEN : BLUE, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '0 2px' }}>
+                          {dayTasks[0].loc.split(' ')[1]}
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <>
-                      <span className="text-[22px] font-bold">{fmt(s.amount)}원</span>
-                      <button onClick={() => { setEditingAmount(s.id); setAmountVal(String(s.amount)) }}
-                        className="flex items-center gap-1 text-[12px] text-[#3182F6] font-medium">
-                        <Pencil size={11} /> 금액수정
+                  );
+                })}
+              </div>
+              <div style={{ display: 'flex', gap: 12, marginTop: 8, justifyContent: 'center' }}>
+                <span style={{ fontSize: 10, color: GREEN, display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: GREEN, display: 'inline-block' }} /> 완료</span>
+                <span style={{ fontSize: 10, color: BLUE, display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: BLUE, display: 'inline-block' }} /> 예정</span>
+              </div>
+            </div>
+
+            {pendingTasks.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#F04452', marginBottom: 8 }}>처리 필요 {pendingTasks.length}건</div>
+                {pendingTasks.map(t => (
+                  <div key={t.id} style={{ background: '#fff', borderRadius: 14, padding: 20, marginBottom: 10 }}>
+                    <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>{t.loc.split(' ')[1]}하우스</div>
+                    <div style={{ fontSize: 12, color: GRAY, marginBottom: 16 }}>{t.room} · {t.date}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                      <span style={{ fontSize: 13, color: '#666' }}>작업 금액</span>
+                      {editId === t.id ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <input value={editAmt} onChange={e => setEditAmt(e.target.value)} type="number" style={{ width: 100, padding: '6px 10px', border: '1px solid #E8E8E8', borderRadius: 8, fontSize: 14, fontFamily: 'inherit', outline: 'none', textAlign: 'right' }} />
+                          <button onClick={() => saveEdit(t.id)} style={{ background: BLUE, border: 'none', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}><Check size={14} color="#fff" /></button>
+                          <button onClick={() => setEditId(null)} style={{ background: '#F0F0F0', border: 'none', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}><X size={14} color="#999" /></button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 16, fontWeight: 700 }}>{fmt(t.amount)}</span>
+                          <button onClick={() => { setEditId(t.id); setEditAmt(String(t.amount)); }} style={{ background: '#F5F5F5', border: 'none', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: '#666' }}><Pencil size={11} /> 수정</button>
+                        </div>
+                      )}
+                    </div>
+                    <button onClick={() => markComplete(t.id)} style={{ width: '100%', padding: 14, borderRadius: 12, border: 'none', background: BLUE, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>✅ 완료 처리</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {completedTasks.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: GREEN, marginBottom: 8 }}>완료 {doneCount}건 · {fmt(completedTotal)}</div>
+                {completedTasks.map(t => (
+                  <div key={t.id} style={{ background: '#fff', borderRadius: 12, padding: '12px 16px', marginBottom: 8, opacity: 0.65, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{t.loc.split(' ')[1]}하우스</div>
+                      <div style={{ fontSize: 11, color: GRAY }}>{t.date} · {fmt(t.amount)}</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ padding: '2px 7px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: '#e8faf2', color: GREEN }}>완료</span>
+                      <button onClick={() => setConfirmId(t.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}><Undo2 size={14} color="#999" /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {prevMonths.length > 0 && (
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: GRAY, marginBottom: 8, textAlign: 'center' }}>── 이전 달 기록 ──</div>
+                {prevMonths.map(([key, tasks]) => {
+                  const isOpen = openMonths[key] ?? false;
+                  const total = tasks.reduce((s, t) => s + t.amount, 0);
+                  return (
+                    <div key={key} style={{ background: '#fff', borderRadius: 12, marginBottom: 8, overflow: 'hidden' }}>
+                      <button onClick={() => toggleMonth(key)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+                        <span style={{ fontSize: 13, fontWeight: 600 }}>{key.replace('.0', '.').replace('.', '년 ')}월</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 12, color: GRAY }}>{tasks.length}건 · {fmt(total)}</span>
+                          {isOpen ? <ChevronUp size={14} color="#999" /> : <ChevronDown size={14} color="#999" />}
+                        </div>
                       </button>
-                    </>
-                  )}
-                </div>
-                <button onClick={() => toggleDone(s.id, true)}
-                  className="w-full mt-3 py-4 rounded-xl bg-[#F04452] text-white text-[20px] font-bold flex items-center justify-center gap-2">
-                  <Check size={22} /> 완료 처리
-                </button>
+                      {isOpen && tasks.map(t => (
+                        <div key={t.id} style={{ padding: '8px 16px', borderTop: '1px solid #F5F5F5', display: 'flex', justifyContent: 'space-between', opacity: 0.7 }}>
+                          <span style={{ fontSize: 12 }}>● {t.loc.split(' ')[1]}하우스 · {t.date}</span>
+                          <span style={{ fontSize: 12, color: GRAY }}>{fmt(t.amount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
-        )}
-
-        {/* Section 2: Future */}
-        {future.length > 0 && (
-          <div className="mb-4">
-            <p className="text-[15px] font-bold text-[#3182F6] mb-2">📅 앞으로 예정</p>
-            {future.map(s => (
-              <div key={s.id} id={`card-${s.id}`} className="rounded-2xl bg-blue-50 p-4 mb-2">
-                {s.memo && <MemoBubble text={s.memo} />}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[13px] text-[#3182F6] font-medium">{s.date}</p>
-                    <p className="text-[20px] font-bold mt-0.5">{s.houseName}</p>
-                    <p className="text-[14px] text-gray-500">{s.type}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[18px] font-bold">{fmt(s.amount)}원</p>
-                    <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 text-[10px] font-bold">예정</span>
-                  </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>{year}년 전체 현황</div>
+            {yearData.map(([label, data]) => {
+              const isOpen = openMonths[label] ?? false;
+              return (
+                <div key={label} style={{ background: '#fff', borderRadius: 12, marginBottom: 8, overflow: 'hidden' }}>
+                  <button onClick={() => toggleMonth(label)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+                    <span style={{ fontSize: 14, fontWeight: 700 }}>{label}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 12, color: GRAY }}>{data.tasks.length}건 (완료 {data.done}건) · {fmt(data.total)}</span>
+                      {isOpen ? <ChevronUp size={14} color="#999" /> : <ChevronDown size={14} color="#999" />}
+                    </div>
+                  </button>
+                  {isOpen && data.tasks.map(t => {
+                    const sc = STATUS_COLOR[t.status];
+                    return (
+                      <div key={t.id} style={{ padding: '8px 16px', borderTop: '1px solid #F5F5F5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: 12 }}>{t.loc.split(' ')[1]}하우스 · {t.room} · {t.date}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 12 }}>{fmt(t.amount)}</span>
+                          <span style={{ padding: '2px 5px', borderRadius: 3, fontSize: 9, fontWeight: 600, background: sc.bg, color: sc.color }}>{t.status}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              </div>
-            ))}
-          </div>
+              );
+            })}
+          </>
         )}
+      </div>
 
-        {/* Section 3: Done */}
-        {done.length > 0 && (
-          <div className="mb-4">
-            <p className="text-[15px] font-bold text-gray-500 mb-2">✅ 완료한 일정</p>
-            {done.map(s => (
-              <div key={s.id} id={`card-${s.id}`} className="rounded-2xl bg-white p-3.5 mb-2 opacity-65">
-                {s.memo && <div className="mb-1.5 px-2 py-1 rounded bg-gray-50 text-[10px] text-gray-400">{s.memo}</div>}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[12px] text-gray-400">{s.date}</p>
-                    <p className="text-[17px] font-bold">{s.houseName}</p>
-                    <p className="text-[12px] text-gray-400">{s.type} · {fmt(s.amount)}원</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-600 text-[10px] font-bold">완료 ✓</span>
-                    <button onClick={() => toggleDone(s.id, false)}
-                      className="flex items-center gap-1 px-2 py-1 rounded-lg bg-gray-100 text-gray-400 text-[10px] font-bold">
-                      <RotateCcw size={10} /> 되돌리기
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+      {confirmId && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div onClick={() => setConfirmId(null)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.4)' }} />
+          <div style={{ position: 'relative', width: '80%', maxWidth: 300, background: '#fff', borderRadius: 16, padding: 24, textAlign: 'center' }}>
+            <div style={{ fontSize: 24, marginBottom: 8 }}>↩</div>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>완료를 취소할까요?</div>
+            <div style={{ fontSize: 13, color: GRAY, marginBottom: 20 }}>운영지출에서도 제거돼요</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setConfirmId(null)} style={{ flex: 1, padding: 12, borderRadius: 10, border: '1px solid #E8E8E8', background: '#fff', fontSize: 13, fontWeight: 600, color: '#555', cursor: 'pointer', fontFamily: 'inherit' }}>아니요</button>
+              <button onClick={() => undoComplete(confirmId)} style={{ flex: 1, padding: 12, borderRadius: 10, border: 'none', background: '#F04452', fontSize: 13, fontWeight: 600, color: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>취소할게요</button>
+            </div>
           </div>
-        )}
-
-        {/* Info */}
-        <div className="rounded-xl bg-green-50 border border-green-200 p-4 mb-4">
-          <p className="text-[12px] text-green-700">🔗 완료 처리 시 운영지출에 자동 반영됩니다</p>
         </div>
+      )}
 
-        <footer className="text-center py-4">
-          <p className="text-[11px] text-gray-400">© 2026 ShareHub</p>
-        </footer>
-      </div>
+      {toast && (
+        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: '#191f28', color: '#fff', padding: '10px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600, zIndex: 999, whiteSpace: 'nowrap' }}>{toast}</div>
+      )}
     </div>
-  )
-}
-
-function MemoBubble({ text }: { text: string }) {
-  return (
-    <div className="mb-3 relative">
-      <div className="absolute top-0 left-0" style={{ width: 0, height: 0, borderRight: '8px solid #F7F8FA', borderBottom: '8px solid transparent' }} />
-      <div className="ml-2 px-3.5 py-3" style={{ background: '#F7F8FA', borderRadius: '0 14px 14px 14px', border: '0.5px solid var(--border, #e5e5e5)' }}>
-        <p className="text-[12px] text-gray-400 mb-1">운영자</p>
-        <p className="text-[16px] leading-[1.65]">{text}</p>
-      </div>
-    </div>
-  )
+  );
 }

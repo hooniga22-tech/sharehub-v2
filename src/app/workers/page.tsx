@@ -1,417 +1,323 @@
-'use client'
+'use client';
 
-import { useState, useEffect, useMemo } from 'react'
-import { PageHeader } from '@/components/ui/PageHeader'
-import { Chip } from '@/components/ui/Chip'
-import { Card } from '@/components/ui/Card'
-import { X, Plus, Calendar, CheckCircle, Loader2 } from 'lucide-react'
-import WorkerCalendar from '@/components/ui/WorkerCalendar'
-import Link from 'next/link'
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Plus, Phone, Link2, ExternalLink, ChevronDown, ChevronUp, X } from 'lucide-react';
+import { mockWorkers, mockTasks as initialTasks, mockIssues as initialIssues, TYPE_COLOR, STATUS_COLOR, fmt, type Worker, type WorkTask, type WorkIssue } from '@/../data/mockWorkers';
 
-const WORKERS = [
-  { name: '이인실', token: 'b775a18c876534ee', role: '청소' },
-  { name: '이미경', token: '4b594c769b0aa6ab', role: '청소' },
-  { name: '이한나', token: 'e8f27ed8eab30c68', role: '청소' },
-  { name: '진진수', token: '2d79c5c07cfb8e4c', role: '수리' },
-  { name: '김기진', token: '9a495582ad427525', role: '수리' },
-]
-
-interface WorkerItem {
-  _rowIndex: number; id: string; name: string; houseName: string;
-  taskType: string; scheduledDate: string; isDone: string;
-  payment: number; issueId: string; memo: string; token: string; createdAt: string;
-}
-
-const DONE_FILTERS = ['전체', '미완료', '완료']
-const TASK_TYPES = ['전체', '퇴실청소', '정기청소', '수리', '기타']
-const CREATE_TASK_TYPES = ['퇴실청소', '정기청소', '수리', '기타']
-
-const taskVariant: Record<string, 'blue' | 'green' | 'red' | 'gray'> = {
-  '퇴실청소': 'blue', '정기청소': 'green', '수리': 'red', '기타': 'gray',
-}
-
-function toMan(n: number) {
-  const m = Math.round(n / 10000)
-  return m > 0 ? `${m.toLocaleString()}만` : n.toLocaleString()
-}
+const BLUE = '#3182f6', RED = '#f04452', GREEN = '#00c471', GRAY = '#8b95a1', ORANGE = '#f59f00';
 
 export default function WorkersPage() {
-  const [workers, setWorkers] = useState<WorkerItem[]>([])
-  const [houseNames, setHouseNames] = useState<string[]>([])
-  const [loading, setLoading] = useState(true)
-  const [doneFilter, setDoneFilter] = useState('전체')
-  const [taskFilter, setTaskFilter] = useState('전체')
-  const [showCreate, setShowCreate] = useState(false)
-  const [completeTarget, setCompleteTarget] = useState<WorkerItem | null>(null)
+  const router = useRouter();
+  const [tasks, setTasks] = useState<WorkTask[]>(initialTasks);
+  const [issues, setIssues] = useState<WorkIssue[]>(initialIssues);
+  const [tab, setTab] = useState(0);
+  const [workerDetail, setWorkerDetail] = useState<string | null>(null);
+  const [selIssue, setSelIssue] = useState<WorkIssue | null>(null);
+  const [assignWorkerId, setAssignWorkerId] = useState<string | null>(null);
+  const [toast, setToast] = useState('');
 
-  function fetchWorkers() {
-    setLoading(true)
-    fetch('/api/workers')
-      .then(r => r.json())
-      .then(d => { if (Array.isArray(d)) setWorkers(d) })
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2200); };
 
-  useEffect(() => {
-    fetchWorkers()
-    fetch('/api/workers/by-token/list-all').catch(() => {})
-    fetch('/api/sheets?sheet=지점')
-      .then(r => r.json())
-      .then(d => {
-        if (Array.isArray(d)) setHouseNames(d.map((r: string[]) => r[1]?.trim()).filter(Boolean))
-      })
-      .catch(() => {})
-  }, [])
+  const pendingIssueCount = issues.filter(i => i.status === '접수' && i.type === '수리').length;
+  const fixedWorkers = mockWorkers.filter(w => w.type === '고정');
+  const externalWorkers = mockWorkers.filter(w => w.type === '외부');
 
-  const now = new Date()
-  const curYear = now.getFullYear()
-  const curMonth = now.getMonth() + 1
+  const juneTasks = tasks.filter(t => t.month === 6 && t.year === 2025);
+  const inProgress = juneTasks.filter(t => t.status === '진행중');
+  const upcoming = juneTasks.filter(t => t.status === '예정');
+  const completed = juneTasks.filter(t => t.status === '완료');
 
-  const thisMonthWorkers = useMemo(() =>
-    workers.filter(w => {
-      if (!w.scheduledDate) return false
-      const [y, m] = w.scheduledDate.split('-').map(Number)
-      return y === curYear && m === curMonth
-    }), [workers, curYear, curMonth])
+  const needAssign = issues.filter(i => i.type === '수리' && i.status === '접수');
+  const processing = issues.filter(i => i.status === '처리중');
+  const otherIssues = issues.filter(i => i.type !== '수리' && i.status === '접수');
 
-  const thisMonthPending = thisMonthWorkers.filter(w => w.isDone !== 'Y').length
-  const thisMonthPayment = thisMonthWorkers.reduce((s, w) => s + w.payment, 0)
+  const totalPay = mockWorkers.reduce((s, w) => s + w.pay, 0);
 
-  const sorted = useMemo(() =>
-    [...workers].sort((a, b) => (b.scheduledDate || '').localeCompare(a.scheduledDate || '')),
-    [workers])
+  const assignIssue = () => {
+    if (!selIssue || !assignWorkerId) return;
+    const worker = mockWorkers.find(w => w.id === assignWorkerId);
+    if (!worker) return;
+    setIssues(prev => prev.map(i => i.id === selIssue.id ? { ...i, status: '처리중' as const, assignedId: assignWorkerId } : i));
+    const newTask: WorkTask = {
+      id: Date.now(), workerId: assignWorkerId, worker: worker.name, type: '수리',
+      loc: selIssue.loc, room: selIssue.room, date: '6월 15일', day: 15, month: 6, year: 2025,
+      status: '예정', memo: selIssue.title, amount: 60000, issueId: selIssue.id,
+    };
+    setTasks(prev => [...prev, newTask]);
+    setSelIssue(null); setAssignWorkerId(null);
+    showToast(`${worker.name}에게 배정 완료!`);
+  };
 
-  const filtered = useMemo(() =>
-    sorted.filter(w => {
-      if (doneFilter === '미완료' && w.isDone === 'Y') return false
-      if (doneFilter === '완료' && w.isDone !== 'Y') return false
-      if (taskFilter !== '전체' && w.taskType !== taskFilter) return false
-      return true
-    }), [sorted, doneFilter, taskFilter])
+  const Badge = ({ label, bg, color }: { label: string; bg: string; color: string }) => (
+    <span style={{ display: 'inline-block', padding: '2px 7px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: bg, color }}>{label}</span>
+  );
 
-  const counts = useMemo(() => ({
-    '전체': workers.length,
-    '미완료': workers.filter(w => w.isDone !== 'Y').length,
-    '완료': workers.filter(w => w.isDone === 'Y').length,
-  }), [workers])
+  const Avatar = ({ ch, bg, color, size = 38 }: { ch: string; bg: string; color: string; size?: number }) => (
+    <div style={{ width: size, height: size, borderRadius: '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.35, fontWeight: 700, color, flexShrink: 0 }}>{ch}</div>
+  );
 
-  return (
-    <div className="flex flex-col min-h-screen">
-      <PageHeader
-        title="용역 관리"
-        right={
-          <button onClick={() => setShowCreate(true)} className="flex items-center gap-1 text-[14px] font-semibold text-[var(--blue)]">
-            <Plus size={16} /> 일정 등록
-          </button>
-        }
-      />
-
-      <div className="grid grid-cols-2 gap-3 mb-4 px-5 mt-3">
-        {WORKERS.map(w => (
-          <Link key={w.token} href={`/worker/${w.token}`}
-            className="bg-[var(--card)] rounded-2xl px-4 py-3 flex items-center gap-3 border border-[var(--border)]">
-            <div className="w-10 h-10 rounded-full bg-[#EBF3FE] flex items-center justify-center text-[15px] font-bold text-[#0C447C]">
-              {w.name[0]}
+  const renderWorkerRow = (w: Worker) => {
+    const isOpen = workerDetail === w.id;
+    const tc = TYPE_COLOR[w.role];
+    const wTasks = tasks.filter(t => t.workerId === w.id && t.month === 6);
+    const wCompleted = wTasks.filter(t => t.status === '완료').length;
+    return (
+      <div key={w.id}>
+        <button onClick={() => setWorkerDetail(isOpen ? null : w.id)}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+          <Avatar ch={w.initial} bg={tc.bg} color={tc.color} />
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: '#191919' }}>{w.name}</span>
+              <Badge label={w.role} bg={tc.bg} color={tc.color} />
             </div>
-            <div>
-              <p className="text-[14px] font-bold">{w.name}</p>
-              <p className="text-[12px] text-[var(--sub)]">{w.role}</p>
-            </div>
-          </Link>
-        ))}
-      </div>
-
-      <WorkerCalendar />
-
-      <div className="flex-1 overflow-y-auto px-5 pb-8">
-        {/* Summary Cards */}
-        <div className="flex gap-3 mt-3">
-          <div className="flex-1 rounded-2xl bg-[var(--amber-light)] p-4">
-            <p className="text-[11px] text-[var(--amber)] font-medium">이번달 미완료</p>
-            <p className="text-[22px] font-bold text-[var(--amber)] mt-0.5">{thisMonthPending}건</p>
+            <div style={{ fontSize: 12, color: GRAY, marginTop: 2 }}>{w.phone} · {fmt(w.pay)}</div>
           </div>
-          <div className="flex-1 rounded-2xl bg-[var(--blue-light)] p-4">
-            <p className="text-[11px] text-[var(--blue)] font-medium">이번달 정산합계</p>
-            <p className="text-[22px] font-bold text-[var(--blue)] mt-0.5">{toMan(thisMonthPayment)}원</p>
-          </div>
-        </div>
-
-        {/* Done Filter */}
-        <div className="flex gap-2 mt-4 overflow-x-auto no-scrollbar">
-          {DONE_FILTERS.map(f => (
-            <button key={f} onClick={() => setDoneFilter(f)}
-              className={`shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-medium transition-colors flex items-center gap-1.5 ${
-                doneFilter === f ? 'bg-[var(--blue)] text-white' : 'bg-[var(--card)] text-[var(--sub)] border border-[var(--border)]'
-              }`}>
-              {f}
-              <span className={`text-[11px] ${doneFilter === f ? 'text-white/70' : 'text-[var(--sub)]'}`}>
-                {counts[f as keyof typeof counts]}
-              </span>
-            </button>
-          ))}
-        </div>
-
-        {/* Task Type Filter */}
-        <div className="flex gap-2 mt-2 pb-2 overflow-x-auto no-scrollbar">
-          {TASK_TYPES.map(t => (
-            <button key={t} onClick={() => setTaskFilter(t)}
-              className={`shrink-0 px-3 py-1 rounded-full text-[12px] font-medium transition-colors ${
-                taskFilter === t ? 'bg-[var(--foreground)] text-[var(--bg)]' : 'bg-[var(--card)] text-[var(--sub)] border border-[var(--border)]'
-              }`}>{t}</button>
-          ))}
-        </div>
-
-        {/* Worker List */}
-        {loading ? (
-          <p className="text-[13px] text-[var(--sub)] py-8 text-center">불러오는 중...</p>
-        ) : filtered.length === 0 ? (
-          <p className="text-[13px] text-[var(--sub)] py-8 text-center">용역 일정이 없습니다</p>
-        ) : (
-          <div className="flex flex-col gap-2.5 mt-1">
-            {filtered.map(w => (
-              <Card key={w.id} className={`px-4 py-3.5 ${w.isDone === 'Y' ? 'opacity-60' : ''}`}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <Chip label={w.taskType || '기타'} variant={taskVariant[w.taskType] || 'gray'} />
-                  </div>
-                  <Chip
-                    label={w.isDone === 'Y' ? '완료' : '대기중'}
-                    variant={w.isDone === 'Y' ? 'green' : 'amber'}
-                  />
-                </div>
-                <p className="text-[15px] font-bold">{w.name}</p>
-                <p className="text-[12px] text-[var(--sub)] mt-0.5">{w.houseName}</p>
-                <div className="flex items-center gap-3 mt-2 text-[11px] text-[var(--sub)]">
-                  {w.scheduledDate && (
-                    <span className="flex items-center gap-1">
-                      <Calendar size={11} /> {w.scheduledDate}
-                    </span>
-                  )}
-                  {w.payment > 0 && <span>{w.payment.toLocaleString()}원</span>}
-                  {w.issueId && <span>이슈: {w.issueId}</span>}
-                </div>
-                {w.isDone !== 'Y' && (
-                  <button onClick={() => setCompleteTarget(w)}
-                    className="mt-2.5 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--green-light)] text-[var(--green)] text-[11px] font-bold">
-                    <CheckCircle size={12} /> 완료 처리
+          {isOpen ? <ChevronUp size={16} color="#999" /> : <ChevronDown size={16} color="#999" />}
+        </button>
+        {isOpen && (
+          <div style={{ padding: '0 20px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ fontSize: 12, color: GRAY }}>이달 작업 {wTasks.length}건 · 완료 {wCompleted}건</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => { navigator.clipboard.writeText(w.phone); showToast('전화번호 복사됨!'); }}
+                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '8px 0', borderRadius: 8, border: '1px solid #E8E8E8', background: '#fff', fontSize: 12, fontWeight: 600, color: '#555', cursor: 'pointer', fontFamily: 'inherit' }}>
+                <Phone size={13} /> 연락
+              </button>
+              {w.token && (
+                <>
+                  <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/worker/${w.token}`); showToast('링크 복사됨!'); }}
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '8px 0', borderRadius: 8, border: '1px solid #E8E8E8', background: '#fff', fontSize: 12, fontWeight: 600, color: '#555', cursor: 'pointer', fontFamily: 'inherit' }}>
+                    <Link2 size={13} /> 링크 공유
                   </button>
-                )}
-                <MemoField workerId={w.id} memo={w.memo} onSaved={(memo) => setWorkers(prev => prev.map(x => x.id === w.id ? { ...x, memo } : x))} />
-              </Card>
-            ))}
+                  <button onClick={() => router.push(`/worker/${w.token}`)}
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '8px 0', borderRadius: 8, border: 'none', background: BLUE, fontSize: 12, fontWeight: 600, color: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
+                    <ExternalLink size={13} /> 개인 페이지
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>
+    );
+  };
 
-      {/* Create Bottom Sheet */}
-      {showCreate && (
-        <CreateSheet
-          houseNames={houseNames}
-          onClose={() => setShowCreate(false)}
-          onCreated={() => { setShowCreate(false); fetchWorkers() }}
-        />
-      )}
+  const renderTaskCard = (t: WorkTask) => {
+    const tc = TYPE_COLOR[t.type]; const sc = STATUS_COLOR[t.status];
+    return (
+      <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px', opacity: t.status === '완료' ? 0.75 : 1 }}>
+        <Avatar ch={t.worker[0]} bg={tc.bg} color={tc.color} size={34} />
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>{t.worker}</span>
+            <Badge label={t.type} bg={tc.bg} color={tc.color} />
+            <Badge label={t.status} bg={sc.bg} color={sc.color} />
+          </div>
+          <div style={{ fontSize: 11, color: GRAY, marginTop: 2 }}>
+            {t.loc} {t.room} · {t.date}
+            {t.issueId != null && <span style={{ marginLeft: 6, padding: '1px 5px', borderRadius: 3, fontSize: 10, background: '#fff8e1', color: ORANGE }}>이슈연동</span>}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
-      {/* Complete Confirmation Modal */}
-      {completeTarget && (
-        <CompleteModal
-          worker={completeTarget}
-          onClose={() => setCompleteTarget(null)}
-          onDone={() => { setCompleteTarget(null); fetchWorkers() }}
-        />
-      )}
-    </div>
-  )
-}
-
-/* ── Create Bottom Sheet ── */
-function CreateSheet({ houseNames, onClose, onCreated }: {
-  houseNames: string[]; onClose: () => void; onCreated: () => void
-}) {
-  const [name, setName] = useState('')
-  const [houseName, setHouseName] = useState('')
-  const [taskType, setTaskType] = useState('')
-  const [scheduledDate, setScheduledDate] = useState('')
-  const [payment, setPayment] = useState('')
-  const [issueId, setIssueId] = useState('')
-  const [memo, setMemo] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-
-  async function handleSubmit() {
-    if (!name.trim() || !taskType) return
-    setSubmitting(true)
-    await fetch('/api/workers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: name.trim(), houseName, taskType, scheduledDate,
-        payment: Number(payment) || 0, issueId, memo,
-      }),
-    })
-    onCreated()
-  }
-
-  const canSubmit = name.trim() && taskType
+  const tabLabels = ['직원·업체', '이달 일정', '이슈·수리', '정산'];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full max-w-[430px] bg-[var(--bg)] rounded-t-2xl max-h-[85vh] overflow-y-auto pb-8">
-        <div className="flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 rounded-full bg-[var(--border)]" />
+    <div style={{ minHeight: '100vh', background: '#F7F8FA' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: '#fff', borderBottom: '1px solid #F0F0F0', position: 'sticky', top: 0, zIndex: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={() => router.push('/manage')} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', padding: 4, color: '#191919' }}>←</button>
+          <span style={{ fontSize: 16, fontWeight: 700 }}>용역 관리</span>
         </div>
-        <div className="flex items-center justify-between px-5 py-3">
-          <h2 className="text-[17px] font-bold">일정 등록</h2>
-          <button onClick={onClose}><X size={20} color="var(--sub)" /></button>
-        </div>
-        <div className="px-5 flex flex-col gap-4">
-          <div>
-            <label className="text-[13px] font-semibold mb-1.5 block">담당자명 *</label>
-            <input value={name} onChange={e => setName(e.target.value)} placeholder="담당자 이름"
-              className="w-full px-4 py-3 rounded-xl bg-[var(--card)] border border-[var(--border)] text-[14px] outline-none placeholder:text-[var(--sub)]" />
-          </div>
-          <div>
-            <label className="text-[13px] font-semibold mb-1.5 block">지점명</label>
-            <select value={houseName} onChange={e => setHouseName(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-[var(--card)] border border-[var(--border)] text-[14px] outline-none">
-              <option value="">선택</option>
-              {houseNames.map(h => <option key={h} value={h}>{h}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="text-[13px] font-semibold mb-1.5 block">작업종류 *</label>
-            <div className="flex flex-wrap gap-2">
-              {CREATE_TASK_TYPES.map(t => (
-                <button key={t} onClick={() => setTaskType(t)}
-                  className={`px-3.5 py-2 rounded-xl text-[13px] font-medium border transition-colors ${
-                    taskType === t
-                      ? 'border-[var(--blue)] bg-[var(--blue-light)] text-[var(--blue)]'
-                      : 'border-[var(--border)] bg-[var(--card)] text-[var(--sub)]'
-                  }`}>{t}</button>
-              ))}
+        <button style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 8, border: 'none', background: BLUE, fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#fff' }}>
+          <Plus size={14} /> 추가
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', background: '#fff', borderBottom: '1px solid #F0F0F0' }}>
+        {tabLabels.map((label, i) => (
+          <button key={i} onClick={() => setTab(i)}
+            style={{ flex: 1, padding: '12px 0', border: 'none', borderBottom: tab === i ? `2px solid ${BLUE}` : '2px solid transparent', background: 'none', fontSize: 13, fontWeight: tab === i ? 700 : 400, color: tab === i ? BLUE : GRAY, cursor: 'pointer', fontFamily: 'inherit', position: 'relative' }}>
+            {label}
+            {i === 2 && pendingIssueCount > 0 && (
+              <span style={{ position: 'absolute', top: 6, right: '15%', width: 16, height: 16, borderRadius: '50%', background: RED, color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{pendingIssueCount}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ padding: 16 }}>
+        {tab === 0 && (
+          <>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#666', marginBottom: 8 }}>👤 고정 용역 {fixedWorkers.length}명</div>
+            <div style={{ background: '#fff', borderRadius: 14, marginBottom: 16, overflow: 'hidden' }}>
+              {fixedWorkers.map((w, i) => (<div key={w.id}>{i > 0 && <div style={{ height: 1, background: '#F5F5F5', margin: '0 20px' }} />}{renderWorkerRow(w)}</div>))}
             </div>
-          </div>
-          <div>
-            <label className="text-[13px] font-semibold mb-1.5 block">예정일</label>
-            <input type="date" value={scheduledDate} onChange={e => setScheduledDate(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-[var(--card)] border border-[var(--border)] text-[14px] outline-none" />
-          </div>
-          <div>
-            <label className="text-[13px] font-semibold mb-1.5 block">정산금액 (원)</label>
-            <input type="number" value={payment} onChange={e => setPayment(e.target.value)} placeholder="0"
-              className="w-full px-4 py-3 rounded-xl bg-[var(--card)] border border-[var(--border)] text-[14px] outline-none placeholder:text-[var(--sub)]" />
-          </div>
-          <div>
-            <label className="text-[13px] font-semibold mb-1.5 block">연결 이슈ID (선택)</label>
-            <input value={issueId} onChange={e => setIssueId(e.target.value)} placeholder="예: I..."
-              className="w-full px-4 py-3 rounded-xl bg-[var(--card)] border border-[var(--border)] text-[14px] outline-none placeholder:text-[var(--sub)]" />
-          </div>
-          <div>
-            <label className="text-[13px] font-semibold mb-1.5 block">메모 (선택)</label>
-            <textarea value={memo} onChange={e => setMemo(e.target.value)} placeholder="메모" rows={2}
-              className="w-full px-4 py-3 rounded-xl bg-[var(--card)] border border-[var(--border)] text-[14px] outline-none resize-none placeholder:text-[var(--sub)]" />
-          </div>
-          <button onClick={handleSubmit} disabled={!canSubmit || submitting}
-            className={`w-full py-3.5 rounded-xl text-[15px] font-semibold transition-colors ${
-              canSubmit ? 'bg-[var(--blue)] text-white' : 'bg-[var(--border)] text-[var(--sub)]'
-            }`}>
-            {submitting ? '등록 중...' : '저장'}
-          </button>
-        </div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#666', marginBottom: 8 }}>🏢 외부 업체 {externalWorkers.length}곳</div>
+            <div style={{ background: '#fff', borderRadius: 14, overflow: 'hidden' }}>
+              {externalWorkers.map((w, i) => (<div key={w.id}>{i > 0 && <div style={{ height: 1, background: '#F5F5F5', margin: '0 20px' }} />}{renderWorkerRow(w)}</div>))}
+            </div>
+          </>
+        )}
+
+        {tab === 1 && (
+          <>
+            {[{ label: '진행중', list: inProgress, dot: ORANGE }, { label: '예정', list: upcoming, dot: GRAY }, { label: '완료', list: completed, dot: GREEN }].map(group => group.list.length > 0 && (
+              <div key={group.label} style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: group.dot }} />
+                  <span style={{ fontSize: 13, fontWeight: 700, color: group.dot }}>{group.label} {group.list.length}건</span>
+                </div>
+                <div style={{ background: '#fff', borderRadius: 14, overflow: 'hidden' }}>
+                  {group.list.map((t, i) => (<div key={t.id}>{i > 0 && <div style={{ height: 1, background: '#F5F5F5', margin: '0 20px' }} />}{renderTaskCard(t)}</div>))}
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
+        {tab === 2 && (
+          <>
+            {needAssign.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: RED }} />
+                  <span style={{ fontSize: 13, fontWeight: 700, color: RED }}>배정 필요 {needAssign.length}건</span>
+                </div>
+                {needAssign.map(issue => (
+                  <div key={issue.id} style={{ background: '#fff', borderRadius: 14, padding: '16px 20px', marginBottom: 10, border: issue.urgent ? `1px solid ${RED}` : 'none' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {issue.urgent && <Badge label="긴급" bg="#FFF0F0" color={RED} />}
+                        <span style={{ fontSize: 14, fontWeight: 600 }}>{issue.title}</span>
+                      </div>
+                      <span style={{ fontSize: 11, color: RED, fontWeight: 600 }}>미배정</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: GRAY, marginBottom: 10 }}>{issue.loc} {issue.room} · {issue.date}</div>
+                    <button onClick={() => { setSelIssue(issue); setAssignWorkerId(null); }}
+                      style={{ width: '100%', padding: '10px 0', borderRadius: 10, border: `1px solid ${BLUE}`, background: '#EBF4FF', fontSize: 13, fontWeight: 600, color: BLUE, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      👤 수리 담당 배정 → 일정 자동 등록
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {processing.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: ORANGE }} />
+                  <span style={{ fontSize: 13, fontWeight: 700, color: ORANGE }}>처리중 {processing.length}건</span>
+                </div>
+                {processing.map(issue => {
+                  const assigned = mockWorkers.find(w => w.id === issue.assignedId);
+                  return (
+                    <div key={issue.id} style={{ background: '#fff', borderRadius: 14, padding: '14px 20px', marginBottom: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        {issue.urgent && <Badge label="긴급" bg="#FFF0F0" color={RED} />}
+                        <span style={{ fontSize: 14, fontWeight: 600 }}>{issue.title}</span>
+                        <Badge label="처리중" bg="#fff8e1" color={ORANGE} />
+                      </div>
+                      <div style={{ fontSize: 12, color: GRAY }}>{issue.loc} {issue.room} · 담당: {assigned?.name || '-'}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {otherIssues.length > 0 && (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: GRAY }} />
+                  <span style={{ fontSize: 13, fontWeight: 700, color: GRAY }}>기타 이슈 {otherIssues.length}건</span>
+                </div>
+                {otherIssues.map(issue => (
+                  <div key={issue.id} style={{ background: '#fff', borderRadius: 14, padding: '14px 20px', marginBottom: 10 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{issue.title}</div>
+                    <div style={{ fontSize: 12, color: GRAY }}>{issue.loc} {issue.room} · {issue.date}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {tab === 3 && (
+          <>
+            <div style={{ background: BLUE, borderRadius: 14, padding: 20, marginBottom: 16, color: '#fff' }}>
+              <div style={{ fontSize: 13, opacity: 0.8, marginBottom: 4 }}>2025년 6월 총 용역비</div>
+              <div style={{ fontSize: 26, fontWeight: 700 }}>{fmt(totalPay)}</div>
+              <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>고정 {fixedWorkers.length}명 + 외부 {externalWorkers.length}곳</div>
+            </div>
+            <div style={{ background: '#fff', borderRadius: 14, overflow: 'hidden' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px 1fr 60px', padding: '12px 20px', borderBottom: '1px solid #F0F0F0' }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: GRAY }}>이름</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: GRAY }}>구분</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: GRAY, textAlign: 'right' }}>금액</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: GRAY, textAlign: 'center' }}>상태</span>
+              </div>
+              {mockWorkers.map((w, i) => (
+                <div key={w.id}>
+                  {i > 0 && <div style={{ height: 1, background: '#F5F5F5', margin: '0 20px' }} />}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px 1fr 60px', padding: '12px 20px', alignItems: 'center' }}>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{w.name}</span>
+                    <span style={{ fontSize: 12, color: GRAY }}>{w.type}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, textAlign: 'right' }}>{fmt(w.pay)}</span>
+                    <span style={{ textAlign: 'center' }}><Badge label="확정" bg="#e8faf2" color={GREEN} /></span>
+                  </div>
+                </div>
+              ))}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px 1fr 60px', padding: '14px 20px', borderTop: '2px solid #E8E8E8', background: '#FAFAFA' }}>
+                <span style={{ fontSize: 13, fontWeight: 700 }}>합계</span><span />
+                <span style={{ fontSize: 14, fontWeight: 700, textAlign: 'right', color: BLUE }}>{fmt(totalPay)}</span><span />
+              </div>
+            </div>
+            <button style={{ width: '100%', padding: 14, borderRadius: 12, border: '1px solid #E8E8E8', background: '#fff', fontSize: 13, fontWeight: 600, color: '#555', cursor: 'pointer', fontFamily: 'inherit', marginTop: 12 }}>
+              📊 정산 내보내기
+            </button>
+          </>
+        )}
       </div>
+
+      {selIssue && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div onClick={() => setSelIssue(null)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.4)' }} />
+          <div style={{ position: 'relative', width: '90%', maxWidth: 360, background: '#fff', borderRadius: 16, padding: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <span style={{ fontSize: 16, fontWeight: 700 }}>담당자 배정</span>
+              <button onClick={() => setSelIssue(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="#999" /></button>
+            </div>
+            <div style={{ background: '#F7F8FA', borderRadius: 10, padding: '10px 14px', marginBottom: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{selIssue.title}</div>
+              <div style={{ fontSize: 12, color: GRAY }}>{selIssue.loc} {selIssue.room}</div>
+            </div>
+            {fixedWorkers.map(w => {
+              const wTasks = tasks.filter(t => t.workerId === w.id && t.month === 6);
+              const selected = assignWorkerId === w.id;
+              return (
+                <button key={w.id} onClick={() => setAssignWorkerId(w.id)}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${selected ? BLUE : '#E8E8E8'}`, background: selected ? '#EBF4FF' : '#fff', marginBottom: 8, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+                  <Avatar ch={w.initial} bg={TYPE_COLOR[w.role].bg} color={TYPE_COLOR[w.role].color} size={32} />
+                  <div style={{ flex: 1 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{w.name}</span>
+                    <span style={{ fontSize: 11, color: GRAY, marginLeft: 6 }}>이달 {wTasks.length}건</span>
+                  </div>
+                  {selected && <span style={{ color: BLUE, fontWeight: 700 }}>✓</span>}
+                </button>
+              );
+            })}
+            <button onClick={assignIssue} disabled={!assignWorkerId}
+              style={{ width: '100%', padding: 14, borderRadius: 12, border: 'none', background: assignWorkerId ? BLUE : '#E8E8E8', color: assignWorkerId ? '#fff' : '#999', fontSize: 14, fontWeight: 700, cursor: assignWorkerId ? 'pointer' : 'default', fontFamily: 'inherit', marginTop: 8 }}>
+              배정 완료
+            </button>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: '#191f28', color: '#fff', padding: '10px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600, zIndex: 999, whiteSpace: 'nowrap' }}>{toast}</div>
+      )}
     </div>
-  )
-}
-
-/* ── Complete Confirmation Modal ── */
-function CompleteModal({ worker, onClose, onDone }: {
-  worker: WorkerItem; onClose: () => void; onDone: () => void
-}) {
-  const [payment, setPayment] = useState(String(worker.payment || ''))
-  const [submitting, setSubmitting] = useState(false)
-
-  async function handleConfirm() {
-    setSubmitting(true)
-    await fetch(`/api/workers/${worker.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isDone: 'Y', payment: Number(payment) || 0 }),
-    })
-    onDone()
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-[90%] max-w-[360px] bg-[var(--bg)] rounded-2xl p-6">
-        <h3 className="text-[16px] font-bold mb-1">완료 처리</h3>
-        <p className="text-[13px] text-[var(--sub)] mb-4">{worker.name} · {worker.houseName} · {worker.taskType}</p>
-        <label className="text-[13px] font-semibold mb-1.5 block">정산금액 (원)</label>
-        <input type="number" value={payment} onChange={e => setPayment(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl bg-[var(--card)] border border-[var(--border)] text-[14px] outline-none mb-4" />
-        <div className="flex gap-2">
-          <button onClick={onClose} className="flex-1 py-3 rounded-xl text-[14px] font-semibold bg-[var(--card)] border border-[var(--border)] text-[var(--sub)]">
-            취소
-          </button>
-          <button onClick={handleConfirm} disabled={submitting}
-            className="flex-1 py-3 rounded-xl text-[14px] font-semibold bg-[var(--green)] text-white flex items-center justify-center gap-1">
-            {submitting ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-            확인
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/* ── Memo Field ── */
-function MemoField({ workerId, memo, onSaved }: { workerId: string; memo: string; onSaved: (v: string) => void }) {
-  const [editing, setEditing] = useState(false)
-  const [val, setVal] = useState(memo || '')
-  const [saving, setSaving] = useState(false)
-
-  async function save() {
-    setSaving(true)
-    await fetch(`/api/workers/schedule/${workerId}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ memo: val }),
-    }).catch(() => {})
-    setSaving(false)
-    setEditing(false)
-    onSaved(val)
-  }
-
-  if (editing) {
-    return (
-      <div className="mt-2">
-        <textarea value={val} onChange={e => setVal(e.target.value)} rows={2}
-          className="w-full px-3 py-2 rounded-lg bg-[var(--bg)] border border-[var(--border)] text-[12px] outline-none resize-none placeholder:text-[var(--sub)]"
-          placeholder="전달사항 입력" />
-        <div className="flex gap-1.5 mt-1">
-          <button onClick={save} disabled={saving} className="px-3 py-1 rounded-lg bg-[var(--blue)] text-white text-[10px] font-bold">
-            {saving ? '...' : '저장'}
-          </button>
-          <button onClick={() => { setEditing(false); setVal(memo || '') }} className="px-3 py-1 rounded-lg bg-gray-100 text-gray-500 text-[10px] font-bold">취소</button>
-        </div>
-      </div>
-    )
-  }
-
-  if (memo) {
-    return (
-      <button onClick={() => setEditing(true)}
-        className="mt-2 w-full text-left px-3 py-2 rounded-lg text-[11px]"
-        style={{ background: '#FEF3E2', color: '#633806' }}>
-        📝 {memo}
-      </button>
-    )
-  }
-
-  return (
-    <button onClick={() => setEditing(true)}
-      className="mt-2 text-[10px] text-[var(--sub)] underline">
-      전달사항 추가
-    </button>
-  )
+  );
 }

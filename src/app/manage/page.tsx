@@ -25,7 +25,7 @@ export default function ManagePage() {
             return (
               <div key={menu.slug}>
                 {i > 0 && <div style={{ height: 1, background: '#F5F5F5', margin: '0 16px' }} />}
-                <Link href={menu.slug === 'applications' ? '/apply' : `/manage/${menu.slug}`} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px' }}>
+                <Link href={menu.slug === 'applications' ? '/apply' : menu.slug === 'worker' ? '/workers' : `/manage/${menu.slug}`} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px' }}>
                   <div style={{ width: 40, height: 40, borderRadius: '50%', background: menu.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <Icon size={20} color={menu.iconColor} />
                   </div>
