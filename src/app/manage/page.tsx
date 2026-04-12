@@ -16,6 +16,20 @@ export default function ManagePage() {
         <h1 style={{ fontSize: 20, fontWeight: 700, letterSpacing: -0.5 }}>관리</h1>
       </div>
 
+      {/* 지점 관리 (최상단) */}
+      <div style={{ padding: '0 16px', marginBottom: 16 }}>
+        <div style={{ background: '#fff', borderRadius: 16 }}>
+          <Link href="/houses" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px' }}>
+            <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#ebf3ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 18 }}>🏠</div>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: 15, fontWeight: 700 }}>지점 관리</p>
+              <p style={{ fontSize: 12, color: '#888888' }}>지점별 정보 및 방 현황</p>
+            </div>
+            <ChevronRight size={18} color="#BBBBBB" />
+          </Link>
+        </div>
+      </div>
+
       {/* 운영 관리 */}
       <div style={{ padding: '0 16px', marginBottom: 16 }}>
         <p style={{ fontSize: 13, fontWeight: 700, color: '#888888', marginBottom: 8 }}>운영 관리</p>
