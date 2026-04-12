@@ -136,7 +136,7 @@ export default function ContractPage() {
           .ct-wrap p, .ct-wrap li { font-size:7.5pt!important; line-height:1.45!important; margin:1px 0!important; }
           .ct-wrap td, .ct-wrap th { padding:2px 5px!important; font-size:7.5pt!important; }
           .ct-wrap ol { margin:2px 0!important; }
-          .ct-wrap ol li { margin:1px 0!important; padding:0!important; }
+          .ct-wrap ol li { margin:3px 0!important; padding:0!important; }
           .ct-wrap .sh-title { font-size:8.5pt!important; margin:4px 0 2px!important; }
           .ct-wrap .sh2-title { font-size:8pt!important; margin:3px 0 1px!important; }
           .ct-wrap .abox-print { padding:4px 8px!important; margin:4px 0!important; }
@@ -145,7 +145,12 @@ export default function ContractPage() {
           .no-print { display:none!important; }
           nav, footer, header, [class*="bottom"], [class*="tab"], [class*="nav"], [class*="bar"], [data-testid*="nav"] { display:none!important; }
           .signature-section { page-break-before:avoid!important; page-break-inside:avoid!important; }
-          .byeolji-section { page-break-before:always!important; }
+          .byeolji-section { page-break-before:always!important; display:flex!important; flex-direction:column!important; min-height:255mm!important; }
+          .byeolji-section .byeolji-title { text-align:center!important; font-size:13pt!important; margin:16px 0 8px!important; }
+          .byeolji-section .byeolji-intro { text-align:center!important; font-size:8pt!important; line-height:1.7!important; margin-bottom:14px!important; }
+          .byeolji-section ol { flex:1!important; display:flex!important; flex-direction:column!important; justify-content:space-between!important; }
+          .byeolji-section ol li { margin-bottom:8px!important; line-height:1.65!important; font-size:8pt!important; }
+          .byeolji-signature { margin-top:20px!important; page-break-inside:avoid!important; }
         }
       `}</style>
 
@@ -247,8 +252,8 @@ export default function ContractPage() {
 
         {/* ═══════════ PAGE 2: 별지 특약 ═══════════ */}
         <div className="byeolji-section">
-          <h1 style={S.h1}>쉐어하우스 별지 특약</h1>
-          <p style={{ textAlign:'center',fontSize:'7.5pt',color:'#555',margin:'3px 0 8px',lineHeight:1.45 }}>
+          <h1 className="byeolji-title" style={S.h1}>쉐어하우스 별지 특약</h1>
+          <p className="byeolji-intro" style={{ textAlign:'center',fontSize:'8pt',color:'#555',margin:'6px 0 14px',lineHeight:1.7 }}>
             이용자는 쉐어하우스 일원으로서 / 제공자는 쉐어하우스의 대표로서<br />
             마음이 편한 집을 &lsquo;함께&rsquo; 만들어 가는 데 적극 협조할 것을 약속합니다. 계약서를 읽은 후 동의할 경우 서명
           </p>
@@ -266,9 +271,9 @@ export default function ContractPage() {
           </p>
 
           {/* 별지 서명란 */}
-          <div style={{ borderTop:'1.5px solid #111',paddingTop:6,marginTop:6 }}>
+          <div className="byeolji-signature" style={{ borderTop:'1.5px solid #111',paddingTop:8,marginTop:20 }}>
             <p style={{ fontWeight:700,fontSize:'8pt',marginBottom:4 }}>별지 특약 서명</p>
-            <p style={{ fontSize:'7pt',color:'#666',marginBottom:6 }}>상기 별지 특약 사항을 모두 확인하였으며 이에 동의합니다.</p>
+            <p style={{ fontSize:'7.5pt',color:'#666',marginBottom:8 }}>상기 별지 특약 사항을 모두 확인하였으며 이에 동의합니다.</p>
             <div style={{ display:'flex',justifyContent:'space-between' }}>
               <div style={{ fontSize:'8.5pt' }}>임차인: ________________________ (인)</div>
               <div style={{ fontSize:'8.5pt' }}>임대인: 유재훈 (인)</div>
