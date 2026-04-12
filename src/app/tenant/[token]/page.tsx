@@ -1,759 +1,271 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
-import { Copy, Check, MapPin, ChevronRight, ChevronDown, Loader2, Calendar, ArrowLeftRight } from 'lucide-react'
+import { useState, useEffect } from 'react';
+import { useParams } from 'next/navigation';
+import { Copy, MessageCircle } from 'lucide-react';
 
-type Lang = 'ko' | 'en'
+const BLUE = '#3182f6', GRAY = '#8b95a1', GREEN = '#00c471', RED = '#f04452';
+const fmt = (n: number) => n.toLocaleString() + '원';
 
-interface TenantData {
-  id: string; houseName: string; roomCode: string; name: string; phone: string;
-  rent: number; managementFee: number; deposit: number;
-  startDate: string; endDate: string; status: string; nationality: string; memo: string; dDay: number | null;
-}
-interface HouseData {
-  name: string; district: string; address: string;
-  doorPassword: string; wifiSsid: string; wifiPassword: string;
-  landlordName: string; memo: string;
-}
-interface IssueItem { id: string; title: string; category: string; status: string; createdAt: string }
-interface DutyItem {
-  id: string; houseName: string; tenantId: string; tenantName: string; roomCode: string;
-  weekStart: string; weekEnd: string; isDone: boolean; note: string;
-}
-interface ExchangeItem {
-  id: string; requesterId: string; requesterName: string; requesterWeek: string;
-  targetId: string; targetName: string; targetWeek: string; status: string;
-}
-
-function formatWeek(ws: string, we: string) {
-  const s = new Date(ws), e = new Date(we)
-  const days = ['일', '월', '화', '수', '목', '금', '토']
-  return `${s.getMonth() + 1}/${s.getDate()}(${days[s.getDay()]}) ~ ${e.getMonth() + 1}/${e.getDate()}(${days[e.getDay()]})`
-}
-function getMonday(d: Date) {
-  const day = d.getDay()
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-  return new Date(d.getFullYear(), d.getMonth(), diff)
-}
-
-const T: Record<string, Record<Lang, string>> = {
-  hello: { ko: '안녕하세요', en: 'Hello' },
-  nim: { ko: '님 👋', en: ' 👋' },
-  contract: { ko: '내 계약 정보', en: 'My Contract' },
-  period: { ko: '계약 기간', en: 'Contract Period' },
-  rent: { ko: '월세', en: 'Rent' },
-  mgmt: { ko: '관리비', en: 'Management Fee' },
-  deposit: { ko: '보증금', en: 'Deposit' },
-  monthly: { ko: '월 납부액', en: 'Monthly Payment' },
-  perMonth: { ko: '/월', en: '/mo' },
-  expiringSoon: { ko: '계약 만료가 다가오고 있어요!', en: 'Your contract is expiring soon!' },
-  expired: { ko: '계약 만료됨', en: 'Expired' },
-  payment: { ko: '납부 안내', en: 'Payment Guide' },
-  duty: { ko: '청소 당번 안내', en: 'Cleaning Duty Guide' },
-  guide: { ko: '하우스 가이드', en: 'House Guide' },
-  doorPw: { ko: '현관 비번', en: 'Door Password' },
-  wifi: { ko: '와이파이', en: 'WiFi' },
-  address: { ko: '주소', en: 'Address' },
-  mapView: { ko: '지도보기', en: 'View Map' },
-  onRouter: { ko: '공유기에 표시됨', en: 'Shown on router' },
-  noData: { ko: '문의 필요', en: 'Contact Manager' },
-  viewGuide: { ko: '전체 입주 가이드 보기 →', en: 'View full house guide →' },
-  myDuty: { ko: '내 청소 당번', en: 'My Cleaning Duty' },
-  thisWeekDuty: { ko: '이번주 내 당번입니다', en: 'This week is your duty' },
-  dutyPhotoNotice: { ko: '공용 청소 완료 후 단톡방에 사진 업로드 필수', en: 'Upload photos to group chat after cleaning' },
-  dutyFineNotice: { ko: '미업로드 시 벌금 30,000원 발생', en: 'Fine of ₩30,000 if photos not uploaded' },
-  nextDuty: { ko: '다음 내 당번', en: 'Next duty' },
-  weeksLater: { ko: '주 후', en: 'weeks later' },
-  dutySchedule: { ko: '당번 순서', en: 'Duty Schedule' },
-  exchangeReq: { ko: '당번 교환 신청', en: 'Request Duty Swap' },
-  exchangeAlert: { ko: '님이 교환을 요청했어요', en: ' requested a swap' },
-  accept: { ko: '수락', en: 'Accept' },
-  reject: { ko: '거절', en: 'Reject' },
-  noDuty: { ko: '등록된 당번이 없습니다', en: 'No duties assigned yet' },
-  payHistory: { ko: '납부 내역', en: 'Payment History' },
-  overdue: { ko: '미납 항목', en: 'Overdue Items' },
-  overdueCount: { ko: '건', en: ' items' },
-  rentLabel: { ko: '월세', en: 'Rent' },
-  mgmtLabel: { ko: '관리비', en: 'Mgmt Fee' },
-  proratedNote: { ko: '일할계산', en: 'Prorated' },
-  paid: { ko: '납부완료', en: 'Paid' },
-  unpaid: { ko: '미납', en: 'Overdue' },
-  dueSoon: { ko: '납부예정', en: 'Due' },
-  scheduled: { ko: '예정', en: 'Upcoming' },
-  issue: { ko: '불편사항 신청', en: 'Report an Issue' },
-  issueTitle: { ko: '제목', en: 'Title' },
-  issueContent: { ko: '내용 (선택)', en: 'Details (optional)' },
-  submit: { ko: '신청하기', en: 'Submit' },
-  issueSuccess: { ko: '접수되었습니다! 매니저가 확인 후 연락드릴게요', en: 'Submitted! The manager will contact you.' },
-  myIssues: { ko: '내 신청 내역', en: 'My Requests' },
-  supplies: { ko: '비품 신청', en: 'Request Supplies' },
-  supplyMemo: { ko: '요청사항 (선택)', en: 'Notes (optional)' },
-  supplySuccess: { ko: '신청되었습니다! 2-3일 내로 배송됩니다.', en: 'Requested! Delivery in 2-3 days.' },
-  contact: { ko: '카카오톡으로 문의하기', en: 'Contact via KakaoTalk' },
-  notFound: { ko: '유효하지 않은 링크입니다.\n매니저에게 문의해주세요.', en: 'Invalid link.\nPlease contact your manager.' },
-  copied: { ko: '복사됨!', en: 'Copied!' },
-  active: { ko: '입주중', en: 'Active' },
-  exitSoon: { ko: '퇴실예정', en: 'Ending Soon' },
-}
-
-const PAYMENT_KO = ['월세와 관리비는 매월 1일까지 납부해 주세요.', '공과금은 별도 청구됩니다.', '납부 계좌는 계약서를 확인해 주세요.']
-const PAYMENT_EN = ['Please pay rent and management fee by the 1st of each month.', 'Utility bills are charged separately.', 'Please check your contract for payment account details.']
-
-const DUTY_KO = ['매주 지정된 당번이 공용구역을 청소합니다.', '당번표는 단체 카톡방을 확인해 주세요.', '사진 미업로드 시 벌금 3만원이 부과됩니다.', '당번 교환은 당사자끼리 조율 후 매니저에게 알려주세요.']
-const DUTY_EN = ['Designated members clean common areas each week.', 'Check the group KakaoTalk chat for the cleaning schedule.', 'A 30,000 won fine applies if photos are not uploaded.', 'For duty swaps, coordinate with the other party and inform the manager.']
-
-const CATEGORIES_KO = ['수리', '청소', '기타']
-const CATEGORIES_EN = ['Repair', 'Cleaning', 'Other']
-const CAT_MAP: Record<string, string> = { 'Repair': '수리', 'Cleaning': '청소', 'Other': '기타' }
-
-const SUPPLIES_KO = ['화장지', '주방세제', '샴푸', '린스', '바디워시', '수세미', '세탁세제', '기타']
-const SUPPLIES_EN = ['Toilet Paper', 'Dish Soap', 'Shampoo', 'Conditioner', 'Body Wash', 'Sponge', 'Laundry Detergent', 'Other']
-
-const statusVariant: Record<string, string> = {
-  '접수': 'bg-red-50 text-red-600', '진행중': 'bg-amber-50 text-amber-600', '완료': 'bg-green-50 text-green-600',
-}
-const catVariant: Record<string, string> = {
-  '수리': 'bg-blue-50 text-blue-600', '청소': 'bg-green-50 text-green-600', '민원': 'bg-amber-50 text-amber-600', '기타': 'bg-gray-100 text-gray-600',
-}
-
-function fmt(n: number) { return n.toLocaleString() }
+const SUPPLIES_KO = ['화장지', '주방세제', '샴푸', '린스', '바디워시', '수세미', '세탁세제', '기타'];
+const SUPPLIES_EN = ['Toilet Paper', 'Dish Soap', 'Shampoo', 'Conditioner', 'Body Wash', 'Sponge', 'Laundry Det.', 'Other'];
+const CATS_KO = ['수리', '청소', '기타'];
+const CATS_EN = ['Repair', 'Cleaning', 'Other'];
 
 export default function TenantPortalPage() {
-  const params = useParams()
-  const token = params.token as string
-  const [data, setData] = useState<{ tenant: TenantData; house: HouseData | null; myIssues: IssueItem[] } | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [notFound, setNotFound] = useState(false)
-  const [lang, setLang] = useState<Lang>('ko')
-  const [copied, setCopied] = useState('')
+  const { token } = useParams<{ token: string }>();
 
-  // Issue form
-  const [issueCategory, setIssueCategory] = useState('')
-  const [issueTitle, setIssueTitle] = useState('')
-  const [issueContent, setIssueContent] = useState('')
-  const [issueSending, setIssueSending] = useState(false)
-  const [issueSuccess, setIssueSuccess] = useState(false)
+  const [tenant, setTenant] = useState<any>(null);
+  const [house, setHouse] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [lang, setLang] = useState<'ko' | 'en'>('ko');
+  const [toast, setToast] = useState('');
 
-  // Supply form
-  const [selectedSupplies, setSelectedSupplies] = useState<string[]>([])
-  const [supplyMemo, setSupplyMemo] = useState('')
-  const [supplySending, setSupplySending] = useState(false)
-  const [supplySuccess, setSupplySuccess] = useState(false)
+  // Supplies
+  const [selSupplies, setSelSupplies] = useState<string[]>([]);
+  const [supplyNote, setSupplyNote] = useState('');
 
-  // Duty
-  const [allDuties, setAllDuties] = useState<DutyItem[]>([])
-  const [exchanges, setExchanges] = useState<ExchangeItem[]>([])
+  // Issue
+  const [issueCat, setIssueCat] = useState('수리');
+  const [issueTitle, setIssueTitle] = useState('');
+  const [issueDesc, setIssueDesc] = useState('');
+  const [issueLoading, setIssueLoading] = useState(false);
+
+  const t = (ko: string, en: string) => lang === 'ko' ? ko : en;
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
+  const copyText = (text: string) => { navigator.clipboard?.writeText(text); showToast(t('복사됐어요!', 'Copied!')); };
 
   useEffect(() => {
-    fetch(`/api/tenant-portal/${token}`)
-      .then(r => r.json())
-      .then(d => {
-        if (d.error) { setNotFound(true); return }
-        setData(d)
-        // Fetch duties for this house
-        if (d.tenant?.houseName) {
-          fetch(`/api/duty?houseName=${encodeURIComponent(d.tenant.houseName)}`)
-            .then(r => r.json()).then(dd => { if (Array.isArray(dd)) setAllDuties(dd.sort((a: DutyItem, b: DutyItem) => a.weekStart.localeCompare(b.weekStart))) }).catch(() => {})
-        }
-        if (d.tenant?.id) {
-          fetch(`/api/duty/exchange?tenantId=${d.tenant.id}`)
-            .then(r => r.json()).then(ex => { if (Array.isArray(ex)) setExchanges(ex.filter((e: ExchangeItem) => e.status === '대기')) }).catch(() => {})
-        }
-      })
-      .catch(() => setNotFound(true))
-      .finally(() => setLoading(false))
-  }, [token])
+    import('@/lib/channeltalk').then(({ loadChannelTalk, bootChannelTalk }) => {
+      loadChannelTalk();
 
-  function copyText(text: string, label: string) {
-    navigator.clipboard.writeText(text)
-    setCopied(label)
-    setTimeout(() => setCopied(''), 1500)
-  }
+      fetch(`/api/tenants?token=${token}`)
+        .then(r => r.json())
+        .then(async (data) => {
+          if (data.error) { setLoading(false); return; }
+          setTenant(data);
 
-  async function submitIssue() {
-    if (!issueTitle.trim() || !issueCategory) return
-    setIssueSending(true)
-    const cat = lang === 'en' ? (CAT_MAP[issueCategory] || issueCategory) : issueCategory
-    await fetch('/api/tenant-portal/issue', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, title: issueTitle.trim(), content: issueContent, category: cat }),
-    })
-    setIssueSending(false)
-    setIssueSuccess(true)
-    setIssueTitle('')
-    setIssueContent('')
-    setIssueCategory('')
-    setTimeout(() => setIssueSuccess(false), 3000)
-  }
+          // Load house info
+          try {
+            const houses = await fetch('/api/houses').then(r => r.json());
+            const found = Array.isArray(houses) ? houses.find((h: any) => h['지점명'] === data['지점명']) : null;
+            if (found) setHouse(found);
+          } catch { /* ignore */ }
 
-  async function submitSupply() {
-    if (selectedSupplies.length === 0 || !data) return
-    setSupplySending(true)
-    await fetch('/api/apply/supplies', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tenantId: data.tenant.id,
-        tenantName: data.tenant.name,
-        houseName: data.tenant.houseName,
-        roomCode: data.tenant.roomCode,
-        items: selectedSupplies,
-        detail: supplyMemo,
-      }),
-    })
-    setSupplySending(false)
-    setSupplySuccess(true)
-    setSelectedSupplies([])
-    setSupplyMemo('')
-    setTimeout(() => setSupplySuccess(false), 3000)
-  }
+          bootChannelTalk({
+            memberId: token,
+            name: data['이름'],
+            mobileNumber: data['연락처'],
+            tags: ['입주자', data['지점명'], data['구'] || ''].filter(Boolean),
+            customAttributes: {
+              house: data['지점명'] || '', room: data['방코드'] || '',
+              contractEnd: data['퇴실일'] || '', status: data['상태'] || '',
+            },
+          });
 
-  function toggleSupply(item: string) {
-    setSelectedSupplies(prev => prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item])
-  }
+          setLoading(false);
+        })
+        .catch(() => setLoading(false));
+    });
+  }, [token]);
 
-  if (loading) return (
-    <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center">
-      <Loader2 size={24} className="animate-spin text-gray-400" />
+  const calcDday = (dateStr: string) => {
+    if (!dateStr) return 0;
+    return Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86400000);
+  };
+
+  const toggleSupply = (item: string) => {
+    setSelSupplies(prev => prev.includes(item) ? prev.filter(x => x !== item) : [...prev, item]);
+  };
+
+  const submitSupply = async () => {
+    if (!selSupplies.length || !tenant) return;
+    await fetch('/api/tenants/portal/supply', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, tenantName: tenant['이름'], house: tenant['지점명'], room: tenant['방코드'], items: selSupplies, note: supplyNote }),
+    });
+    setSelSupplies([]); setSupplyNote('');
+    showToast(t('신청됐어요!', 'Request submitted!'));
+  };
+
+  const submitIssue = async () => {
+    if (!issueTitle.trim() || !tenant) return;
+    setIssueLoading(true);
+    await fetch('/api/issues', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 지점명: tenant['지점명'], 방코드: tenant['방코드'], 제목: issueTitle, 내용: issueDesc, 카테고리: issueCat, 상태: '접수', 등록일: new Date().toISOString().split('T')[0] }),
+    });
+    setIssueTitle(''); setIssueDesc(''); setIssueLoading(false);
+    showToast(t('접수됐어요! 매니저가 확인 후 연락드릴게요.', 'Submitted! Manager will contact you.'));
+  };
+
+  const handleContact = async () => {
+    const { openChannelTalk } = await import('@/lib/channeltalk');
+    openChannelTalk();
+  };
+
+  if (loading) return <div style={{ minHeight: '100vh', background: '#F7F8FA', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><p style={{ color: GRAY, fontSize: 13 }}>{t('불러오는 중...', 'Loading...')}</p></div>;
+
+  if (!tenant) return (
+    <div style={{ minHeight: '100vh', background: '#F7F8FA', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+      <p style={{ fontSize: 40 }}>🔒</p>
+      <p style={{ fontSize: 15, fontWeight: 600, color: '#333' }}>{t('유효하지 않은 링크예요', 'Invalid link')}</p>
+      <p style={{ fontSize: 13, color: GRAY }}>{t('매니저에게 문의해 주세요.', 'Please contact your manager.')}</p>
     </div>
-  )
+  );
 
-  if (notFound || !data) return (
-    <div className="min-h-screen bg-[#F9FAFB] flex flex-col items-center justify-center px-8 text-center">
-      <p className="text-[16px] font-bold text-gray-600 whitespace-pre-line">{T.notFound[lang]}</p>
-    </div>
-  )
+  const name = tenant['이름'] || '';
+  const houseName = tenant['지점명'] || '';
+  const room = tenant['방코드'] || '';
+  const rent = Number(tenant['월세']) || 0;
+  const mgmt = Number(tenant['관리비']) || 0;
+  const deposit = Number(tenant['보증금']) || 0;
+  const dday = calcDday(tenant['퇴실일']);
+  const supplyItems = lang === 'ko' ? SUPPLIES_KO : SUPPLIES_EN;
+  const catItems = lang === 'ko' ? CATS_KO : CATS_EN;
 
-  const { tenant: t, house: h, myIssues } = data
-  const monthly = t.rent + t.managementFee
-  const categories = lang === 'ko' ? CATEGORIES_KO : CATEGORIES_EN
-  const supplies = lang === 'ko' ? SUPPLIES_KO : SUPPLIES_EN
-
-  function getWifiDisplay() {
-    if (!h) return T.noData[lang]
-    if (!h.wifiSsid && !h.wifiPassword) return T.noData[lang]
-    if (h.wifiPassword === '기계에 써 있음') return T.onRouter[lang]
-    const parts = []
-    if (h.wifiSsid) parts.push(h.wifiSsid)
-    if (h.wifiPassword && h.wifiPassword !== '기계에 써 있음') parts.push(h.wifiPassword)
-    return parts.join(' / ')
-  }
+  const inputStyle: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid #E8E8E8', borderRadius: 10, fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box', outline: 'none' };
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB]">
-      <div className="max-w-[480px] mx-auto px-5 py-6">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-6">
+    <div style={{ minHeight: '100vh', background: '#F7F8FA' }}>
+      {/* Header */}
+      <div style={{ background: '#fff', padding: '20px 20px 16px', borderBottom: '1px solid #F0F0F0' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <h1 className="text-[20px] font-bold">{T.hello[lang]}, {t.name}{T.nim[lang]}</h1>
-            <p className="text-[13px] text-gray-400 mt-0.5">{t.houseName} · {t.roomCode}</p>
-            <span className={`inline-block mt-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-              t.status === '입주중' ? 'bg-green-50 text-green-600' : 'bg-amber-50 text-amber-600'
-            }`}>
-              {t.status === '입주중' ? T.active[lang] : T.exitSoon[lang]}
-            </span>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#191f28' }}>{t(`안녕하세요, ${name}님 👋`, `Hello, ${name} 👋`)}</div>
+            <div style={{ fontSize: 13, color: GRAY, marginTop: 4 }}>{houseName} · {room}</div>
           </div>
-          <div className="flex bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <button onClick={() => setLang('ko')}
-              className={`px-3 py-1.5 text-[12px] font-semibold transition-colors ${lang === 'ko' ? 'bg-[#3182F6] text-white' : 'text-gray-500'}`}>한국어</button>
-            <button onClick={() => setLang('en')}
-              className={`px-3 py-1.5 text-[12px] font-semibold transition-colors ${lang === 'en' ? 'bg-[#3182F6] text-white' : 'text-gray-500'}`}>English</button>
+          <button onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}
+            style={{ background: '#F2F4F6', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#555' }}>
+            {lang === 'ko' ? 'EN' : '한'}
+          </button>
+        </div>
+      </div>
+
+      <div style={{ padding: 16 }}>
+        {/* D-day Card */}
+        <div style={{ background: BLUE, borderRadius: 14, padding: 20, marginBottom: 12, color: '#fff' }}>
+          <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>{t('계약 잔여일', 'Days Remaining')}</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+            <div style={{ fontSize: 32, fontWeight: 700 }}>D-{Math.max(0, dday)}</div>
+            <div style={{ textAlign: 'right', fontSize: 12, opacity: 0.8, lineHeight: 1.6 }}>
+              {tenant['입주일']} ~<br />{tenant['퇴실일']}
+            </div>
+          </div>
+          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 8 }}>
+            {t('월세', 'Rent')} {fmt(rent)} / {t('관리비', 'Mgmt')} {fmt(mgmt)}
           </div>
         </div>
 
-        {/* Section 1: Contract */}
-        <Section title={T.contract[lang]}>
-          <Row label={T.period[lang]} value={`${t.startDate} ~ ${t.endDate || '-'}`} />
-          {t.dDay !== null && (
-            <div className="mb-3">
-              <span className={`inline-block px-2.5 py-1 rounded-full text-[12px] font-bold ${
-                t.dDay < 0 ? 'bg-red-50 text-red-600' :
-                t.dDay <= 30 ? 'bg-amber-50 text-amber-600' :
-                'bg-blue-50 text-blue-600'
-              }`}>
-                {t.dDay < 0 ? T.expired[lang] : `D-${t.dDay}`}
-              </span>
-              {t.dDay >= 0 && t.dDay <= 30 && (
-                <p className="text-[12px] text-amber-600 mt-1">{T.expiringSoon[lang]}</p>
-              )}
-            </div>
-          )}
-          <Row label={T.rent[lang]} value={`₩${fmt(t.rent)}`} />
-          <Row label={T.mgmt[lang]} value={`₩${fmt(t.managementFee)}`} />
-          <Row label={T.deposit[lang]} value={`₩${fmt(t.deposit)}`} />
-          <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
-            <span className="text-[13px] font-semibold">{T.monthly[lang]}</span>
-            <span className="text-[17px] font-bold text-[#3182F6]">₩{fmt(monthly)}{T.perMonth[lang]}</span>
+        {/* Contract Info */}
+        <div style={{ background: '#fff', borderRadius: 14, padding: '14px 18px', marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f2f4f6' }}>
+            <span style={{ fontSize: 13, color: GRAY }}>{t('월 납부액', 'Monthly')}</span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: '#191f28' }}>{fmt(rent + mgmt)}</span>
           </div>
-        </Section>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0' }}>
+            <span style={{ fontSize: 13, color: GRAY }}>{t('보증금', 'Deposit')}</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28' }}>{fmt(deposit)}</span>
+          </div>
+        </div>
 
-        {/* Section 2: Payment */}
-        <Section title={T.payment[lang]}>
-          {(lang === 'ko' ? PAYMENT_KO : PAYMENT_EN).map((t, i) => (
-            <p key={i} className="text-[13px] text-gray-600 leading-relaxed mb-1.5">{t}</p>
-          ))}
-        </Section>
-
-        {/* Section 2.5: Payment History */}
-        <PaymentHistory lang={lang} tenant={t} house={h} />
-
-        {/* Section 3: Duty */}
-        <Section title={T.duty[lang]}>
-          <ol className="flex flex-col gap-2">
-            {(lang === 'ko' ? DUTY_KO : DUTY_EN).map((t, i) => (
-              <li key={i} className="flex gap-2 text-[13px] text-gray-600 leading-relaxed">
-                <span className="shrink-0 w-5 h-5 rounded-full bg-blue-50 text-blue-600 text-[11px] font-bold flex items-center justify-center mt-0.5">{i + 1}</span>
-                <span>{t}</span>
-              </li>
-            ))}
-          </ol>
-        </Section>
-
-        {/* Section 4: House Guide */}
-        {h && (
-          <Section title={T.guide[lang]}>
-            <GuideRow label={T.doorPw[lang]} value={h.doorPassword || T.noData[lang]} isEmpty={!h.doorPassword}
-              copyable={!!h.doorPassword} copied={copied} onCopy={copyText} copiedText={T.copied[lang]} copyLabel="door" />
-            <GuideRow label={T.wifi[lang]} value={getWifiDisplay()} isEmpty={!h.wifiSsid && !h.wifiPassword}
-              copyable={!!h.wifiPassword && h.wifiPassword !== '기계에 써 있음'} copied={copied} onCopy={copyText}
-              copiedText={T.copied[lang]} copyLabel="wifi" copyValue={h.wifiPassword} />
-            {h.address && (
-              <div className="flex items-center justify-between py-2.5 border-b border-gray-100">
-                <div>
-                  <p className="text-[11px] text-gray-400">{T.address[lang]}</p>
-                  <p className="text-[13px] font-medium text-gray-800">{h.address}</p>
+        {/* House Info */}
+        {house && (
+          <div style={{ background: '#fff', borderRadius: 14, padding: '14px 18px', marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{t('하우스 정보', 'House Info')}</div>
+            {[
+              { l: t('현관 비번', 'Door Code'), v: house['현관비번'], copy: true },
+              { l: t('와이파이', 'WiFi'), v: house['와이파이SSID'] },
+              { l: t('비밀번호', 'Password'), v: house['와이파이PW'], copy: true },
+              { l: t('주소', 'Address'), v: house['주소'] },
+            ].map(row => (
+              <div key={row.l} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid #f2f4f6' }}>
+                <span style={{ fontSize: 12, color: GRAY }}>{row.l}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: '#191f28', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.v || '-'}</span>
+                  {row.copy && row.v && (
+                    <button onClick={() => copyText(row.v)} style={{ background: '#f2f4f6', border: 'none', borderRadius: 6, width: 24, height: 24, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Copy size={12} color={GRAY} />
+                    </button>
+                  )}
                 </div>
-                <a href={`https://map.kakao.com/?q=${encodeURIComponent(h.address)}`} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-600 text-[11px] font-semibold">
-                  <MapPin size={11} /> {T.mapView[lang]}
-                </a>
               </div>
-            )}
-            <a href={`/house/${encodeURIComponent(h.name)}`} target="_blank" rel="noopener noreferrer"
-              className="flex items-center justify-between mt-3 text-[13px] font-semibold text-[#3182F6]">
-              {T.viewGuide[lang]} <ChevronRight size={14} />
-            </a>
-          </Section>
+            ))}
+          </div>
         )}
 
-        {/* Section 5: My Duty */}
-        <DutySection
-          lang={lang} t={t} token={token}
-          allDuties={allDuties} exchanges={exchanges}
-          setExchanges={setExchanges} setAllDuties={setAllDuties}
-        />
-
-        {/* Section 6: Issue Report */}
-        <Section title={T.issue[lang]}>
-          {issueSuccess ? (
-            <div className="py-4 text-center">
-              <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-2">
-                <Check size={20} className="text-green-600" />
-              </div>
-              <p className="text-[13px] text-green-600 font-medium">{T.issueSuccess[lang]}</p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              <div className="flex gap-2">
-                {categories.map(c => (
-                  <button key={c} onClick={() => setIssueCategory(c)}
-                    className={`flex-1 py-2 rounded-xl text-[12px] font-semibold border transition-colors ${
-                      issueCategory === c ? 'border-[#3182F6] bg-blue-50 text-[#3182F6]' : 'border-gray-200 text-gray-500'
-                    }`}>{c}</button>
-                ))}
-              </div>
-              <input value={issueTitle} onChange={e => setIssueTitle(e.target.value)}
-                placeholder={T.issueTitle[lang]}
-                className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-[14px] outline-none placeholder:text-gray-400" />
-              <textarea value={issueContent} onChange={e => setIssueContent(e.target.value)}
-                placeholder={T.issueContent[lang]} rows={2}
-                className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-[14px] outline-none resize-none placeholder:text-gray-400" />
-              <button onClick={submitIssue} disabled={!issueTitle.trim() || !issueCategory || issueSending}
-                className={`w-full py-3 rounded-xl text-[14px] font-semibold transition-colors ${
-                  issueTitle.trim() && issueCategory ? 'bg-[#3182F6] text-white' : 'bg-gray-200 text-gray-400'
-                }`}>
-                {issueSending ? <Loader2 size={14} className="animate-spin mx-auto" /> : T.submit[lang]}
-              </button>
-            </div>
-          )}
-
-          {myIssues.length > 0 && (
-            <div className="mt-4 pt-3 border-t border-gray-100">
-              <p className="text-[12px] font-semibold text-gray-400 mb-2">{T.myIssues[lang]}</p>
-              {myIssues.slice(0, 3).map(i => (
-                <div key={i.id} className="flex items-center gap-2 py-2 border-b border-gray-50">
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${catVariant[i.category] || 'bg-gray-100 text-gray-600'}`}>{i.category}</span>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${statusVariant[i.status] || 'bg-gray-100 text-gray-600'}`}>{i.status}</span>
-                  <span className="text-[12px] flex-1 truncate">{i.title}</span>
-                  <span className="text-[10px] text-gray-400">{i.createdAt}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </Section>
-
-        {/* Section 6: Supplies */}
-        <Section title={T.supplies[lang]}>
-          {supplySuccess ? (
-            <div className="py-4 text-center">
-              <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-2">
-                <Check size={20} className="text-green-600" />
-              </div>
-              <p className="text-[13px] text-green-600 font-medium">{T.supplySuccess[lang]}</p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-wrap gap-2">
-                {supplies.map(s => (
-                  <button key={s} onClick={() => toggleSupply(s)}
-                    className={`px-3 py-1.5 rounded-xl text-[12px] font-medium border transition-colors ${
-                      selectedSupplies.includes(s)
-                        ? 'border-[#3182F6] bg-blue-50 text-[#3182F6]'
-                        : 'border-gray-200 text-gray-500'
-                    }`}>{s}</button>
-                ))}
-              </div>
-              <input value={supplyMemo} onChange={e => setSupplyMemo(e.target.value)}
-                placeholder={T.supplyMemo[lang]}
-                className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-[14px] outline-none placeholder:text-gray-400" />
-              <button onClick={submitSupply} disabled={selectedSupplies.length === 0 || supplySending}
-                className={`w-full py-3 rounded-xl text-[14px] font-semibold transition-colors ${
-                  selectedSupplies.length > 0 ? 'bg-[#3182F6] text-white' : 'bg-gray-200 text-gray-400'
-                }`}>
-                {supplySending ? <Loader2 size={14} className="animate-spin mx-auto" /> : T.submit[lang]}
-              </button>
-            </div>
-          )}
-        </Section>
-
-        {/* Contact */}
-        <a href="http://pf.kakao.com/_xnxnNxj" target="_blank" rel="noopener noreferrer"
-          className="block w-full py-4 rounded-2xl bg-[#FEE500] text-center text-[15px] font-bold text-[#3C1E1E] mb-6">
-          {T.contact[lang]}
-        </a>
-
-        <footer className="text-center py-4">
-          <p className="text-[11px] text-gray-400">© 2026 ShareHub</p>
-        </footer>
-      </div>
-    </div>
-  )
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="bg-white rounded-2xl p-5 shadow-sm mb-4">
-      <h2 className="text-[15px] font-bold mb-3">{title}</h2>
-      {children}
-    </section>
-  )
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between py-1.5">
-      <span className="text-[13px] text-gray-400">{label}</span>
-      <span className="text-[13px] font-medium text-gray-800">{value}</span>
-    </div>
-  )
-}
-
-function GuideRow({ label, value, isEmpty, copyable, copied, onCopy, copiedText, copyLabel, copyValue }: {
-  label: string; value: string; isEmpty?: boolean; copyable?: boolean;
-  copied: string; onCopy: (t: string, l: string) => void; copiedText: string; copyLabel: string; copyValue?: string;
-}) {
-  return (
-    <div className="flex items-center justify-between py-2.5 border-b border-gray-100">
-      <div>
-        <p className="text-[11px] text-gray-400">{label}</p>
-        <p className={`text-[13px] font-medium ${isEmpty ? 'text-gray-400' : 'text-gray-800'}`}>{value}</p>
-      </div>
-      {copyable && (
-        <button onClick={() => onCopy(copyValue || value, copyLabel)}
-          className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold ${
-            copied === copyLabel ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-500'
-          }`}>
-          {copied === copyLabel ? <Check size={11} /> : <Copy size={11} />}
-          {copied === copyLabel ? copiedText : 'Copy'}
-        </button>
-      )}
-    </div>
-  )
-}
-
-/* ── Payment History (Toss Style) ── */
-function PaymentHistory({ lang, tenant, house }: { lang: Lang; tenant: TenantData; house: HouseData | null }) {
-  const [showHistory, setShowHistory] = useState(false)
-
-  if (!tenant.startDate || !tenant.endDate) return null
-
-  const startDate = new Date(tenant.startDate)
-  const daysInMonth = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0).getDate()
-  const remainDays = daysInMonth - startDate.getDate() + 1
-  const proratedRent = Math.round(tenant.rent * remainDays / daysInMonth)
-  const proratedMgmt = Math.round(tenant.managementFee * remainDays / daysInMonth)
-  const contractDeposit = 500000
-  const deposit = tenant.deposit || 2000000
-  const balanceDeposit = deposit - contractDeposit
-  const firstRentTotal = balanceDeposit + proratedRent
-
-  const w = (n: number) => n.toLocaleString('ko-KR') + (lang === 'ko' ? '원' : ' KRW')
-  const fmtD = (d: string) => { const dt = new Date(d); return `${dt.getFullYear()}. ${String(dt.getMonth() + 1).padStart(2, '0')}. ${String(dt.getDate()).padStart(2, '0')}` }
-
-  const today = new Date()
-  const nextMonth = today.getMonth() === 11 ? new Date(today.getFullYear() + 1, 0, 1) : new Date(today.getFullYear(), today.getMonth() + 1, 1)
-  const dDay = Math.ceil((nextMonth.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-  const nextML = nextMonth.getMonth() + 1
-  const nextMonthStr = `${nextMonth.getFullYear()}. ${String(nextML).padStart(2, '0')}. 01`
-  const monthlyTotal = tenant.rent + tenant.managementFee
-
-  const startM = startDate.getMonth() + 1
-  const startMonthLabel = `${startM}/${startDate.getDate()}~${startM}/${daysInMonth}`
-  const rentAccountName = house?.landlordName || (lang === 'ko' ? '별도 안내' : 'TBD')
-  const mgmtAccount = 'K BANK 100-166-670094 유재훈'
-
-  // Past months (between first month+1 and current month)
-  const pastMonths: { label: string; ym: string }[] = []
-  const cur = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 1)
-  const thisYM = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
-  while (`${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}` < thisYM) {
-    pastMonths.push({ label: `${cur.getMonth() + 1}월`, ym: `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}` })
-    cur.setMonth(cur.getMonth() + 1)
-  }
-
-  const PBadge = ({ type }: { type: 'paid' | 'due' }) => (
-    <span className="text-[11px] font-medium px-2.5 py-1 rounded-[6px]"
-      style={type === 'paid' ? { background: '#EAF3DE', color: '#27500A' } : { background: '#EBF3FE', color: '#0C447C' }}>
-      {type === 'paid' ? (lang === 'ko' ? '납부완료' : 'Paid') : (lang === 'ko' ? '납부예정' : 'Due')}
-    </span>
-  )
-  const Div = () => <div className="h-[1px] bg-[var(--bg)]" />
-
-  return (
-    <div className="flex flex-col gap-2.5 mt-6 mb-8">
-      <p className="text-[17px] font-bold mb-1">{lang === 'ko' ? '납부 내역' : 'Payment History'}</p>
-
-      {/* 1. 계약금 */}
-      <div className="rounded-2xl bg-[var(--card)] overflow-hidden">
-        <div className="flex justify-between items-center px-5 py-[18px]">
-          <div>
-            <p className="text-[14px] text-[var(--sub)] mb-1">{lang === 'ko' ? '계약금' : 'Contract Deposit'}</p>
-            <p className="text-[22px] font-bold">500,000{lang === 'ko' ? '원' : ' KRW'}</p>
-            <p className="text-[12px] text-[var(--sub)] mt-1">{fmtD(tenant.startDate)}</p>
-          </div>
-          <PBadge type="paid" />
-        </div>
-      </div>
-
-      {/* 2. 잔금 + 첫달 월세 */}
-      <div className="rounded-2xl bg-[var(--card)] overflow-hidden">
-        <div className="flex justify-between items-center px-5 py-[18px]">
-          <div>
-            <p className="text-[14px] text-[var(--sub)] mb-1">{lang === 'ko' ? '잔금 + 첫달 월세' : 'Balance + First Rent'}</p>
-            <p className="text-[22px] font-bold">{w(firstRentTotal)}</p>
-            <p className="text-[12px] text-[var(--sub)] mt-1">{fmtD(tenant.startDate)} · {lang === 'ko' ? '월세통장' : 'Rent account'}</p>
-          </div>
-          <PBadge type="paid" />
-        </div>
-        <Div />
-        <div className="px-5 py-3">
-          <div className="flex justify-between items-center py-1.5">
-            <span className="text-[14px] text-[var(--sub)]">{lang === 'ko' ? '보증금 잔액' : 'Deposit Balance'}</span>
-            <span className="text-[14px]">{w(balanceDeposit)}</span>
-          </div>
-          <div className="py-1.5">
-            <div className="flex justify-between items-center">
-              <span className="text-[14px] text-[var(--sub)]">{lang === 'ko' ? '첫달 월세 일할' : 'Prorated Rent'}</span>
-              <span className="text-[14px]">{w(proratedRent)}</span>
-            </div>
-            <p className="text-[12px] text-[var(--sub)] mt-0.5">{startMonthLabel} · {remainDays}{lang === 'ko' ? '일' : 'd'} ÷ {daysInMonth}{lang === 'ko' ? '일' : 'd'}</p>
-          </div>
-        </div>
-        <Div />
-        <div className="px-5 py-[14px]">
-          <p className="text-[12px] text-[var(--sub)] mb-1">{lang === 'ko' ? '월세 납입계좌' : 'Rent Account'}</p>
-          <p className="text-[14px] font-bold">{rentAccountName}{rentAccountName !== (lang === 'ko' ? '별도 안내' : 'TBD') ? ` (${lang === 'ko' ? '계약서 참조' : 'See contract'})` : ''}</p>
-        </div>
-      </div>
-
-      {/* 3. 첫달 관리비 */}
-      <div className="rounded-2xl bg-[var(--card)] overflow-hidden">
-        <div className="flex justify-between items-center px-5 py-[18px]">
-          <div>
-            <p className="text-[14px] text-[var(--sub)] mb-1">{lang === 'ko' ? '첫달 관리비' : 'First Mgmt Fee'}</p>
-            <p className="text-[22px] font-bold">{w(proratedMgmt)}</p>
-            <p className="text-[12px] text-[var(--sub)] mt-1">{fmtD(tenant.startDate)} · {lang === 'ko' ? '관리비통장' : 'Mgmt account'} · {startMonthLabel}</p>
-          </div>
-          <PBadge type="paid" />
-        </div>
-        <Div />
-        <div className="px-5 py-[14px]">
-          <p className="text-[12px] text-[var(--sub)] mb-1">{lang === 'ko' ? '관리비 납입계좌' : 'Mgmt Account'}</p>
-          <p className="text-[14px] font-bold">{mgmtAccount}</p>
-        </div>
-      </div>
-
-      {/* 4. 다음달 납부예정 */}
-      <div className="rounded-2xl overflow-hidden" style={{ border: '1.5px solid #3182F6' }}>
-        <div className="px-5 py-3" style={{ background: '#3182F6' }}>
-          <p className="text-[13px] text-white/80">{nextML}{lang === 'ko' ? '월 납부예정' : ' Due'} · D-{dDay}</p>
-          <p className="text-[13px] text-white/80">{nextMonthStr}</p>
-        </div>
-        <div className="px-5 pt-[18px] pb-4 bg-[var(--card)]">
-          <p className="text-[26px] font-bold">{w(monthlyTotal)}</p>
-        </div>
-        <Div />
-        <div className="px-5 py-3 bg-[var(--card)]">
-          <div className="flex justify-between py-1"><span className="text-[14px] text-[var(--sub)]">{lang === 'ko' ? '월세' : 'Rent'}</span><span className="text-[14px]">{w(tenant.rent)}</span></div>
-          <div className="flex justify-between py-1"><span className="text-[14px] text-[var(--sub)]">{lang === 'ko' ? '관리비' : 'Mgmt'}</span><span className="text-[14px]">{w(tenant.managementFee)}</span></div>
-        </div>
-        <Div />
-        <div className="grid grid-cols-2 gap-[1px] bg-[var(--bg)]">
-          <div className="bg-[var(--card)] px-4 py-[14px]">
-            <p className="text-[11px] text-[var(--sub)] mb-1">{lang === 'ko' ? '월세 계좌' : 'Rent Acct'}</p>
-            <p className="text-[13px] font-bold">{house?.landlordName || (lang === 'ko' ? '별도안내' : 'TBD')}</p>
-            <p className="text-[12px] text-[var(--sub)] mt-0.5">{lang === 'ko' ? '계약서 참조' : 'See contract'}</p>
-          </div>
-          <div className="bg-[var(--card)] px-4 py-[14px]">
-            <p className="text-[11px] text-[var(--sub)] mb-1">{lang === 'ko' ? '관리비 계좌' : 'Mgmt Acct'}</p>
-            <p className="text-[13px] font-bold">{lang === 'ko' ? '유재훈' : 'Yoo Jaehoon'}</p>
-            <p className="text-[12px] text-[var(--sub)] mt-0.5">K BANK 670094</p>
-          </div>
-        </div>
-      </div>
-
-      {/* 이전 납부 내역 */}
-      {pastMonths.length > 0 && (
-        <>
-          <div onClick={() => setShowHistory(!showHistory)}
-            className="rounded-2xl bg-[var(--card)] px-5 py-4 flex justify-between items-center opacity-50 cursor-pointer">
-            <span className="text-[14px] text-[var(--sub)]">{lang === 'ko' ? '이전 납부 내역' : 'Past Payments'}</span>
-            <span className="text-[13px] text-[var(--sub)]">{showHistory ? (lang === 'ko' ? '접기 ▲' : 'Close ▲') : (lang === 'ko' ? '펼치기 ▼' : 'Open ▼')}</span>
-          </div>
-          {showHistory && pastMonths.map(pm => (
-            <div key={pm.ym} className="rounded-2xl bg-[var(--card)] overflow-hidden opacity-50">
-              <div className="flex justify-between items-center px-5 py-[18px]">
-                <div>
-                  <p className="text-[14px] text-[var(--sub)] mb-1">{pm.label} {lang === 'ko' ? '월세·관리비' : 'Rent & Mgmt'}</p>
-                  <p className="text-[22px] font-bold">{w(monthlyTotal)}</p>
-                  <p className="text-[12px] text-[var(--sub)] mt-1">{pm.ym}-01</p>
-                </div>
-                <PBadge type="paid" />
-              </div>
-            </div>
+        {/* Payment Notice */}
+        <div style={{ background: '#fff', borderRadius: 14, padding: '14px 18px', marginBottom: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>💰 {t('납부 안내', 'Payment Info')}</div>
+          {[
+            t('월세/관리비는 매월 1일까지 납부해 주세요.', 'Rent/management fee due by the 1st.'),
+            t('공과금은 별도 청구됩니다.', 'Utility bills are charged separately.'),
+            t('납부 계좌는 계약서를 확인해 주세요.', 'Check your contract for bank details.'),
+          ].map((text, i) => (
+            <p key={i} style={{ fontSize: 12, color: '#555', margin: '4px 0', lineHeight: 1.5 }}>• {text}</p>
           ))}
-        </>
-      )}
-    </div>
-  )
-}
+        </div>
 
-/* ── Duty Section ── */
-function DutySection({ lang, t, token, allDuties, exchanges, setExchanges, setAllDuties }: {
-  lang: Lang; t: TenantData; token: string;
-  allDuties: DutyItem[]; exchanges: ExchangeItem[];
-  setExchanges: (v: ExchangeItem[]) => void; setAllDuties: (v: DutyItem[]) => void;
-}) {
-  const thisMonday = getMonday(new Date()).toISOString().split('T')[0]
-  const myDuties = allDuties.filter(d => d.tenantId === t.id)
-  const thisWeekMine = myDuties.find(d => d.weekStart === thisMonday)
-  const futureMine = myDuties.filter(d => d.weekStart > thisMonday && !d.isDone)
-  const nextDuty = futureMine[0]
-  const weeksUntilNext = nextDuty ? Math.round((new Date(nextDuty.weekStart).getTime() - Date.now()) / (7 * 86400000)) : 0
+        {/* Duty Notice */}
+        <div style={{ background: '#fff', borderRadius: 14, padding: '14px 18px', marginBottom: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>🧹 {t('청소 당번 안내', 'Cleaning Duty')}</div>
+          {[
+            t('매주 지정된 당번이 공용구역을 청소합니다.', 'A designated person cleans shared areas weekly.'),
+            t('당번표는 단체 카톡방을 확인해 주세요.', 'Check the group chat for the schedule.'),
+            t('사진 미업로드 시 벌금 30,000원이 부과됩니다.', '30,000 KRW fine if photo not uploaded.'),
+            t('당번 교환은 당사자끼리 조율 후 매니저에게 알려주세요.', 'Swap with housemates, then notify manager.'),
+          ].map((text, i) => (
+            <p key={i} style={{ fontSize: 12, color: '#555', margin: '4px 0', lineHeight: 1.5 }}>• {text}</p>
+          ))}
+        </div>
 
-  const pendingExchanges = exchanges.filter(e => e.targetId === t.id && e.status === '대기')
-
-  async function respondExchange(excId: string, action: string) {
-    await fetch('/api/duty/exchange', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ exchangeId: excId, action }),
-    })
-    setExchanges(exchanges.filter(e => e.id !== excId))
-    if (action === '수락') {
-      const res = await fetch(`/api/duty?houseName=${encodeURIComponent(t.houseName)}`)
-      const d = await res.json()
-      if (Array.isArray(d)) setAllDuties(d.sort((a: DutyItem, b: DutyItem) => a.weekStart.localeCompare(b.weekStart)))
-    }
-  }
-
-  if (allDuties.length === 0) {
-    return (
-      <section className="bg-white rounded-2xl p-5 shadow-sm mb-4">
-        <h2 className="text-[15px] font-bold mb-3">{T.myDuty[lang]}</h2>
-        <p className="text-[13px] text-gray-400 text-center py-3">{T.noDuty[lang]}</p>
-      </section>
-    )
-  }
-
-  return (
-    <section className="bg-white rounded-2xl p-5 shadow-sm mb-4">
-      <h2 className="text-[15px] font-bold mb-3">{T.myDuty[lang]}</h2>
-
-      {/* Exchange alerts */}
-      {pendingExchanges.map(ex => (
-        <div key={ex.id} className="rounded-xl bg-amber-50 border border-amber-200 p-3 mb-3">
-          <p className="text-[12px] font-semibold text-amber-700">
-            {ex.requesterName}{T.exchangeAlert[lang]}
-          </p>
-          <p className="text-[11px] text-amber-600 mt-0.5">
-            {formatWeek(ex.requesterWeek, '')} ↔ {formatWeek(ex.targetWeek, '')}
-          </p>
-          <div className="flex gap-2 mt-2">
-            <button onClick={() => respondExchange(ex.id, '수락')}
-              className="flex-1 py-1.5 rounded-lg bg-[#3182F6] text-white text-[11px] font-bold">{T.accept[lang]}</button>
-            <button onClick={() => respondExchange(ex.id, '거절')}
-              className="flex-1 py-1.5 rounded-lg bg-gray-200 text-gray-600 text-[11px] font-bold">{T.reject[lang]}</button>
+        {/* Supplies Request */}
+        <div style={{ background: '#fff', borderRadius: 14, padding: '14px 18px', marginBottom: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>📦 {t('비품 신청', 'Supply Request')}</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+            {supplyItems.map((item, i) => {
+              const selected = selSupplies.includes(SUPPLIES_KO[i]);
+              return (
+                <button key={item} onClick={() => toggleSupply(SUPPLIES_KO[i])}
+                  style={{ padding: '7px 14px', borderRadius: 20, border: `1.5px solid ${selected ? BLUE : '#E8E8E8'}`, background: selected ? '#EBF4FF' : '#fff', color: selected ? BLUE : '#555', fontSize: 12, fontWeight: selected ? 600 : 400, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  {item}
+                </button>
+              );
+            })}
           </div>
+          <button onClick={submitSupply} disabled={!selSupplies.length}
+            style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', background: selSupplies.length ? BLUE : '#E8E8E8', color: selSupplies.length ? '#fff' : '#999', fontSize: 13, fontWeight: 600, cursor: selSupplies.length ? 'pointer' : 'default', fontFamily: 'inherit' }}>
+            {t('신청하기', 'Submit')}
+          </button>
         </div>
-      ))}
 
-      {/* This week highlight */}
-      {thisWeekMine && (
-        <div className="rounded-xl bg-[#3182F6] p-4 mb-3">
-          <p className="text-[12px] text-white/80">{T.thisWeekDuty[lang]}</p>
-          <p className="text-[12px] text-white/70 mt-1">
-            <Calendar size={11} className="inline mr-1" />
-            {formatWeek(thisWeekMine.weekStart, thisWeekMine.weekEnd)}
-          </p>
-          <p className="text-[11px] text-white/60 mt-2">{T.dutyPhotoNotice[lang]}</p>
-          <p className="text-[11px] text-red-200 mt-0.5">{T.dutyFineNotice[lang]}</p>
+        {/* Issue Report */}
+        <div style={{ background: '#fff', borderRadius: 14, padding: '14px 18px', marginBottom: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>🔧 {t('불편사항 신청', 'Report Issue')}</div>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+            {catItems.map((c, i) => (
+              <button key={c} onClick={() => setIssueCat(CATS_KO[i])}
+                style={{ flex: 1, padding: '8px 0', borderRadius: 8, border: `1.5px solid ${issueCat === CATS_KO[i] ? BLUE : '#E8E8E8'}`, background: issueCat === CATS_KO[i] ? '#EBF4FF' : '#fff', color: issueCat === CATS_KO[i] ? BLUE : '#555', fontSize: 12, fontWeight: issueCat === CATS_KO[i] ? 600 : 400, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center' }}>
+                {c}
+              </button>
+            ))}
+          </div>
+          <input value={issueTitle} onChange={e => setIssueTitle(e.target.value)} placeholder={t('제목 (예: 화장실 변기 막힘)', 'Title (e.g., Toilet clogged)')} style={{ ...inputStyle, marginBottom: 8 }} />
+          <textarea value={issueDesc} onChange={e => setIssueDesc(e.target.value)} placeholder={t('내용 (선택)', 'Details (optional)')} rows={3} style={{ ...inputStyle, resize: 'none', marginBottom: 10 }} />
+          <button onClick={submitIssue} disabled={!issueTitle.trim() || issueLoading}
+            style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', background: issueTitle.trim() ? BLUE : '#E8E8E8', color: issueTitle.trim() ? '#fff' : '#999', fontSize: 13, fontWeight: 600, cursor: issueTitle.trim() ? 'pointer' : 'default', fontFamily: 'inherit' }}>
+            {issueLoading ? t('접수 중...', 'Submitting...') : t('접수하기', 'Submit')}
+          </button>
         </div>
-      )}
 
-      {/* Next duty */}
-      {!thisWeekMine && nextDuty && (
-        <div className="rounded-xl bg-blue-50 p-3 mb-3">
-          <p className="text-[12px] font-semibold text-blue-700">{T.nextDuty[lang]}</p>
-          <p className="text-[12px] text-blue-600 mt-0.5">
-            {formatWeek(nextDuty.weekStart, nextDuty.weekEnd)}
-            <span className="text-blue-400 ml-2">({lang === 'ko' ? `약 ${weeksUntilNext}${T.weeksLater[lang]}` : `~${weeksUntilNext} ${T.weeksLater[lang]}`})</span>
-          </p>
-        </div>
-      )}
-
-      {/* Full schedule (compact) */}
-      <p className="text-[12px] font-semibold text-gray-400 mb-2 mt-2">{T.dutySchedule[lang]}</p>
-      <div className="flex flex-col gap-1">
-        {allDuties.slice(0, 12).map(d => {
-          const isMine = d.tenantId === t.id
-          const isSkip = d.note === '청소용역'
-          const isCurrent = d.weekStart === thisMonday
-          return (
-            <div key={d.id} className={`flex items-center gap-2 py-1.5 px-2 rounded-lg text-[11px] ${
-              isMine ? 'bg-blue-50' : isSkip ? 'bg-gray-50' : ''
-            }`}>
-              <span className="text-gray-400 w-24 shrink-0">{formatWeek(d.weekStart, d.weekEnd).split(' ~ ')[0]}</span>
-              <span className={`flex-1 font-medium ${isSkip ? 'text-gray-400' : isMine ? 'text-blue-600 font-bold' : 'text-gray-700'}`}>
-                {isSkip ? (lang === 'ko' ? '용역' : 'Cleaning Service') : d.tenantName}
-              </span>
-              {isCurrent && <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-600 text-[9px] font-bold">{lang === 'ko' ? '이번주' : 'This week'}</span>}
-              {d.isDone && <span className="text-green-600">✓</span>}
-            </div>
-          )
-        })}
+        {/* Contact Manager */}
+        <button onClick={handleContact}
+          style={{ width: '100%', padding: 14, borderRadius: 12, border: 'none', background: '#191f28', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 40 }}>
+          <MessageCircle size={16} /> {t('매니저에게 문의하기', 'Contact Manager')}
+        </button>
       </div>
-    </section>
-  )
+
+      {toast && <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: '#191f28', color: '#fff', padding: '10px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600, zIndex: 999, whiteSpace: 'nowrap' }}>{toast}</div>}
+    </div>
+  );
 }

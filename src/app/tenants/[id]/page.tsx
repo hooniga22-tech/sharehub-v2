@@ -137,10 +137,18 @@ export default function TenantDetailPage() {
           <button onClick={() => router.back()} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', padding: 4, color: '#191919' }}>←</button>
           <span style={{ fontSize: 16, fontWeight: 700 }}>입주자 상세</span>
         </div>
-        <button onClick={() => window.open(`/contract/${id}`, '_blank')}
-          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 8, border: 'none', background: BLUE, fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#fff' }}>
-          <FileText size={13} /> 계약서
-        </button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {tenant?.연락처 && (
+            <button onClick={() => { navigator.clipboard?.writeText(`${window.location.origin}/tenant/${tenant.연락처}`); showToast('개인 링크가 복사됐어요!'); }}
+              style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e8eb', background: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#191f28' }}>
+              🔗 링크
+            </button>
+          )}
+          <button onClick={() => window.open(`/contract/${id}`, '_blank')}
+            style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 8, border: 'none', background: BLUE, fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#fff' }}>
+            <FileText size={13} /> 계약서
+          </button>
+        </div>
       </div>
 
       {/* Section 1: Profile */}

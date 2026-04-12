@@ -38,12 +38,20 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
     const id = searchParams.get('id')
+    const token = searchParams.get('token')
 
     const rows = await getSheetData('입주자') // 헤더 제외된 데이터
     const tenants = rows.map((r, i) => rowToTenant(r, i))
 
     if (id) {
       const tenant = tenants.find(t => t.입주자ID === id)
+      if (!tenant) return NextResponse.json({ error: '없음' }, { status: 404 })
+      return NextResponse.json(tenant)
+    }
+
+    if (token) {
+      // 링크토큰은 인덱스 [13] — 연락처 필드에 저장되어 있거나 별도 토큰 필드
+      const tenant = tenants.find(t => t.연락처 === token || (t as any).링크토큰 === token)
       if (!tenant) return NextResponse.json({ error: '없음' }, { status: 404 })
       return NextResponse.json(tenant)
     }
