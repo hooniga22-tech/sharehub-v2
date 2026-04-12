@@ -1,39 +1,87 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Search, ChevronDown, ChevronUp, X } from 'lucide-react';
 import Link from 'next/link';
-import { districts, vacantRooms, upcomingCheckouts, upcomingCheckins, getBranchIdByName, formatWon } from '@/lib/mockData';
 import Avatar from '@/components/ui/Avatar';
 
-type FilterTab = 'occupied' | 'vacant' | 'checkout' | 'checkin';
+type Tenant = {
+  입주자ID: string; 구: string; 지점명: string; 방코드: string; 방타입: string;
+  이름: string; 입주일: string; 퇴실일: string; 상태: string;
+  보증금: string; 월세: string; 관리비: string;
+  메모: string; 연락처: string;
+}
 
-const totalTenants = districts.reduce((s, d) => s + d.branches.reduce((bs, b) => bs + b.tenants, 0), 0);
-const totalVacant = districts.reduce((s, d) => s + d.branches.reduce((bs, b) => bs + b.vacant, 0), 0);
+type FilterTab = 'occupied' | 'vacant' | 'checkout';
 
-const tabs: { key: FilterTab; label: string; count: number }[] = [
-  { key: 'occupied', label: '입주중', count: totalTenants },
-  { key: 'vacant', label: '공실', count: totalVacant },
-  { key: 'checkout', label: '퇴실예정', count: upcomingCheckouts.length },
-  { key: 'checkin', label: '입실예정', count: upcomingCheckins.length },
-];
+const fmtWon = (n: number) => n.toLocaleString() + '원';
 
 export default function TenantsPage() {
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [filter, setFilter] = useState<FilterTab>('occupied');
-  const [expanded, setExpanded] = useState<string | null>(districts[0].name);
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
 
-  const isSearching = search.trim().length > 0;
+  useEffect(() => {
+    fetch('/api/tenants')
+      .then(r => r.json())
+      .then(data => {
+        setTenants(Array.isArray(data) ? data : []);
+        setLoading(false);
+      })
+      .catch(() => { setError('데이터를 불러오지 못했어요'); setLoading(false); });
+  }, []);
 
+  const occupied = tenants.filter(t => t['상태'] === '입주중' || t['상태'] === '계약중');
+  const checkout = tenants.filter(t => t['상태'] === '퇴실예정');
+
+  // Group by 지점명
+  const byHouse = useMemo(() => {
+    const map: Record<string, Tenant[]> = {};
+    for (const t of occupied) {
+      const h = t['지점명'] || '미지정';
+      if (!map[h]) map[h] = [];
+      map[h].push(t);
+    }
+    return Object.entries(map).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [occupied]);
+
+  // Search
+  const isSearching = search.trim().length > 0;
   const searchResults = useMemo(() => {
-    if (!isSearching) return { branches: [] as { name: string; district: string; districtColor: string; rooms: number; vacant: number }[] };
+    if (!isSearching) return [];
     const q = search.trim().toLowerCase();
-    const branches = districts.flatMap((d) =>
-      d.branches.filter((b) => b.name.toLowerCase().includes(q)).map((b) => ({ name: b.name, district: d.name, districtColor: d.color, rooms: b.rooms, vacant: b.vacant }))
+    return tenants.filter(t =>
+      t['이름']?.toLowerCase().includes(q) ||
+      t['지점명']?.toLowerCase().includes(q) ||
+      t['방코드']?.toLowerCase().includes(q)
     );
-    return { branches };
-  }, [search, isSearching]);
+  }, [search, isSearching, tenants]);
+
+  const tabs: { key: FilterTab; label: string; count: number }[] = [
+    { key: 'occupied', label: '입주중', count: occupied.length },
+    { key: 'checkout', label: '퇴실예정', count: checkout.length },
+    { key: 'vacant', label: '전체', count: tenants.length },
+  ];
+
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '80px 0', color: '#8b95a1' }}>
+        <div style={{ fontSize: 13 }}>불러오는 중...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ textAlign: 'center', padding: '80px 0', color: '#f04452' }}>
+        <div style={{ fontSize: 13 }}>{error}</div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ paddingBottom: 16 }}>
@@ -43,59 +91,29 @@ export default function TenantsPage() {
 
         {/* 검색창 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-          <div
-            style={{
-              flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px',
-              height: 40, borderRadius: 12,
-              background: searchFocused ? '#fff' : '#F5F5F5',
-              border: searchFocused ? '1.5px solid #3182F6' : '1.5px solid transparent',
-              transition: 'all 0.2s',
-            }}
-          >
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', height: 40, borderRadius: 12, background: searchFocused ? '#fff' : '#F5F5F5', border: searchFocused ? '1.5px solid #3182F6' : '1.5px solid transparent', transition: 'all 0.2s' }}>
             <Search size={16} color="#BBBBBB" />
-            <input
-              style={{ flex: 1, background: 'transparent', fontSize: 14, color: '#191919' }}
-              placeholder="지점명 또는 입주자명 검색"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+            <input style={{ flex: 1, background: 'transparent', fontSize: 14, color: '#191919', border: 'none', outline: 'none', fontFamily: 'inherit' }}
+              placeholder="이름 또는 지점명 검색" value={search}
+              onChange={e => setSearch(e.target.value)}
               onFocus={() => setSearchFocused(true)}
-              onBlur={() => !search && setSearchFocused(false)}
-            />
-            {search && (
-              <button onClick={() => { setSearch(''); setSearchFocused(false); }}>
-                <X size={16} color="#BBBBBB" />
-              </button>
-            )}
+              onBlur={() => !search && setSearchFocused(false)} />
+            {search && <button onClick={() => { setSearch(''); setSearchFocused(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={16} color="#BBBBBB" /></button>}
           </div>
           {searchFocused && (
-            <button
-              onClick={() => { setSearch(''); setSearchFocused(false); }}
-              style={{ fontSize: 14, color: '#3182F6', fontWeight: 500, whiteSpace: 'nowrap' }}
-            >
-              취소
-            </button>
+            <button onClick={() => { setSearch(''); setSearchFocused(false); }} style={{ fontSize: 14, color: '#3182F6', fontWeight: 500, whiteSpace: 'nowrap', background: 'none', border: 'none', cursor: 'pointer' }}>취소</button>
           )}
         </div>
 
         {/* 필터 탭 */}
         {!isSearching && (
           <div style={{ display: 'flex' }}>
-            {tabs.map((tab) => (
-              <button
-                key={tab.key}
-                style={{
-                  flex: 1, paddingBottom: 10, textAlign: 'center',
-                  fontSize: 13,
-                  fontWeight: filter === tab.key ? 700 : 400,
-                  color: filter === tab.key ? '#191919' : '#888888',
-                  borderBottom: filter === tab.key ? '2.5px solid #3182F6' : '2.5px solid transparent',
-                }}
-                onClick={() => setFilter(tab.key)}
-              >
+            {tabs.map(tab => (
+              <button key={tab.key}
+                style={{ flex: 1, paddingBottom: 10, textAlign: 'center', fontSize: 13, fontWeight: filter === tab.key ? 700 : 400, color: filter === tab.key ? '#191919' : '#888888', borderBottom: filter === tab.key ? '2.5px solid #3182F6' : '2.5px solid transparent', background: 'none', border: 'none', borderBottomStyle: 'solid', cursor: 'pointer', fontFamily: 'inherit' }}
+                onClick={() => setFilter(tab.key)}>
                 {tab.label}
-                <span style={{ marginLeft: 4, color: filter === tab.key ? '#3182F6' : '#BBBBBB', fontSize: 12 }}>
-                  {tab.count}
-                </span>
+                <span style={{ marginLeft: 4, color: filter === tab.key ? '#3182F6' : '#BBBBBB', fontSize: 12 }}>{tab.count}</span>
               </button>
             ))}
           </div>
@@ -105,139 +123,117 @@ export default function TenantsPage() {
       {/* 검색 결과 */}
       {isSearching ? (
         <div style={{ padding: '16px 16px' }}>
-          {searchResults.branches.length > 0 ? (
+          {searchResults.length > 0 ? (
             <>
-              <p style={{ fontSize: 13, fontWeight: 700, color: '#888888', marginBottom: 8 }}>
-                지점 {searchResults.branches.length}건
-              </p>
-              {searchResults.branches.map((b) => (
-                <Link key={b.name} href={`/houses/${getBranchIdByName(b.name) || 'gongdeok'}`}
-                  style={{ display: 'block', background: '#fff', marginBottom: 8, padding: 16, borderRadius: 16 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: b.districtColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
-                      {b.name.charAt(0)}
-                    </div>
-                    <div>
-                      <p style={{ fontSize: 14, fontWeight: 600 }}>{b.name}</p>
-                      <p style={{ fontSize: 12, color: '#888888' }}>{b.district} · {b.rooms}실 · 공실 {b.vacant}</p>
-                    </div>
+              <p style={{ fontSize: 13, fontWeight: 700, color: '#888888', marginBottom: 8 }}>검색 결과 {searchResults.length}건</p>
+              {searchResults.map(t => (
+                <Link key={t['입주자ID']} href={`/tenants/${t['입주자ID']}`}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#fff', marginBottom: 8, padding: 16, borderRadius: 16, textDecoration: 'none', color: 'inherit' }}>
+                  <Avatar name={t['이름']} size={40} />
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: 14, fontWeight: 600 }}>{t['이름']}</p>
+                    <p style={{ fontSize: 12, color: '#888888' }}>{t['지점명']} {t['방코드']}</p>
                   </div>
+                  <span style={{ fontSize: 12, color: '#888888' }}>{t['상태']}</span>
                 </Link>
               ))}
             </>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 0' }}>
               <p style={{ fontSize: 14, color: '#BBBBBB' }}>검색 결과가 없어요</p>
             </div>
           )}
         </div>
       ) : (
         <div style={{ padding: '16px 16px' }}>
-          {/* 입주중 */}
-          {filter === 'occupied' && districts.map((district) => {
-            const isOpen = expanded === district.name;
-            const districtRooms = district.branches.reduce((s, b) => s + b.rooms, 0);
-            const districtVacant = district.branches.reduce((s, b) => s + b.vacant, 0);
+          {/* 입주중 — 지점별 그룹 */}
+          {filter === 'occupied' && byHouse.map(([house, hTenants]) => {
+            const isOpen = expanded === house;
+            const totalRent = hTenants.reduce((s, t) => s + (Number(t['월세']) || 0), 0);
             return (
-              <div key={district.name} style={{ background: '#fff', marginBottom: 8, borderRadius: 16 }}>
-                <button
-                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: 16 }}
-                  onClick={() => setExpanded(isOpen ? null : district.name)}
-                >
-                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: district.bg, color: district.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
-                    {district.name.charAt(0)}
+              <div key={house} style={{ background: '#fff', marginBottom: 8, borderRadius: 16 }}>
+                <button onClick={() => setExpanded(isOpen ? null : house)}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: 16, border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#EEF3FF', color: '#3182F6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
+                    {house.charAt(0)}
                   </div>
                   <div style={{ flex: 1, textAlign: 'left' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 15, fontWeight: 700 }}>{district.name}</span>
-                      <span style={{ fontSize: 12, color: '#888888' }}>{district.branches.length}지점 · {districtRooms}실</span>
+                      <span style={{ fontSize: 15, fontWeight: 700 }}>{house}</span>
+                      <span style={{ fontSize: 12, color: '#888888' }}>{hTenants.length}명</span>
                     </div>
                   </div>
-                  {districtVacant > 0 && (
-                    <span style={{ padding: '2px 8px', borderRadius: 99, fontSize: 11, fontWeight: 600, background: '#FFF8E8', color: '#D97706' }}>
-                      공실 {districtVacant}
-                    </span>
-                  )}
+                  <span style={{ fontSize: 12, color: '#888888', marginRight: 4 }}>{fmtWon(totalRent)}</span>
                   {isOpen ? <ChevronUp size={18} color="#BBBBBB" /> : <ChevronDown size={18} color="#BBBBBB" />}
                 </button>
                 {isOpen && (
                   <div style={{ padding: '0 16px 12px' }}>
-                    {district.branches.map((branch, bi) => {
-                      const isFull = branch.vacant === 0;
-                      return (
-                        <div key={branch.name}>
-                          {bi > 0 && <div style={{ height: 1, background: '#F5F5F5' }} />}
-                          <Link href={`/houses/${getBranchIdByName(branch.name) || 'gongdeok'}`}
-                            style={{ display: 'flex', alignItems: 'center', padding: '12px 0', gap: 10 }}>
-                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: isFull ? '#00B493' : '#D97706', flexShrink: 0 }} />
-                            <span style={{ flex: 1, fontSize: 14, fontWeight: 500 }}>{branch.name}</span>
-                            <span style={{ fontSize: 12, color: '#888888' }}>{branch.rooms}실/{branch.tenants}명</span>
-                            <span style={{ fontSize: 12, color: '#888888', minWidth: 70, textAlign: 'right' }}>{formatWon(branch.monthlyRent)}</span>
-                            {branch.vacant > 0 && (
-                              <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: '#FFF8E8', color: '#D97706' }}>
-                                공실{branch.vacant}
-                              </span>
-                            )}
-                          </Link>
-                        </div>
-                      );
-                    })}
+                    {hTenants.map((t, i) => (
+                      <div key={t['입주자ID']}>
+                        {i > 0 && <div style={{ height: 1, background: '#F5F5F5' }} />}
+                        <Link href={`/tenants/${t['입주자ID']}`}
+                          style={{ display: 'flex', alignItems: 'center', padding: '12px 0', gap: 10, textDecoration: 'none', color: 'inherit' }}>
+                          <Avatar name={t['이름']} size={32} />
+                          <div style={{ flex: 1 }}>
+                            <span style={{ fontSize: 14, fontWeight: 500 }}>{t['이름']}</span>
+                            <span style={{ fontSize: 12, color: '#888888', marginLeft: 6 }}>{t['방코드']}</span>
+                          </div>
+                          <span style={{ fontSize: 13, fontWeight: 600 }}>{fmtWon(Number(t['월세']) || 0)}</span>
+                        </Link>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
             );
           })}
 
-          {/* 공실 */}
-          {filter === 'vacant' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {vacantRooms.map((room, i) => (
-                <div key={i} style={{ background: '#fff', padding: 16, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div>
-                    <p style={{ fontSize: 14, fontWeight: 600 }}>{room.house} {room.room}</p>
-                    <p style={{ fontSize: 12, color: '#888888' }}>{room.district}</p>
-                  </div>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: '#191919' }}>{formatWon(room.rent)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
           {/* 퇴실예정 */}
           {filter === 'checkout' && (
+            checkout.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {checkout.map(t => (
+                  <Link key={t['입주자ID']} href={`/tenants/${t['입주자ID']}`}
+                    style={{ background: '#fff', padding: 16, borderRadius: 16, display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none', color: 'inherit' }}>
+                    <Avatar name={t['이름']} size={40} />
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontSize: 14, fontWeight: 600 }}>{t['이름']}</p>
+                      <p style={{ fontSize: 12, color: '#888888' }}>{t['지점명']} {t['방코드']}</p>
+                    </div>
+                    <span style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, fontWeight: 600, background: '#FFF8E8', color: '#D97706' }}>
+                      {t['퇴실일']} 퇴실
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '60px 0', color: '#BBBBBB' }}>퇴실 예정자가 없어요</div>
+            )
+          )}
+
+          {/* 전체 */}
+          {filter === 'vacant' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {upcomingCheckouts.map((t) => (
-                <Link key={t.tenantId} href={`/tenants/${t.tenantId}`}
-                  style={{ background: '#fff', padding: 16, borderRadius: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <Avatar name={t.name} size={40} />
+              {tenants.map(t => (
+                <Link key={t['입주자ID']} href={`/tenants/${t['입주자ID']}`}
+                  style={{ background: '#fff', padding: 16, borderRadius: 16, display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none', color: 'inherit' }}>
+                  <Avatar name={t['이름']} size={40} />
                   <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: 14, fontWeight: 600 }}>{t.name}</p>
-                    <p style={{ fontSize: 12, color: '#888888' }}>{t.house} {t.room}</p>
+                    <p style={{ fontSize: 14, fontWeight: 600 }}>{t['이름']}</p>
+                    <p style={{ fontSize: 12, color: '#888888' }}>{t['지점명']} {t['방코드']}</p>
                   </div>
-                  <span style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, fontWeight: 600, background: '#FFF8E8', color: '#D97706' }}>
-                    {t.date} 퇴실
-                  </span>
+                  <div style={{ textAlign: 'right' }}>
+                    <p style={{ fontSize: 13, fontWeight: 600 }}>{fmtWon(Number(t['월세']) || 0)}</p>
+                    <span style={{ fontSize: 11, color: t['상태'] === '입주중' ? '#00B493' : '#D97706' }}>{t['상태']}</span>
+                  </div>
                 </Link>
               ))}
             </div>
           )}
 
-          {/* 입실예정 */}
-          {filter === 'checkin' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {upcomingCheckins.map((t) => (
-                <div key={t.tenantId} style={{ background: '#fff', padding: 16, borderRadius: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <Avatar name={t.name} size={40} color="#7C3AED" />
-                  <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: 14, fontWeight: 600 }}>{t.name}</p>
-                    <p style={{ fontSize: 12, color: '#888888' }}>{t.house} {t.room}</p>
-                  </div>
-                  <span style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, fontWeight: 600, background: '#F3EEFF', color: '#7C3AED' }}>
-                    {t.date} 입실
-                  </span>
-                </div>
-              ))}
-            </div>
+          {/* 데이터 없음 */}
+          {filter === 'occupied' && byHouse.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '60px 0', color: '#BBBBBB' }}>입주자가 없어요</div>
           )}
         </div>
       )}

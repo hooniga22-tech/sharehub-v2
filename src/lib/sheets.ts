@@ -44,6 +44,26 @@ export async function updateRow(sheetName: string, rowIndex: number, row: (strin
   })
 }
 
+export function rowsToObjects(rows: string[][]): Record<string, string>[] {
+  if (!rows || rows.length < 2) return []
+  const headers = rows[0]
+  return rows.slice(1).map(row => {
+    const obj: Record<string, string> = {}
+    headers.forEach((h, i) => { obj[h] = row[i] || '' })
+    return obj
+  })
+}
+
+export async function getSheetDataWithHeader(sheetName: string): Promise<string[][]> {
+  const auth = await getAuth()
+  const sheets = google.sheets({ version: 'v4', auth })
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: `${sheetName}!A1:Z`,
+  })
+  return res.data.values || []
+}
+
 export async function getUtilityCosts(): Promise<string[][]> {
   return getSheetData('공과금')
 }
