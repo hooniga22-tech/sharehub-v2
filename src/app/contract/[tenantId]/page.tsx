@@ -128,28 +128,29 @@ export default function ContractPage() {
     <>
       <style>{`
         @media print {
-          @page { size: A4; margin: 10mm 15mm; }
-          html, body { width:210mm!important; margin:0!important; padding:0!important; font-size:8pt!important; line-height:1.45!important; }
+          @page { size: A4; margin: 8mm 14mm 6mm 14mm; }
+          html, body { width:210mm!important; margin:0!important; padding:0!important; font-size:9pt!important; line-height:1.55!important; }
           body > div, #__next, main { max-width:100%!important; width:100%!important; padding:0!important; margin:0!important; }
-          .ct-wrap { padding:0!important; font-size:8pt!important; line-height:1.45!important; }
-          .ct-wrap h1 { font-size:13pt!important; margin:4px 0!important; }
-          .ct-wrap p, .ct-wrap li { font-size:7.5pt!important; line-height:1.45!important; margin:1px 0!important; }
-          .ct-wrap td, .ct-wrap th { padding:2px 5px!important; font-size:7.5pt!important; }
+          .ct-wrap { padding:0!important; font-size:9pt!important; line-height:1.55!important; }
+          .ct-wrap h1 { font-size:14pt!important; margin:4px 0 6px!important; }
+          .ct-wrap p, .ct-wrap li { font-size:8.5pt!important; line-height:1.55!important; margin:2px 0!important; }
+          .ct-wrap td, .ct-wrap th { padding:3px 6px!important; font-size:8.5pt!important; }
           .ct-wrap ol { margin:2px 0!important; }
-          .ct-wrap ol li { margin:3px 0!important; padding:0!important; }
-          .ct-wrap .sh-title { font-size:8.5pt!important; margin:4px 0 2px!important; }
-          .ct-wrap .sh2-title { font-size:8pt!important; margin:3px 0 1px!important; }
+          .ct-wrap ol li { margin:2px 0!important; padding:0!important; }
+          .ct-wrap .sh-title { font-size:9.5pt!important; margin:5px 0 3px!important; }
+          .ct-wrap .sh2-title { font-size:9pt!important; margin:4px 0 2px!important; }
           .ct-wrap .abox-print { padding:4px 8px!important; margin:4px 0!important; }
           .ct-wrap .sign-box { padding:6px 10px!important; margin-bottom:6px!important; }
-          .ct-wrap .sign-row { margin-bottom:2px!important; font-size:7.5pt!important; }
+          .ct-wrap .sign-row { margin-bottom:2px!important; font-size:8.5pt!important; }
           .no-print { display:none!important; }
           nav, footer, header, [class*="bottom"], [class*="tab"], [class*="nav"], [class*="bar"], [data-testid*="nav"] { display:none!important; }
-          .signature-section { page-break-before:avoid!important; page-break-inside:avoid!important; }
-          .byeolji-section { page-break-before:always!important; display:flex!important; flex-direction:column!important; min-height:255mm!important; }
-          .byeolji-section .byeolji-title { text-align:center!important; font-size:13pt!important; margin:16px 0 8px!important; }
-          .byeolji-section .byeolji-intro { text-align:center!important; font-size:8pt!important; line-height:1.7!important; margin-bottom:14px!important; }
+          .signature-section { page-break-before:avoid!important; page-break-inside:avoid!important; margin-bottom:0!important; padding-bottom:0!important; }
+          .account-section { margin-bottom:0!important; padding-bottom:0!important; }
+          .byeolji-section { page-break-before:always!important; display:flex!important; flex-direction:column!important; min-height:260mm!important; }
+          .byeolji-section .byeolji-title { text-align:center!important; font-size:14pt!important; margin:16px 0 8px!important; }
+          .byeolji-section .byeolji-intro { text-align:center!important; font-size:8.5pt!important; line-height:1.7!important; margin-bottom:14px!important; }
           .byeolji-section ol { flex:1!important; display:flex!important; flex-direction:column!important; justify-content:space-between!important; }
-          .byeolji-section ol li { margin-bottom:8px!important; line-height:1.65!important; font-size:8pt!important; }
+          .byeolji-section ol li { margin-bottom:5px!important; line-height:1.6!important; font-size:8.5pt!important; }
           .byeolji-signature { margin-top:20px!important; page-break-inside:avoid!important; }
         }
       `}</style>
@@ -244,7 +245,7 @@ export default function ContractPage() {
           </div>
         </div>
 
-        <div className="abox-print" style={S.abox}>
+        <div className="abox-print account-section" style={S.abox}>
           <p style={{ margin:0 }}>■ 임대료(월세) 납입계좌: {house?.landlordName || '-'} (계약서 참조)</p>
           <p style={{ margin:0 }}>■ 관리비 납입계좌: 케이뱅크 유재훈 100-166-670094</p>
         </div>
