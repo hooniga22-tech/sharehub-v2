@@ -115,6 +115,14 @@ export interface RoomInfo {
   unpaidDays?: number;
 }
 
+export interface UtilityAccount {
+  type: '전기' | '가스' | '수도' | '인터넷' | '정수기';
+  icon: string;
+  company: string;
+  number: string;
+  memo: string;
+}
+
 export interface BranchDetail {
   id: string;
   name: string;
@@ -125,6 +133,7 @@ export interface BranchDetail {
   vacant: number;
   monthlyRent: number;
   rooms: RoomInfo[];
+  utilityAccounts: UtilityAccount[];
 }
 
 export const branchDetails: Record<string, BranchDetail> = {
@@ -145,6 +154,13 @@ export const branchDetails: Record<string, BranchDetail> = {
       { id: 'F2', name: 'F-2호', tenantName: '자○○', tenantId: 'tenant-15', contractEnd: '2026.09.10', rent: 500000, status: 'paid' },
       { id: 'G2', name: 'G-2호', tenantName: null, tenantId: null, contractEnd: null, rent: 520000, status: 'vacant' },
     ],
+    utilityAccounts: [
+      { type: '전기', icon: '⚡', company: '한국전력', number: '1234-5678-90', memo: '' },
+      { type: '가스', icon: '🔥', company: '서울도시가스', number: 'GAS-9876-5432', memo: '' },
+      { type: '수도', icon: '💧', company: '서울시 상수도', number: 'W-1111-2222', memo: '' },
+      { type: '인터넷', icon: '🌐', company: 'SK브로드밴드', number: 'B-3333-4444', memo: '100M' },
+      { type: '정수기', icon: '🚿', company: '코웨이', number: 'P-5555-6666', memo: '월 렌탈' },
+    ],
   },
   danzzan: {
     id: 'danzzan', name: '단짠하우스', district: '마포구', districtColor: '#3182F6',
@@ -158,6 +174,12 @@ export const branchDetails: Record<string, BranchDetail> = {
       { id: 'C2', name: 'C2호', tenantName: '파○○', tenantId: 'tenant-19', contractEnd: '2026.12.10', rent: 700000, status: 'paid' },
       { id: 'D1', name: 'D1호', tenantName: '하○○', tenantId: 'tenant-20', contractEnd: '2027.03.05', rent: 700000, status: 'paid' },
       { id: 'D2', name: 'D2호', tenantName: '갈○○', tenantId: 'tenant-21', contractEnd: '2026.10.20', rent: 700000, status: 'paid' },
+    ],
+    utilityAccounts: [
+      { type: '전기', icon: '⚡', company: '한국전력', number: '2345-6789-01', memo: '' },
+      { type: '가스', icon: '🔥', company: '서울도시가스', number: 'GAS-8765-4321', memo: '' },
+      { type: '수도', icon: '💧', company: '서울시 상수도', number: 'W-2222-3333', memo: '' },
+      { type: '인터넷', icon: '🌐', company: 'KT', number: 'KT-4444-5555', memo: '500M' },
     ],
   },
   wannabe: {
@@ -174,6 +196,13 @@ export const branchDetails: Record<string, BranchDetail> = {
       { id: 'E2', name: 'E-2호', tenantName: null, tenantId: null, contractEnd: null, rent: 640000, status: 'vacant' },
       { id: 'F1', name: 'F-1호', tenantName: '살○○', tenantId: 'tenant-27', contractEnd: '2026.10.20', rent: 640000, status: 'paid' },
       { id: 'F2', name: 'F-2호', tenantName: '알○○', tenantId: 'tenant-28', contractEnd: '2026.12.25', rent: 640000, status: 'paid' },
+    ],
+    utilityAccounts: [
+      { type: '전기', icon: '⚡', company: '한국전력', number: '3456-7890-12', memo: '' },
+      { type: '가스', icon: '🔥', company: '서울도시가스', number: 'GAS-7654-3210', memo: '' },
+      { type: '수도', icon: '💧', company: '서울시 상수도', number: 'W-3333-4444', memo: '' },
+      { type: '인터넷', icon: '🌐', company: 'LG유플러스', number: 'LG-6666-7777', memo: '기가인터넷' },
+      { type: '정수기', icon: '🚿', company: '쿠쿠', number: 'CK-8888-9999', memo: '냉온정수기' },
     ],
   },
 };
