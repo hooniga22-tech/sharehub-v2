@@ -128,18 +128,17 @@ export default function ContractPage() {
     <>
       <style>{`
         @media print {
-          @page { size: A4; margin: 6mm 12mm !important; }
+          @page { size: A4; margin: 8mm 14mm; }
           * { -webkit-print-color-adjust: exact; }
 
           nav, header, footer, button,
           [class*="nav"], [class*="tab"],
           [class*="bottom"], [class*="bar"],
-          [class*="header"], [class*="btn"],
           .no-print { display: none !important; height: 0 !important; }
 
           body, html {
-            font-size: 10.5pt !important;
-            line-height: 1.6 !important;
+            font-size: 9.5pt !important;
+            line-height: 1.55 !important;
             margin: 0 !important;
             padding: 0 !important;
             width: 210mm !important;
@@ -152,33 +151,30 @@ export default function ContractPage() {
           }
           .ct-wrap { padding: 0 !important; }
 
-          h1 { font-size: 16pt !important; margin: 0 0 8px !important; }
-          h2 { font-size: 11pt !important; margin: 6px 0 3px !important; }
-          p  { font-size: 10pt !important; margin: 2px 0 !important; }
-          li { font-size: 10pt !important; margin: 2px 0 !important; line-height: 1.55 !important; }
-          td, th { padding: 4px 8px !important; font-size: 10pt !important; }
+          h1 { font-size: 15pt !important; margin: 0 0 6px !important; }
+          p  { font-size: 9pt !important; margin: 1px 0 !important; }
+          li { font-size: 9pt !important; margin: 1px 0 !important; line-height: 1.55 !important; }
+          td, th { padding: 3px 6px !important; font-size: 9pt !important; }
 
-          .sh-title { font-size: 11pt !important; margin: 6px 0 3px !important; }
-          .sh2-title { font-size: 10pt !important; margin: 4px 0 2px !important; }
+          .sh-title { font-size: 10pt !important; margin: 5px 0 2px !important; }
+          .sh2-title { font-size: 9.5pt !important; margin: 4px 0 2px !important; }
           .sign-box { padding: 8px 12px !important; }
-          .sign-row { font-size: 10pt !important; }
+          .sign-row { font-size: 9pt !important; }
 
           .signature-section {
             page-break-before: avoid !important;
             page-break-inside: avoid !important;
-            margin-top: 8px !important;
+            margin-top: 6px !important;
           }
 
-          .byeolji-section {
+          .page2-section {
             page-break-before: always !important;
           }
-          .byeolji-section li {
-            font-size: 10pt !important;
-            line-height: 1.6 !important;
-            margin-bottom: 4px !important;
+          .page2-section li {
+            font-size: 9pt !important;
+            line-height: 1.55 !important;
+            margin-bottom: 1px !important;
           }
-          .byeolji-title { font-size: 16pt !important; }
-          .byeolji-intro { font-size: 10pt !important; }
         }
       `}</style>
 
@@ -245,15 +241,6 @@ export default function ContractPage() {
         <div className="sh2-title" style={S.sh2}>제9항 [제공자의 의무]</div>
         <p style={S.body}>임대인(제공자)은 거주 가능한 상태로 집을 유지·관리할 의무가 있으며, 시설이 저하되는 상황이 발생할 경우 최대한 빠르게 복구한다.</p>
 
-        <div className="sh-title" style={S.sh}>제3조. 특약 사항</div>
-        <ol style={S.ol}>
-          {specialTerms.map((t, i) => (
-            <li key={i} style={S.li}>
-              {editing ? <textarea style={{ width:'100%',fontSize:'8.5pt',lineHeight:1.55,border:'1px solid #3182F6',borderRadius:3,padding:'2px 4px',background:'#EBF3FE' }} rows={2} value={t} onChange={e => { const c = [...specialTerms]; c[i] = e.target.value; setSpecialTerms(c) }} /> : t}
-            </li>
-          ))}
-        </ol>
-
         {/* 서명란 */}
         <div className="signature-section">
         <p style={{ textAlign:'right',margin:'4px 0',fontSize:'7.5pt' }}>계약일: {todayStr}</p>
@@ -278,10 +265,21 @@ export default function ContractPage() {
         </div>
         </div>{/* end signature-section */}
 
-        {/* ═══════════ PAGE 2: 별지 특약 ═══════════ */}
-        <div className="byeolji-section">
-          <h1 className="byeolji-title" style={S.h1}>쉐어하우스 별지 특약</h1>
-          <p className="byeolji-intro" style={{ textAlign:'center',fontSize:'8pt',color:'#555',margin:'6px 0 14px',lineHeight:1.7 }}>
+        {/* ═══════════ PAGE 2: 특약 + 별지 ═══════════ */}
+        <div className="page2-section">
+          <div className="sh-title" style={S.sh}>제3조. 특약 사항</div>
+          <ol style={S.ol}>
+            {specialTerms.map((t, i) => (
+              <li key={i} style={S.li}>
+                {editing ? <textarea style={{ width:'100%',fontSize:'9pt',lineHeight:1.5,border:'1px solid #3182F6',borderRadius:3,padding:'2px 4px',background:'#EBF3FE' }} rows={2} value={t} onChange={e => { const c = [...specialTerms]; c[i] = e.target.value; setSpecialTerms(c) }} /> : t}
+              </li>
+            ))}
+          </ol>
+
+          <div style={{ height:1,background:'#aaa',margin:'10px 0' }} />
+
+          <h1 style={{ ...S.h1, margin:'8px 0 4px' }}>쉐어하우스 별지 특약</h1>
+          <p style={{ textAlign:'center',fontSize:'8pt',color:'#555',margin:'4px 0 8px',lineHeight:1.6 }}>
             이용자는 쉐어하우스 일원으로서 / 제공자는 쉐어하우스의 대표로서<br />
             마음이 편한 집을 &lsquo;함께&rsquo; 만들어 가는 데 적극 협조할 것을 약속합니다. 계약서를 읽은 후 동의할 경우 서명
           </p>
@@ -289,22 +287,22 @@ export default function ContractPage() {
           <ol style={S.ol}>
             {appendixTerms.map((t, i) => (
               <li key={i} style={S.li}>
-                {editing ? <textarea style={{ width:'100%',fontSize:'8.5pt',lineHeight:1.55,border:'1px solid #3182F6',borderRadius:3,padding:'2px 4px',background:'#EBF3FE' }} rows={3} value={t} onChange={e => { const c = [...appendixTerms]; c[i] = e.target.value; setAppendixTerms(c) }} /> : t}
+                {editing ? <textarea style={{ width:'100%',fontSize:'9pt',lineHeight:1.5,border:'1px solid #3182F6',borderRadius:3,padding:'2px 4px',background:'#EBF3FE' }} rows={3} value={t} onChange={e => { const c = [...appendixTerms]; c[i] = e.target.value; setAppendixTerms(c) }} /> : t}
               </li>
             ))}
           </ol>
 
-          <p style={{ margin:'4px 0',fontSize:'7.5pt',fontStyle:'italic' }}>
+          <p style={{ margin:'4px 0',fontSize:'8pt',fontStyle:'italic' }}>
             운영에 관하여 변동이 있을 시 제공자는 최소 4주 전에 고지 의무를 가진다.
           </p>
 
           {/* 별지 서명란 */}
-          <div className="byeolji-signature" style={{ borderTop:'1.5px solid #111',paddingTop:8,marginTop:20 }}>
-            <p style={{ fontWeight:700,fontSize:'8pt',marginBottom:4 }}>별지 특약 서명</p>
-            <p style={{ fontSize:'7.5pt',color:'#666',marginBottom:8 }}>상기 별지 특약 사항을 모두 확인하였으며 이에 동의합니다.</p>
+          <div style={{ borderTop:'1.5px solid #111',paddingTop:8,marginTop:10 }}>
+            <p style={{ fontWeight:700,fontSize:'9pt',marginBottom:4 }}>별지 특약 서명</p>
+            <p style={{ fontSize:'8pt',color:'#666',marginBottom:6 }}>상기 별지 특약 사항을 모두 확인하였으며 이에 동의합니다.</p>
             <div style={{ display:'flex',justifyContent:'space-between' }}>
-              <div style={{ fontSize:'8.5pt' }}>임차인: ________________________ (인)</div>
-              <div style={{ fontSize:'8.5pt' }}>임대인: 유재훈 (인)</div>
+              <div style={{ fontSize:'9pt' }}>임차인: ________________________ (인)</div>
+              <div style={{ fontSize:'9pt' }}>임대인: 유재훈 (인)</div>
             </div>
           </div>
         </div>
