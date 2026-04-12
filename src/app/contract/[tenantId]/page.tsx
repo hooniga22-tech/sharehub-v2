@@ -134,7 +134,7 @@ export default function ContractPage() {
     editing ? <input type="number" style={{ border:'1px solid #3182F6',borderRadius:3,padding:'1px 5px',fontSize:'inherit',background:'#EBF3FE',outline:'none',width:100 }} value={v} onChange={e => onChange(Number(e.target.value) || 0)} /> : <>{won(v)}</>
 
   const S: Record<string, React.CSSProperties> = {
-    ct: { fontFamily:"'Malgun Gothic','맑은 고딕','Noto Sans KR',sans-serif", fontSize:'8pt', lineHeight:1.45, color:'#111', maxWidth:750, margin:'0 auto', padding:24, background:'#fff' },
+    ct: { fontFamily:"'Malgun Gothic','맑은 고딕','Noto Sans KR',sans-serif", fontSize:'8pt', lineHeight:1.45, color:'#111', maxWidth:794, margin:'0 auto', padding:'30px 40px', background:'#fff' },
     h1: { fontSize:'13pt', textAlign:'center', fontWeight:700, margin:'4px 0 2px' },
     sub: { fontSize:'8pt', textAlign:'center', color:'#666', marginBottom:8 },
     sh: { fontSize:'8.5pt', fontWeight:700, margin:'4px 0 2px', borderBottom:'1.5px solid #111', paddingBottom:1 },
@@ -153,7 +153,7 @@ export default function ContractPage() {
     <>
       <style>{`
         @media print {
-          @page { size: A4; margin: 8mm 14mm 6mm 14mm; }
+          @page { size: A4; margin: 6mm 10mm; }
           html, body { width:210mm!important; margin:0!important; padding:0!important; font-size:9pt!important; line-height:1.55!important; }
           body > div, #__next, main { max-width:100%!important; width:100%!important; padding:0!important; margin:0!important; }
           .ct-wrap { padding:0!important; font-size:9pt!important; line-height:1.55!important; }
@@ -250,7 +250,7 @@ export default function ContractPage() {
 
         <div className="sh-title" style={S.sh}>제3조. 특약 사항</div>
         <ol style={S.ol}>
-          {specialTerms.map((t, i) => (
+          {specialTerms.slice(0, 9).map((t, i) => (
             <li key={i} style={S.li}>
               {editing ? <textarea style={{ width:'100%',fontSize:'8.5pt',lineHeight:1.55,border:'1px solid #3182F6',borderRadius:3,padding:'2px 4px',background:'#EBF3FE' }} rows={2} value={t} onChange={e => { const c = [...specialTerms]; c[i] = e.target.value; setSpecialTerms(c) }} /> : t}
             </li>
@@ -279,7 +279,19 @@ export default function ContractPage() {
         </div>
         </div>
 
+        {/* ═══ 2페이지: 특약 계속 + 별지 ═══ */}
         <div className="byeolji-section">
+          <div className="sh-title" style={S.sh}>제3조. 특약 사항 (계속)</div>
+          <ol style={{ ...S.ol, listStyleType:'decimal' }} start={10}>
+            {specialTerms.slice(9).map((t, i) => (
+              <li key={i + 9} style={S.li}>
+                {editing ? <textarea style={{ width:'100%',fontSize:'8.5pt',lineHeight:1.55,border:'1px solid #3182F6',borderRadius:3,padding:'2px 4px',background:'#EBF3FE' }} rows={2} value={t} onChange={e => { const c = [...specialTerms]; c[i + 9] = e.target.value; setSpecialTerms(c) }} /> : t}
+              </li>
+            ))}
+          </ol>
+
+          <div style={{ borderTop:'1px solid #333',margin:'10px 0' }} />
+
           <h1 className="byeolji-title" style={S.h1}>쉐어하우스 별지 특약</h1>
           <p className="byeolji-intro" style={{ textAlign:'center',fontSize:'8pt',color:'#555',margin:'6px 0 14px',lineHeight:1.7 }}>
             이용자는 쉐어하우스 일원으로서 / 제공자는 쉐어하우스의 대표로서<br />
@@ -295,7 +307,7 @@ export default function ContractPage() {
           <p style={{ margin:'4px 0',fontSize:'7.5pt',fontStyle:'italic' }}>
             운영에 관하여 변동이 있을 시 제공자는 최소 4주 전에 고지 의무를 가진다.
           </p>
-          <div className="byeolji-signature" style={{ borderTop:'1.5px solid #111',paddingTop:8,marginTop:20 }}>
+          <div className="byeolji-signature" style={{ borderTop:'1.5px solid #111',paddingTop:8,marginTop:12 }}>
             <p style={{ fontWeight:700,fontSize:'8pt',marginBottom:4 }}>별지 특약 서명</p>
             <p style={{ fontSize:'7.5pt',color:'#666',marginBottom:8 }}>상기 별지 특약 사항을 모두 확인하였으며 이에 동의합니다.</p>
             <div style={{ display:'flex',justifyContent:'space-between' }}>
