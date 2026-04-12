@@ -1,290 +1,360 @@
-'use client'
+'use client';
 
-import { useState, useEffect, useMemo } from 'react'
-import { PageHeader } from '@/components/ui/PageHeader'
-import { Card } from '@/components/ui/Card'
-import { Chip } from '@/components/ui/Chip'
-import { Check, AlertTriangle, Plus, X, Loader2, Calendar } from 'lucide-react'
-import DutyCalendar from '@/components/ui/DutyCalendar'
+import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import { ChevronRight, X, ArrowUpDown, ShieldOff, Check, Undo2 } from 'lucide-react';
+import { mockDutyHouses, mockSchedule, mockExchangeRequests, THIS_WEEK, fmtWeek, type DutySlot, type DutyStatus, type ExchangeRequest } from '@/../data/mockDuty';
 
-interface DutyItem {
-  id: string; houseName: string; tenantId: string; tenantName: string; roomCode: string;
-  weekStart: string; weekEnd: string; isDone: boolean; doneAt: string; hasFine: boolean; note: string;
-}
-interface HouseItem { id: string; name: string; district: string }
+const BLUE = '#3182f6', GRAY = '#8b95a1', GREEN = '#00c471', RED = '#f04452', ORANGE = '#f59f00';
 
-function formatWeek(ws: string, we: string) {
-  const s = new Date(ws), e = new Date(we)
-  const days = ['일', '월', '화', '수', '목', '금', '토']
-  return `${s.getMonth() + 1}/${s.getDate()}(${days[s.getDay()]}) ~ ${e.getMonth() + 1}/${e.getDate()}(${days[e.getDay()]})`
-}
-
-function getMonday(d: Date) {
-  const day = d.getDay()
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-  return new Date(d.getFullYear(), d.getMonth(), diff)
-}
+const StatusBadge = ({ status }: { status: DutyStatus }) => {
+  const cfg: Record<DutyStatus, { bg: string; color: string; label: string }> = {
+    '완료': { bg: '#e8faf2', color: GREEN, label: '완료' },
+    '예정': { bg: '#f2f4f6', color: GRAY, label: '예정' },
+    '미완료': { bg: '#fff0f1', color: RED, label: '미완료' },
+    '면제': { bg: '#f2f4f6', color: GRAY, label: '면제' },
+    '건너뜀': { bg: '#f2f4f6', color: GRAY, label: '공실·건너뜀' },
+    '스킵': { bg: '#ebf3ff', color: BLUE, label: '청소주·스킵' },
+  };
+  const c = cfg[status];
+  return <span style={{ padding: '2px 8px', borderRadius: 5, fontSize: 11, fontWeight: 600, background: c.bg, color: c.color }}>{c.label}</span>;
+};
 
 export default function DutyPage() {
-  const [houses, setHouses] = useState<HouseItem[]>([])
-  const [selectedHouse, setSelectedHouse] = useState('')
-  const [duties, setDuties] = useState<DutyItem[]>([])
-  const [loading, setLoading] = useState(false)
-  const [showGenerate, setShowGenerate] = useState(false)
+  const router = useRouter();
+  const [selHouse, setSelHouse] = useState<number | null>(null);
+  const [tab, setTab] = useState(0);
+  const [schedule, setSchedule] = useState<DutySlot[]>(mockSchedule);
+  const [exchanges, setExchanges] = useState<ExchangeRequest[]>(mockExchangeRequests);
+  const [swapSheet, setSwapSheet] = useState<string | null>(null);
+  const [swapTarget, setSwapTarget] = useState<string | null>(null);
+  const [exemptSheet, setExemptSheet] = useState<string | null>(null);
+  const [exemptReason, setExemptReason] = useState('');
+  const [toast, setToast] = useState('');
 
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2200); };
+
+  const anySheet = swapSheet || exemptSheet;
   useEffect(() => {
-    fetch('/api/houses').then(r => r.json())
-      .then(d => { if (Array.isArray(d)) setHouses(d) })
-      .catch(() => {})
-  }, [])
+    document.body.style.overflow = anySheet ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [anySheet]);
 
-  function fetchDuties(hn: string) {
-    if (!hn) return
-    setLoading(true)
-    fetch(`/api/duty?houseName=${encodeURIComponent(hn)}`)
-      .then(r => r.json())
-      .then(d => { if (Array.isArray(d)) setDuties(d.sort((a: DutyItem, b: DutyItem) => a.weekStart.localeCompare(b.weekStart))) })
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }
+  const thisWeekSlot = schedule.find(s => s.weekStart === THIS_WEEK);
+  const futureSlots = schedule.filter(s => s.weekStart > THIS_WEEK);
+  const pastSlots = schedule.filter(s => s.weekStart < THIS_WEEK).sort((a, b) => b.weekStart.localeCompare(a.weekStart));
 
-  useEffect(() => { if (selectedHouse) fetchDuties(selectedHouse) }, [selectedHouse])
+  const markComplete = (weekStart: string) => {
+    const now = new Date();
+    const timeStr = `${now.getMonth() + 1}월 ${now.getDate()}일 ${now.getHours() < 12 ? '오전' : '오후'} ${now.getHours() % 12 || 12}:${String(now.getMinutes()).padStart(2, '0')}`;
+    setSchedule(prev => prev.map(s =>
+      s.weekStart === weekStart ? { ...s, status: '완료' as const, completedAt: timeStr, completedBy: 'admin' as const } : s
+    ));
+    showToast('완료 처리됐어요!');
+  };
 
-  const today = new Date().toISOString().split('T')[0]
-  const thisMonday = getMonday(new Date()).toISOString().split('T')[0]
+  const undoComplete = (weekStart: string) => {
+    setSchedule(prev => prev.map(s =>
+      s.weekStart === weekStart ? { ...s, status: '예정' as const, completedAt: null, completedBy: null } : s
+    ));
+    showToast('되돌렸어요');
+  };
 
-  const thisWeekDuty = duties.find(d => d.weekStart === thisMonday)
-  const fineCount = duties.filter(d => d.hasFine).length
-  const activeTenantCount = new Set(duties.filter(d => d.tenantId).map(d => d.tenantId)).size
+  const handleExempt = () => {
+    if (!exemptSheet) return;
+    setSchedule(prev => prev.map(s =>
+      s.weekStart === exemptSheet ? { ...s, status: '면제' as const, exemptReason: exemptReason || null } : s
+    ));
+    setExemptSheet(null);
+    setExemptReason('');
+    showToast('면제 처리됐어요');
+  };
 
-  async function toggleDone(d: DutyItem) {
-    await fetch(`/api/duty/${d.id}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isDone: !d.isDone }),
-    })
-    setDuties(prev => prev.map(x => x.id === d.id ? { ...x, isDone: !d.isDone, doneAt: !d.isDone ? today : '' } : x))
-  }
+  const handleSwap = () => {
+    if (!swapSheet || !swapTarget) return;
+    showToast('교환 신청 완료!');
+    setSwapSheet(null);
+    setSwapTarget(null);
+  };
 
-  async function toggleFine(d: DutyItem) {
-    await fetch(`/api/duty/${d.id}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ hasFine: !d.hasFine }),
-    })
-    setDuties(prev => prev.map(x => x.id === d.id ? { ...x, hasFine: !d.hasFine } : x))
-  }
+  const acceptExchange = (id: number) => {
+    setExchanges(prev => prev.filter(e => e.id !== id));
+    showToast('교환 수락! 순서가 바뀌었어요');
+  };
 
-  function getDutyStatus(d: DutyItem) {
-    if (d.note === '청소용역') return { label: '용역', variant: 'gray' as const }
-    if (d.isDone) return { label: '완료', variant: 'green' as const }
-    if (d.weekStart === thisMonday) return { label: '이번주', variant: 'blue' as const }
-    if (d.weekStart > thisMonday && d.weekStart <= new Date(new Date(thisMonday).getTime() + 7 * 86400000).toISOString().split('T')[0])
-      return { label: '다음주', variant: 'amber' as const }
-    if (d.weekStart < thisMonday) return { label: '미완료', variant: 'red' as const }
-    return { label: '예정', variant: 'gray' as const }
-  }
+  const rejectExchange = (id: number) => {
+    setExchanges(prev => prev.filter(e => e.id !== id));
+    showToast('거절했어요');
+  };
 
-  return (
-    <div className="flex flex-col min-h-screen">
-      <PageHeader title="청소 당번" />
-
-      <DutyCalendar houseName={selectedHouse || undefined} />
-
-      <div className="flex-1 overflow-y-auto px-5 pb-8">
-        {/* House Select */}
-        <select value={selectedHouse} onChange={e => setSelectedHouse(e.target.value)}
-          className="w-full px-4 py-3 mt-3 rounded-xl bg-[var(--card)] border border-[var(--border)] text-[14px] outline-none">
-          <option value="">지점 선택</option>
-          {houses.map(h => <option key={h.id} value={h.name}>{h.name} ({h.district})</option>)}
-        </select>
-
-        {selectedHouse && !loading && (
-          <>
-            {/* Summary */}
-            <div className="flex gap-2.5 mt-4">
-              <div className="flex-1 rounded-xl bg-[var(--card)] border border-[var(--border)] p-3 text-center">
-                <p className="text-[10px] text-[var(--sub)]">이번주</p>
-                <p className={`text-[16px] font-bold ${thisWeekDuty?.isDone ? 'text-[var(--green)]' : 'text-[var(--amber)]'}`}>
-                  {thisWeekDuty ? (thisWeekDuty.isDone ? '완료' : '미완료') : '-'}
-                </p>
-              </div>
-              <div className="flex-1 rounded-xl bg-[var(--card)] border border-[var(--border)] p-3 text-center">
-                <p className="text-[10px] text-[var(--sub)]">벌금</p>
-                <p className="text-[16px] font-bold text-[var(--red)]">{fineCount}건</p>
-              </div>
-              <div className="flex-1 rounded-xl bg-[var(--card)] border border-[var(--border)] p-3 text-center">
-                <p className="text-[10px] text-[var(--sub)]">입주자</p>
-                <p className="text-[16px] font-bold">{activeTenantCount}명</p>
-              </div>
-            </div>
-
-            {/* This Week Highlight */}
-            {thisWeekDuty && thisWeekDuty.tenantId && (
-              <div className={`rounded-2xl p-5 mt-4 ${thisWeekDuty.isDone ? 'bg-[var(--green)]' : 'bg-[#3182F6]'}`}>
-                <p className="text-[12px] text-white/70">이번주 당번</p>
-                <p className="text-[22px] font-bold text-white mt-1">{thisWeekDuty.tenantName}</p>
-                <p className="text-[12px] text-white/60 mt-0.5">{thisWeekDuty.roomCode}</p>
-                <p className="text-[12px] text-white/70 mt-2">
-                  <Calendar size={11} className="inline mr-1" />
-                  {formatWeek(thisWeekDuty.weekStart, thisWeekDuty.weekEnd)}
-                </p>
-                <div className="flex gap-2 mt-3">
-                  <button onClick={() => toggleDone(thisWeekDuty)}
-                    className={`flex-1 py-2.5 rounded-xl text-[12px] font-bold flex items-center justify-center gap-1 ${
-                      thisWeekDuty.isDone ? 'bg-white/30 text-white' : 'bg-white text-[#3182F6]'
-                    }`}>
-                    <Check size={14} /> {thisWeekDuty.isDone ? '완료 취소' : '완료 처리'}
-                  </button>
-                  <button onClick={() => toggleFine(thisWeekDuty)}
-                    className={`px-4 py-2.5 rounded-xl text-[12px] font-bold ${
-                      thisWeekDuty.hasFine ? 'bg-[var(--red)] text-white' : 'bg-white/20 text-white'
-                    }`}>
-                    <AlertTriangle size={14} className="inline mr-1" />
-                    {thisWeekDuty.hasFine ? '벌금 취소' : '벌금 3만'}
+  // ===== House Selection =====
+  if (selHouse === null) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#F7F8FA' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', background: '#fff', borderBottom: '1px solid #F0F0F0', position: 'sticky', top: 0, zIndex: 10 }}>
+          <button onClick={() => router.push('/manage')} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', padding: 4, color: '#191919' }}>←</button>
+          <span style={{ fontSize: 16, fontWeight: 700 }}>당번 관리</span>
+        </div>
+        <div style={{ padding: 16 }}>
+          <div style={{ background: '#fff', borderRadius: 14, overflow: 'hidden' }}>
+            {mockDutyHouses.map((h, i) => {
+              const tw = thisWeekSlot;
+              const label = tw ? (tw.type === '청소주' ? '스킵' : tw.type === '공실' ? '공실' : tw.name) : '—';
+              return (
+                <div key={h.id}>
+                  {i > 0 && <div style={{ height: 1, background: '#F5F5F5', margin: '0 20px' }} />}
+                  <button onClick={() => { setSelHouse(h.id); setTab(0); }}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: '#191f28' }}>{h.name}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 12, color: GRAY }}>이번주: {label}</span>
+                      <ChevronRight size={16} color="#CCC" />
+                    </div>
                   </button>
                 </div>
+              );
+            })}
+          </div>
+        </div>
+        {toast && <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: '#191f28', color: '#fff', padding: '10px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600, zIndex: 999, whiteSpace: 'nowrap' }}>{toast}</div>}
+      </div>
+    );
+  }
+
+  // ===== House Detail =====
+  const house = mockDutyHouses.find(h => h.id === selHouse)!;
+  const tabLabels = ['현황', '이력', '교환요청'];
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#F7F8FA' }}>
+      {/* Header */}
+      <div style={{ background: '#fff', borderBottom: '1px solid #F0F0F0', position: 'sticky', top: 0, zIndex: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px' }}>
+          <button onClick={() => setSelHouse(null)} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', padding: 4, color: '#191919' }}>←</button>
+          <span style={{ fontSize: 16, fontWeight: 700 }}>{house.name} 당번</span>
+        </div>
+        <div style={{ display: 'flex', borderTop: '1px solid #F0F0F0' }}>
+          {tabLabels.map((label, i) => (
+            <button key={i} onClick={() => setTab(i)}
+              style={{ flex: 1, padding: '12px 0', border: 'none', borderBottom: tab === i ? `2px solid ${BLUE}` : '2px solid transparent', background: 'none', fontSize: 13, fontWeight: tab === i ? 700 : 400, color: tab === i ? BLUE : GRAY, cursor: 'pointer', fontFamily: 'inherit', position: 'relative' }}>
+              {label}
+              {i === 2 && exchanges.length > 0 && (
+                <span style={{ position: 'absolute', top: 8, right: '25%', width: 7, height: 7, borderRadius: '50%', background: RED }} />
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ padding: 16 }}>
+        {/* Tab 0: 현황 */}
+        {tab === 0 && (
+          <>
+            {/* This week card */}
+            {thisWeekSlot && (
+              <div style={{ background: thisWeekSlot.type === '청소주' ? '#f2f4f6' : '#f0f7ff', borderRadius: 14, padding: 20, marginBottom: 16, border: thisWeekSlot.type === '청소주' ? 'none' : `1.5px solid ${BLUE}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: BLUE, color: '#fff' }}>이번주</span>
+                  <span style={{ fontSize: 13, color: GRAY }}>{fmtWeek(thisWeekSlot.weekStart)}</span>
+                </div>
+
+                {thisWeekSlot.type === '청소주' ? (
+                  <div style={{ fontSize: 14, color: GRAY }}>정기청소 주 · 당번 없음</div>
+                ) : thisWeekSlot.type === '공실' ? (
+                  <div style={{ fontSize: 14, color: GRAY }}>공실 · 건너뜀</div>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: '#191f28', marginBottom: 2 }}>{thisWeekSlot.name}</div>
+                    <div style={{ fontSize: 12, color: GRAY, marginBottom: 14 }}>{thisWeekSlot.room}</div>
+
+                    {thisWeekSlot.status === '완료' ? (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: 13, color: GREEN, fontWeight: 600 }}>✓ 완료 · {thisWeekSlot.completedAt}{thisWeekSlot.completedBy === 'admin' ? ' (관리자)' : ''}</span>
+                        <button onClick={() => undoComplete(thisWeekSlot.weekStart)}
+                          style={{ fontSize: 12, color: GRAY, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', fontFamily: 'inherit' }}>
+                          되돌리기
+                        </button>
+                      </div>
+                    ) : thisWeekSlot.status === '면제' ? (
+                      <div style={{ fontSize: 13, color: GRAY }}>면제 처리됨{thisWeekSlot.exemptReason ? ` · ${thisWeekSlot.exemptReason}` : ''}</div>
+                    ) : (
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={() => { setSwapSheet(thisWeekSlot.weekStart); setSwapTarget(null); }}
+                          style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: '1px solid #e5e8eb', background: '#fff', fontSize: 12, fontWeight: 600, color: '#555', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                          <ArrowUpDown size={13} /> 교환
+                        </button>
+                        <button onClick={() => { setExemptSheet(thisWeekSlot.weekStart); setExemptReason(''); }}
+                          style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: '1px solid #e5e8eb', background: '#fff', fontSize: 12, fontWeight: 600, color: '#555', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                          <ShieldOff size={13} /> 면제
+                        </button>
+                        <button onClick={() => markComplete(thisWeekSlot.weekStart)}
+                          style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: 'none', background: BLUE, fontSize: 12, fontWeight: 600, color: '#fff', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                          <Check size={13} /> 완료 처리
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             )}
 
-            {/* Generate Button */}
-            <div className="flex justify-end mt-4">
-              <button onClick={() => setShowGenerate(true)}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-[var(--blue)] text-white text-[12px] font-semibold">
-                <Plus size={14} /> 당번 자동 생성
-              </button>
-            </div>
-
-            {/* Duty List */}
-            <div className="mt-3 flex flex-col gap-2">
-              {duties.map(d => {
-                const st = getDutyStatus(d)
-                const isSkip = d.note === '청소용역'
-                return (
-                  <Card key={d.id} className={`px-4 py-3 flex items-center gap-3 ${isSkip ? 'opacity-50' : ''} ${d.isDone ? 'opacity-70' : ''}`}>
-                    <div className="w-9 h-9 rounded-full bg-[var(--blue-light)] flex items-center justify-center shrink-0">
-                      <span className="text-[12px] font-bold text-[var(--blue)]">
-                        {isSkip ? '⏭' : (d.tenantName?.[0] || '?')}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[13px] font-semibold truncate">{isSkip ? '청소용역 (건너뜀)' : d.tenantName}</span>
-                        <Chip label={st.label} variant={st.variant} />
+            {/* Future */}
+            {futureSlots.length > 0 && (
+              <>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#666', marginBottom: 8 }}>앞으로 당번</div>
+                <div style={{ background: '#fff', borderRadius: 14, overflow: 'hidden' }}>
+                  {futureSlots.map((s, i) => (
+                    <div key={s.weekStart}>
+                      {i > 0 && <div style={{ height: 1, background: '#F5F5F5', margin: '0 20px' }} />}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', opacity: s.type !== '당번' ? 0.6 : 1 }}>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: s.type !== '당번' ? GRAY : '#191f28' }}>
+                            {s.type === '당번' ? s.name : s.type === '공실' ? '공실' : '정기청소'}
+                          </div>
+                          <div style={{ fontSize: 11, color: GRAY }}>{s.type === '당번' ? s.room + ' · ' : ''}{fmtWeek(s.weekStart)}</div>
+                        </div>
+                        <StatusBadge status={s.status} />
                       </div>
-                      <p className="text-[11px] text-[var(--sub)] mt-0.5">
-                        {d.roomCode ? `${d.roomCode} · ` : ''}{formatWeek(d.weekStart, d.weekEnd)}
-                      </p>
-                    </div>
-                    {!isSkip && !d.isDone && (
-                      <button onClick={() => toggleDone(d)}
-                        className="px-2.5 py-1 rounded-lg bg-[var(--green-light)] text-[var(--green)] text-[10px] font-bold">
-                        <Check size={10} className="inline" /> 완료
-                      </button>
-                    )}
-                    {d.hasFine && (
-                      <span className="px-2 py-0.5 rounded-full bg-[var(--red-light)] text-[var(--red)] text-[10px] font-bold">벌금</span>
-                    )}
-                  </Card>
-                )
-              })}
-            </div>
-
-            {/* Fine List */}
-            {fineCount > 0 && (
-              <div className="mt-5">
-                <h3 className="text-[14px] font-bold mb-2">벌금 내역</h3>
-                <Card className="px-4 py-3">
-                  {duties.filter(d => d.hasFine).map(d => (
-                    <div key={d.id} className="flex items-center justify-between py-2 border-b border-[var(--border)] last:border-0">
-                      <div>
-                        <span className="text-[13px] font-semibold">{d.tenantName}</span>
-                        <span className="text-[11px] text-[var(--sub)] ml-2">{formatWeek(d.weekStart, d.weekEnd)}</span>
-                      </div>
-                      <span className="text-[13px] font-bold text-[var(--red)]">30,000원</span>
                     </div>
                   ))}
-                </Card>
-              </div>
+                </div>
+              </>
             )}
           </>
         )}
 
-        {loading && <p className="text-[13px] text-[var(--sub)] py-8 text-center">불러오는 중...</p>}
-      </div>
-
-      {/* Generate Modal */}
-      {showGenerate && (
-        <GenerateModal houseName={selectedHouse}
-          onClose={() => setShowGenerate(false)}
-          onDone={() => { setShowGenerate(false); fetchDuties(selectedHouse) }}
-        />
-      )}
-    </div>
-  )
-}
-
-function GenerateModal({ houseName, onClose, onDone }: {
-  houseName: string; onClose: () => void; onDone: () => void
-}) {
-  const [weeks, setWeeks] = useState('12')
-  const [workerWeeks, setWorkerWeeks] = useState<string[]>([])
-  const [workerInput, setWorkerInput] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-
-  function addWorkerWeek() {
-    if (workerInput && !workerWeeks.includes(workerInput)) {
-      setWorkerWeeks([...workerWeeks, workerInput])
-      setWorkerInput('')
-    }
-  }
-
-  async function handleGenerate() {
-    setSubmitting(true)
-    await fetch('/api/duty/generate', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ houseName, weeksAhead: Number(weeks) || 12, workerWeeks }),
-    })
-    onDone()
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-[90%] max-w-[380px] bg-[var(--bg)] rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-[16px] font-bold">당번 자동 생성</h3>
-          <button onClick={onClose}><X size={18} className="text-[var(--sub)]" /></button>
-        </div>
-        <p className="text-[13px] text-[var(--sub)] mb-3">{houseName} 지점</p>
-
-        <label className="text-[12px] font-semibold block mb-1">주차 수</label>
-        <input type="number" value={weeks} onChange={e => setWeeks(e.target.value)}
-          className="w-full px-3 py-2.5 rounded-xl bg-[var(--card)] border border-[var(--border)] text-[14px] outline-none mb-3" />
-
-        <label className="text-[12px] font-semibold block mb-1">청소 용역 주 (월요일 날짜)</label>
-        <div className="flex gap-2 mb-2">
-          <input type="date" value={workerInput} onChange={e => setWorkerInput(e.target.value)}
-            className="flex-1 px-3 py-2 rounded-xl bg-[var(--card)] border border-[var(--border)] text-[13px] outline-none" />
-          <button onClick={addWorkerWeek} className="px-3 py-2 rounded-xl bg-[var(--blue)] text-white text-[12px] font-bold">추가</button>
-        </div>
-        {workerWeeks.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            {workerWeeks.map(w => (
-              <span key={w} className="px-2 py-0.5 rounded-full bg-gray-100 text-[11px] flex items-center gap-1">
-                {w}
-                <button onClick={() => setWorkerWeeks(prev => prev.filter(x => x !== w))}>
-                  <X size={10} />
-                </button>
-              </span>
+        {/* Tab 1: 이력 */}
+        {tab === 1 && (
+          <>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#666', marginBottom: 10 }}>최근 2개월 당번 이력</div>
+            {pastSlots.map(s => (
+              <div key={s.weekStart} style={{ background: '#fff', borderRadius: 12, border: '1px solid #f2f4f6', padding: '14px 18px', marginBottom: 8, opacity: 0.85 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#191f28' }}>
+                      {s.type === '당번' ? `${s.name}   ${s.room}` : s.type === '공실' ? '공실 · 건너뜀' : '정기청소 · 스킵'}
+                    </div>
+                    <div style={{ fontSize: 12, color: GRAY }}>{fmtWeek(s.weekStart)}</div>
+                  </div>
+                  <StatusBadge status={s.status} />
+                </div>
+                {s.completedAt && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 12, color: GREEN }}>✓ {s.completedAt}{s.completedBy === 'admin' ? ' (관리자)' : ''}</span>
+                    <button style={{ fontSize: 11, color: GRAY, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>수정</button>
+                  </div>
+                )}
+              </div>
             ))}
-          </div>
+          </>
         )}
 
-        <button onClick={handleGenerate} disabled={submitting}
-          className="w-full mt-2 py-3 rounded-xl text-[14px] font-semibold bg-[var(--blue)] text-white flex items-center justify-center gap-2">
-          {submitting ? <Loader2 size={14} className="animate-spin" /> : null}
-          {submitting ? '생성 중...' : '생성하기'}
-        </button>
+        {/* Tab 2: 교환요청 */}
+        {tab === 2 && (
+          exchanges.length > 0 ? (
+            <>
+              <div style={{ fontSize: 13, fontWeight: 700, color: ORANGE, marginBottom: 10 }}>교환 요청 {exchanges.length}건</div>
+              {exchanges.map(ex => (
+                <div key={ex.id} style={{ background: '#fffbeb', borderRadius: 14, border: '1px solid #fde68a', padding: 20, marginBottom: 10 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, color: '#191f28' }}>🔄 {ex.fromName}님이 교환을 신청했어요</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 13, color: GRAY }}>내 주</span>
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>{fmtWeek(ex.myWeekStart)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 13, color: GRAY }}>상대 주</span>
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>{fmtWeek(ex.theirWeekStart)}</span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => rejectExchange(ex.id)}
+                      style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: '1px solid #e5e8eb', background: '#fff', fontSize: 13, fontWeight: 600, color: '#555', cursor: 'pointer', fontFamily: 'inherit' }}>
+                      거절
+                    </button>
+                    <button onClick={() => acceptExchange(ex.id)}
+                      style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: 'none', background: BLUE, fontSize: 13, fontWeight: 600, color: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
+                      수락
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '60px 0' }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
+              <div style={{ fontSize: 16, fontWeight: 600, color: '#333', marginBottom: 4 }}>교환 요청이 없어요</div>
+              <div style={{ fontSize: 13, color: GRAY }}>새로운 요청이 오면 여기에 표시돼요</div>
+            </div>
+          )
+        )}
       </div>
+
+      {/* ===== Swap Sheet ===== */}
+      {swapSheet && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div onClick={() => setSwapSheet(null)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.45)' }} />
+          <div style={{ position: 'relative', width: '100%', maxWidth: 430, background: '#fff', borderRadius: '20px 20px 0 0', padding: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+              <div style={{ width: 36, height: 4, borderRadius: 2, background: '#e5e8eb' }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <span style={{ fontSize: 16, fontWeight: 700 }}>당번 교환 신청</span>
+              <button onClick={() => setSwapSheet(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="#999" /></button>
+            </div>
+            <div style={{ fontSize: 13, color: GRAY, marginBottom: 20 }}>내 당번: {fmtWeek(swapSheet)}</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#333', marginBottom: 10 }}>교환할 상대 선택</div>
+            {[...futureSlots.filter(s => s.type === '당번' && s.weekStart !== swapSheet), ...(thisWeekSlot && thisWeekSlot.type === '당번' && thisWeekSlot.weekStart !== swapSheet ? [thisWeekSlot] : [])].map(s => {
+              const selected = swapTarget === s.weekStart;
+              return (
+                <button key={s.weekStart} onClick={() => setSwapTarget(s.weekStart)}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 10, border: `1.5px solid ${selected ? BLUE : '#E8E8E8'}`, background: selected ? '#EBF4FF' : '#fff', marginBottom: 8, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  <span style={{ fontSize: 13, fontWeight: 500 }}>{s.name}  {fmtWeek(s.weekStart)}</span>
+                  {selected && <span style={{ color: BLUE, fontWeight: 700 }}>✓</span>}
+                </button>
+              );
+            })}
+            <button onClick={handleSwap} disabled={!swapTarget}
+              style={{ width: '100%', padding: 14, borderRadius: 12, border: 'none', background: swapTarget ? BLUE : '#e5e8eb', color: swapTarget ? '#fff' : '#999', fontSize: 14, fontWeight: 700, cursor: swapTarget ? 'pointer' : 'default', fontFamily: 'inherit', marginTop: 8 }}>
+              신청하기
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ===== Exempt Sheet ===== */}
+      {exemptSheet && (() => {
+        const slot = schedule.find(s => s.weekStart === exemptSheet);
+        return (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+            <div onClick={() => setExemptSheet(null)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.45)' }} />
+            <div style={{ position: 'relative', width: '100%', maxWidth: 430, background: '#fff', borderRadius: '20px 20px 0 0', padding: 24 }}>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+                <div style={{ width: 36, height: 4, borderRadius: 2, background: '#e5e8eb' }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ fontSize: 16, fontWeight: 700 }}>면제 처리</span>
+                <button onClick={() => setExemptSheet(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="#999" /></button>
+              </div>
+              <div style={{ fontSize: 13, color: GRAY, marginBottom: 20 }}>
+                {slot?.name} · {slot?.room} · {fmtWeek(exemptSheet)}
+              </div>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#333', display: 'block', marginBottom: 6 }}>면제 사유 (선택)</label>
+              <textarea value={exemptReason} onChange={e => setExemptReason(e.target.value)}
+                placeholder="예: 출장 중, 퇴실 직후 등..."
+                style={{ width: '100%', height: 100, padding: '12px 14px', border: '1px solid #E8E8E8', borderRadius: 10, fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box', outline: 'none', resize: 'none', marginBottom: 12 }} />
+              <button onClick={handleExempt}
+                style={{ width: '100%', padding: 14, borderRadius: 12, border: 'none', background: BLUE, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                면제 처리
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {toast && (
+        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: '#191f28', color: '#fff', padding: '10px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600, zIndex: 999, whiteSpace: 'nowrap' }}>{toast}</div>
+      )}
     </div>
-  )
+  );
 }
