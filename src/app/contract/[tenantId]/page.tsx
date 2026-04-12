@@ -85,8 +85,8 @@ export default function ContractPage() {
     }).catch(() => {}).finally(() => setLoading(false))
   }, [tenantId])
 
-  if (loading) return <div className="flex items-center justify-center min-h-screen text-gray-400">불러오는 중...</div>
-  if (!tenant) return <div className="flex items-center justify-center min-h-screen text-gray-400">입주자를 찾을 수 없습니다</div>
+  if (loading) return <div style={{ display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',color:'#999' }}>불러오는 중...</div>
+  if (!tenant) return <div style={{ display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',color:'#999' }}>입주자를 찾을 수 없습니다</div>
 
   const deposit = f.deposit || 2000000
   const contractDeposit = 500000
@@ -103,199 +103,161 @@ export default function ContractPage() {
   const today = new Date()
   const todayStr = `${today.getFullYear()}년 ${today.getMonth() + 1}월 ${today.getDate()}일`
 
-  const EI = ({ v, k, onChange }: { v: string; k: string; onChange: (v: string) => void }) =>
-    editing ? <input className="ei" value={v} onChange={e => onChange(e.target.value)} /> : <>{v}</>
-  const EN = ({ v, k, onChange }: { v: number; k: string; onChange: (v: number) => void }) =>
-    editing ? <input type="number" className="ei w-28" value={v} onChange={e => onChange(Number(e.target.value) || 0)} /> : <>{won(v)}</>
+  const EI = ({ v, onChange }: { v: string; onChange: (v: string) => void }) =>
+    editing ? <input style={{ border:'1px solid #3182F6',borderRadius:3,padding:'1px 5px',fontSize:'inherit',background:'#EBF3FE',outline:'none' }} value={v} onChange={e => onChange(e.target.value)} /> : <>{v}</>
+  const EN = ({ v, onChange }: { v: number; onChange: (v: number) => void }) =>
+    editing ? <input type="number" style={{ border:'1px solid #3182F6',borderRadius:3,padding:'1px 5px',fontSize:'inherit',background:'#EBF3FE',outline:'none',width:100 }} value={v} onChange={e => onChange(Number(e.target.value) || 0)} /> : <>{won(v)}</>
+
+  const S: Record<string, React.CSSProperties> = {
+    ct: { fontFamily:"'Malgun Gothic','맑은 고딕','Noto Sans KR',sans-serif", fontSize:'9pt', lineHeight:1.55, color:'#111', maxWidth:750, margin:'0 auto', padding:24, background:'#fff' },
+    h1: { fontSize:'14pt', textAlign:'center', fontWeight:700, margin:'0 0 2px' },
+    sub: { fontSize:'9pt', textAlign:'center', color:'#666', marginBottom:12 },
+    sh: { fontSize:'9.5pt', fontWeight:700, margin:'6px 0 3px', borderBottom:'1.5px solid #111', paddingBottom:2 },
+    sh2: { fontSize:'9pt', fontWeight:700, margin:'4px 0 2px' },
+    td: { border:'1px solid #aaa', padding:'3px 7px', fontSize:'8.5pt' },
+    th: { border:'1px solid #aaa', padding:'3px 7px', fontSize:'8.5pt', background:'#f5f5f5', fontWeight:700, width:'22%', textAlign:'left' as const },
+    body: { fontSize:'8.5pt', lineHeight:1.55, margin:'2px 0' },
+    abox: { background:'#f9f9f9', border:'1px solid #ddd', borderRadius:4, padding:'6px 10px', margin:'6px 0', fontSize:'8.5pt' },
+    sign: { border:'1px solid #aaa', borderRadius:4, padding:'10px 14px', marginBottom:10 },
+    sr: { marginBottom:4, fontSize:'8.5pt' },
+    ol: { paddingLeft:16, margin:'2px 0' },
+    li: { marginBottom:2, fontSize:'8.5pt', lineHeight:1.55 },
+  }
 
   return (
     <>
-      <style jsx global>{`
+      <style>{`
         @media print {
-          html, body { width: 210mm !important; height: 297mm !important; margin: 0 !important; padding: 0 !important; }
-          body > div, #__next, main { max-width: 100% !important; width: 100% !important; padding: 0 !important; margin: 0 !important; }
-          .ct { max-width: 100% !important; width: 100% !important; padding: 0 !important; margin: 0 !important; font-size: 9.5pt !important; }
-          .no-print { display: none !important; }
-          @page { size: A4; margin: 15mm 18mm; }
+          @page { size: A4; margin: 12mm 18mm; }
+          html, body { width:210mm!important; margin:0!important; padding:0!important; }
+          body > div, #__next, main { max-width:100%!important; width:100%!important; padding:0!important; margin:0!important; }
+          .no-print { display:none!important; }
+          nav, footer, header, [class*="bottom"], [class*="tab"], [class*="nav"], [class*="bar"] { display:none!important; }
+          .pb2 { page-break-before: always; }
         }
-        .ct { font-family: 'Malgun Gothic', '맑은 고딕', 'Noto Sans KR', sans-serif; font-size: 10pt; line-height: 1.75; color: #111; max-width: 750px; margin: 0 auto; padding: 24px; background: #fff; }
-        .ct h1 { font-size: 16pt; text-align: center; font-weight: 700; margin: 0 0 4px; }
-        .ct .sub { font-size: 10pt; text-align: center; color: #666; margin-bottom: 18px; }
-        .ct .sh { font-size: 11pt; font-weight: 700; margin: 16px 0 6px; border-bottom: 1.5px solid #111; padding-bottom: 3px; }
-        .ct .sh2 { font-size: 10pt; font-weight: 700; margin: 10px 0 4px; }
-        .ct table { width: 100%; border-collapse: collapse; margin: 6px 0; font-size: 9.5pt; }
-        .ct td, .ct th { border: 1px solid #aaa; padding: 4px 8px; }
-        .ct th { background: #f5f5f5; font-weight: 700; width: 22%; text-align: left; }
-        .ct .abox { background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; padding: 8px 12px; margin: 8px 0; font-size: 9.5pt; }
-        .ct .body { font-size: 9.5pt; line-height: 1.7; }
-        .ct .sign { margin-top: 14px; border-top: 1px solid #aaa; padding-top: 10px; font-size: 9.5pt; }
-        .ct .sr { margin-bottom: 8px; }
-        .ct .pb { page-break-before: always; padding-top: 8px; }
-        .ct ol { padding-left: 18px; }
-        .ct ol li { margin-bottom: 6px; font-size: 9.5pt; line-height: 1.65; }
-        .ct .red { color: #E53E3E; font-weight: 700; }
-        .ei { border: 1px solid #3182F6; border-radius: 3px; padding: 1px 5px; font-size: inherit; background: #EBF3FE; outline: none; }
       `}</style>
 
       {/* Control Bar */}
-      <div className="no-print sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between max-w-[750px] mx-auto">
-        <div className="flex items-center gap-3">
-          <button onClick={() => router.back()}><ArrowLeft size={20} className="text-gray-600" /></button>
-          <span className="text-[15px] font-bold">{f.name} 계약서</span>
+      <div className="no-print" style={{ position:'sticky',top:0,zIndex:10,background:'#fff',borderBottom:'1px solid #eee',padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',maxWidth:750,margin:'0 auto' }}>
+        <div style={{ display:'flex',alignItems:'center',gap:12 }}>
+          <button onClick={() => router.back()} style={{ background:'none',border:'none',cursor:'pointer' }}><ArrowLeft size={20} color="#666" /></button>
+          <span style={{ fontSize:15,fontWeight:700 }}>{f.name} 계약서</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div style={{ display:'flex',alignItems:'center',gap:8 }}>
           <button onClick={() => setEditing(!editing)}
-            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-semibold ${editing ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+            style={{ display:'flex',alignItems:'center',gap:4,padding:'6px 12px',borderRadius:8,fontSize:12,fontWeight:600,border:'none',cursor:'pointer',background:editing?'#e8faf2':'#f2f4f6',color:editing?'#0e6245':'#666' }}>
             {editing ? <Save size={12} /> : <Pencil size={12} />}{editing ? '완료' : '수정'}
           </button>
           <button onClick={() => window.print()}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#3182F6] text-white text-[12px] font-semibold">
+            style={{ display:'flex',alignItems:'center',gap:4,padding:'6px 12px',borderRadius:8,background:'#3182F6',color:'#fff',fontSize:12,fontWeight:600,border:'none',cursor:'pointer' }}>
             <Printer size={12} /> PDF 출력
           </button>
         </div>
       </div>
 
       {/* ═══════════ PAGE 1 ═══════════ */}
-      <div className="ct">
-        <h1>쉐어메이트 계약서</h1>
-        <p className="sub">Share Mate Contract</p>
+      <div style={S.ct}>
+        <h1 style={S.h1}>쉐어메이트 계약서</h1>
+        <p style={S.sub}>Share Mate Contract</p>
 
-        {/* 제1조 거주공간 */}
-        <div className="sh">제1조. 거주공간의 표시</div>
-        <table>
+        <div style={S.sh}>제1조. 거주공간의 표시</div>
+        <table style={{ width:'100%',borderCollapse:'collapse',margin:'4px 0' }}>
           <tbody>
-            <tr><th>소재지 (주소)</th><td>{house?.address || '-'}</td></tr>
-            <tr><th>하우스명</th><td>{tenant.houseName}</td></tr>
-            <tr><th>임대 부분</th><td><EI v={f.roomCode} k="roomCode" onChange={v => setF(p => ({ ...p, roomCode: v }))} /></td></tr>
+            <tr><th style={S.th}>소재지 (주소)</th><td style={S.td}>{house?.address || '-'}</td></tr>
+            <tr><th style={S.th}>하우스명</th><td style={S.td}>{tenant.houseName}</td></tr>
+            <tr><th style={S.th}>임대 부분</th><td style={S.td}><EI v={f.roomCode} onChange={v => setF(p => ({ ...p, roomCode: v }))} /></td></tr>
           </tbody>
         </table>
 
-        {/* 제2조 계약 내용 */}
-        <div className="sh">제2조. 계약 내용</div>
-
-        <div className="sh2">제1항 [목적]</div>
-        <p className="body">위 부동산의 임대차에 대하여 임대인과 임차인은 합의에 의하여 아래와 같이 계약을 체결한다.</p>
-
-        <table>
+        <div style={S.sh}>제2조. 계약 내용</div>
+        <p style={S.body}>위 부동산의 임대차에 대하여 임대인과 임차인은 합의에 의하여 아래와 같이 계약을 체결한다.</p>
+        <table style={{ width:'100%',borderCollapse:'collapse',margin:'4px 0' }}>
           <tbody>
-            <tr><th>보증금</th><td>₩<EN v={deposit} k="deposit" onChange={v => setF(p => ({ ...p, deposit: v }))} /> — 퇴실 시 최대 7일 이내 반환</td></tr>
-            <tr><th>월세</th><td>₩<EN v={rent} k="rent" onChange={v => setF(p => ({ ...p, rent: v }))} /> / 월</td></tr>
-            <tr><th>첫달 일할 월세</th><td>₩{won(proratedRent)} ({remainDays}일 ÷ {daysInMonth}일)</td></tr>
-            <tr><th>계약금</th><td>₩500,000 — 계약 시 납부</td></tr>
-            <tr><th>잔금</th><td className="red">₩{won(balance)} — 입주 시 납부</td></tr>
-            <tr><th>관리비</th><td>₩<EN v={mgmt} k="mgmt" onChange={v => setF(p => ({ ...p, mgmt: v }))} /> / 월</td></tr>
-            <tr><th>첫달 일할 관리비</th><td>₩{won(proratedMgmt)} ({remainDays}일 ÷ {daysInMonth}일)</td></tr>
+            <tr><th style={S.th}>보증금</th><td style={S.td}>₩<EN v={deposit} onChange={v => setF(p => ({ ...p, deposit: v }))} /> — 퇴실 시 최대 7일 이내 반환</td></tr>
+            <tr><th style={S.th}>월세</th><td style={S.td}>₩<EN v={rent} onChange={v => setF(p => ({ ...p, rent: v }))} /> / 월</td></tr>
+            <tr><th style={S.th}>첫달 일할 월세</th><td style={S.td}>₩{won(proratedRent)} ({remainDays}일 ÷ {daysInMonth}일)</td></tr>
+            <tr><th style={S.th}>계약금</th><td style={S.td}>₩500,000 — 계약 시 납부</td></tr>
+            <tr><th style={S.th}>잔금</th><td style={{ ...S.td, color:'#E53E3E',fontWeight:700 }}>₩{won(balance)} — 입주 시 납부</td></tr>
+            <tr><th style={S.th}>관리비</th><td style={S.td}>₩<EN v={mgmt} onChange={v => setF(p => ({ ...p, mgmt: v }))} /> / 월</td></tr>
+            <tr><th style={S.th}>첫달 일할 관리비</th><td style={S.td}>₩{won(proratedMgmt)} ({remainDays}일 ÷ {daysInMonth}일)</td></tr>
           </tbody>
         </table>
 
-        <div className="sh2">제2항 [존속기간]</div>
-        <p className="body">
-          임대인은 위 부동산을 임대차 목적대로 사용·수익할 수 있는 상태로&nbsp;
-          <EI v={f.startDate} k="startDate" onChange={v => setF(p => ({ ...p, startDate: v }))} /> 까지 임차인에게 인도하며,
-          임대차 기간은 인도일로부터&nbsp;
-          <EI v={f.endDate} k="endDate" onChange={v => setF(p => ({ ...p, endDate: v }))} /> 까지로 한다.
-        </p>
+        <div style={S.sh2}>제2항 [존속기간]</div>
+        <p style={S.body}>임대인은 위 부동산을 임대차 목적대로 사용·수익할 수 있는 상태로 <EI v={f.startDate} onChange={v => setF(p => ({ ...p, startDate: v }))} /> 까지 임차인에게 인도하며, 임대차 기간은 인도일로부터 <EI v={f.endDate} onChange={v => setF(p => ({ ...p, endDate: v }))} /> 까지로 한다.</p>
+        <div style={S.sh2}>제3항 [기간 한정]</div>
+        <p style={S.body}>계약금은 계약과 동시에 납부하고, 잔금은 입주일에 납부한다.</p>
+        <div style={S.sh2}>제4항 [계약 해지]</div>
+        <p style={S.body}>임차인이 임대인에게 중도금을 지급하기 전까지, 임대인은 계약금의 배액을 상환하고, 임차인은 계약금을 포기하고 이 계약을 해제할 수 있다.</p>
+        <div style={S.sh2}>제5항 [계약 종료]</div>
+        <p style={S.body}>임대차 계약이 종료된 경우, 임차인은 위 부동산을 원상으로 회복하여 임대인에게 반환한다. 이와 동시에 임대인은 보증금을 임차인에게 반환한다.</p>
+        <div style={S.sh2}>제6항 [채무 불이행]</div>
+        <p style={S.body}>임대인 또는 임차인이 본 계약상의 내용에 대하여 불이행이 있을 경우 그 상대방은 서면으로 최고하고, 이행하지 않으면 계약을 해제하며 손해배상을 청구할 수 있다.</p>
+        <div style={S.sh2}>제7항 [계약 중도 해지]</div>
+        <p style={S.body}>임차인의 사정으로 계약을 중도 해지할 경우, 퇴실 30일 전에 서면 또는 카카오톡으로 통보해야 하며, 미통보 시 1개월 월세에 해당하는 위약금이 발생할 수 있다.</p>
+        <div style={S.sh2}>제8항 [입주 당일]</div>
+        <p style={S.body}>입주 당일 집기 및 시설물의 상태를 확인하고, 이상이 있을 경우 즉시 임대인에게 알려야 한다.</p>
+        <div style={S.sh2}>제9항 [제공자의 의무]</div>
+        <p style={S.body}>임대인(제공자)은 거주 가능한 상태로 집을 유지·관리할 의무가 있으며, 시설이 저하되는 상황이 발생할 경우 최대한 빠르게 복구한다.</p>
 
-        <div className="sh2">제3항 [기간 한정]</div>
-        <p className="body">계약금은 계약과 동시에 납부하고, 잔금은 입주일에 납부한다.</p>
+        <div style={S.sh}>제3조. 특약 사항</div>
+        <ol style={S.ol}>
+          {specialTerms.map((t, i) => (
+            <li key={i} style={S.li}>
+              {editing ? <textarea style={{ width:'100%',fontSize:'8.5pt',lineHeight:1.55,border:'1px solid #3182F6',borderRadius:3,padding:'2px 4px',background:'#EBF3FE' }} rows={2} value={t} onChange={e => { const c = [...specialTerms]; c[i] = e.target.value; setSpecialTerms(c) }} /> : t}
+            </li>
+          ))}
+        </ol>
 
-        <div className="sh2">제4항 [계약 해지]</div>
-        <p className="body">임차인이 임대인에게 중도금(계약금 제외)을 지급하기 전까지, 임대인은 계약금의 배액을 상환하고, 임차인은 계약금을 포기하고 이 계약을 해제할 수 있다.</p>
-
-        <div className="sh2">제5항 [계약 종료]</div>
-        <p className="body">임대차 계약이 종료된 경우, 임차인은 위 부동산을 원상으로 회복하여 임대인에게 반환한다. 이와 동시에 임대인은 보증금을 임차인에게 반환한다.</p>
-
-        <div className="sh2">제6항 [채무 불이행]</div>
-        <p className="body">임대인 또는 임차인이 본 계약상의 내용에 대하여 불이행이 있을 경우 그 상대방은 불이행한 자에 대하여 서면으로 최고하고, 상대방이 이행하지 않으면 계약을 해제하며 손해배상을 청구할 수 있다.</p>
-
-        <div className="sh2">제7항 [계약 중도 해지]</div>
-        <p className="body">임차인의 사정으로 계약을 중도 해지할 경우, 퇴실 30일 전에 서면 또는 카카오톡으로 통보해야 하며, 미통보 시 1개월 월세에 해당하는 위약금이 발생할 수 있다.</p>
-
-        <div className="sh2">제8항 [입주 당일]</div>
-        <p className="body">입주 당일 집기 및 시설물의 상태를 확인하고, 이상이 있을 경우 즉시 임대인에게 알려야 한다. 미고지 시 기존 파손·오염으로 간주하지 않을 수 있다.</p>
-
-        <div className="sh2">제9항 [제공자의 의무]</div>
-        <p className="body">임대인(제공자)은 거주 가능한 상태로 집을 유지·관리할 의무가 있으며, 시설이 저하되는 상황이 발생할 경우 최대한 빠르게 복구한다.</p>
-
-        {/* 납입계좌 */}
-        <div className="abox">
-          <p>■ 임대료(월세) 납입계좌: {house?.landlordName || '-'} (계약서 참조)</p>
-          <p>■ 관리비 납입계좌: 케이뱅크 유재훈 100-166-670094</p>
+        {/* 서명란 */}
+        <p style={{ textAlign:'right',margin:'6px 0',fontSize:'8.5pt' }}>계약일: {todayStr}</p>
+        <div style={{ display:'flex',gap:10,marginBottom:6 }}>
+          <div style={{ ...S.sign, flex:1 }}>
+            <p style={{ fontWeight:700,fontSize:'9pt',marginBottom:6 }}>임차인</p>
+            <div style={S.sr}>이름: <EI v={f.name} onChange={v => setF(p => ({ ...p, name: v }))} /></div>
+            <div style={S.sr}>연락처: <EI v={f.phone} onChange={v => setF(p => ({ ...p, phone: v }))} /></div>
+            <div style={{ textAlign:'right',marginTop:6,fontSize:'8.5pt' }}>서명: __________________ (인)</div>
+          </div>
+          <div style={{ ...S.sign, flex:1 }}>
+            <p style={{ fontWeight:700,fontSize:'9pt',marginBottom:6 }}>임대인</p>
+            <div style={S.sr}>이름: 유재훈</div>
+            <div style={S.sr}>연락처: 010-____-____</div>
+            <div style={{ textAlign:'right',marginTop:6,fontSize:'8.5pt' }}>서명: __________________ (인)</div>
+          </div>
         </div>
 
-        {/* ═══════════ PAGE 2: 특약 ═══════════ */}
-        <div className="pb">
-          <h1>쉐어하우스 별지 특약</h1>
-          <p style={{ textAlign: 'center', fontSize: '9.5pt', color: '#555', margin: '8px 0 16px', lineHeight: 1.7 }}>
+        <div style={S.abox}>
+          <p style={{ margin:0 }}>■ 임대료(월세) 납입계좌: {house?.landlordName || '-'} (계약서 참조)</p>
+          <p style={{ margin:0 }}>■ 관리비 납입계좌: 케이뱅크 유재훈 100-166-670094</p>
+        </div>
+
+        {/* ═══════════ PAGE 2: 별지 특약 ═══════════ */}
+        <div className="pb2">
+          <h1 style={S.h1}>쉐어하우스 별지 특약</h1>
+          <p style={{ textAlign:'center',fontSize:'8.5pt',color:'#555',margin:'4px 0 10px',lineHeight:1.55 }}>
             이용자는 쉐어하우스 일원으로서 / 제공자는 쉐어하우스의 대표로서<br />
-            마음이 편한 집을 &lsquo;함께&rsquo; 만들어 가는 데 적극 협조할 것을 약속합니다.<br />
-            계약서를 읽은 후 동의할 경우 서명
+            마음이 편한 집을 &lsquo;함께&rsquo; 만들어 가는 데 적극 협조할 것을 약속합니다. 계약서를 읽은 후 동의할 경우 서명
           </p>
 
-          <div className="sh">제3조. 특약 사항</div>
-          <ol>
-            {specialTerms.map((t, i) => (
-              <li key={i}>
-                {editing ? (
-                  <textarea className="ei w-full" rows={2} value={t} style={{ fontSize: '9.5pt', lineHeight: 1.65 }}
-                    onChange={e => { const c = [...specialTerms]; c[i] = e.target.value; setSpecialTerms(c) }} />
-                ) : t}
-              </li>
-            ))}
-          </ol>
-
-          <div className="sh">별지 세부 특약</div>
-          <ol>
+          <ol style={S.ol}>
             {appendixTerms.map((t, i) => (
-              <li key={i}>
-                {editing ? (
-                  <textarea className="ei w-full" rows={3} value={t} style={{ fontSize: '9.5pt', lineHeight: 1.65 }}
-                    onChange={e => { const c = [...appendixTerms]; c[i] = e.target.value; setAppendixTerms(c) }} />
-                ) : t}
+              <li key={i} style={S.li}>
+                {editing ? <textarea style={{ width:'100%',fontSize:'8.5pt',lineHeight:1.55,border:'1px solid #3182F6',borderRadius:3,padding:'2px 4px',background:'#EBF3FE' }} rows={3} value={t} onChange={e => { const c = [...appendixTerms]; c[i] = e.target.value; setAppendixTerms(c) }} /> : t}
               </li>
             ))}
           </ol>
 
-          <p style={{ margin: '12px 0', fontSize: '9.5pt', fontStyle: 'italic' }}>
+          <p style={{ margin:'6px 0',fontSize:'8.5pt',fontStyle:'italic' }}>
             운영에 관하여 변동이 있을 시 제공자는 최소 4주 전에 고지 의무를 가진다.
           </p>
-        </div>
 
-        {/* ═══════════ PAGE 3: 서명란 ═══════════ */}
-        <div className="pb">
-          <h1>쉐어메이트 계약서 서명란</h1>
-          <p className="sub">Share Mate Contract — Signature Page</p>
-
-          <div className="abox" style={{ margin: '16px 0' }}>
-            <p>■ 임대료(월세) 납입계좌: {house?.landlordName || '-'} (계약서 참조)</p>
-            <p>■ 관리비 납입계좌: 케이뱅크 유재훈 100-166-670094</p>
-          </div>
-
-          <p style={{ textAlign: 'right', margin: '14px 0 16px', fontSize: '9.5pt' }}>계약일: {todayStr}</p>
-
-          <div style={{ border: '1px solid #aaa', borderRadius: 4, padding: '16px 20px', marginBottom: 20 }}>
-            <p style={{ fontWeight: 700, fontSize: '11pt', marginBottom: 12 }}>임차인</p>
-            <div className="sr">이름: <EI v={f.name} k="name" onChange={v => setF(p => ({ ...p, name: v }))} /></div>
-            <div className="sr">연락처: <EI v={f.phone} k="phone" onChange={v => setF(p => ({ ...p, phone: v }))} /></div>
-            <div className="sr">생년월일: <EI v={f.birthDate || '_________________________'} k="birthDate" onChange={v => setF(p => ({ ...p, birthDate: v }))} /></div>
-            <div className="sr">본가주소: <EI v={f.homeAddress || '________________________________________________'} k="homeAddress" onChange={v => setF(p => ({ ...p, homeAddress: v }))} /></div>
-            <div className="sr">보호자: <EI v={f.guardianName || '_____________'} k="guardianName" onChange={v => setF(p => ({ ...p, guardianName: v }))} />&nbsp;&nbsp;관계: <EI v={f.guardianRelation || '_______'} k="guardianRelation" onChange={v => setF(p => ({ ...p, guardianRelation: v }))} />&nbsp;&nbsp;연락처: <EI v={f.guardianPhone || '____________________'} k="guardianPhone" onChange={v => setF(p => ({ ...p, guardianPhone: v }))} /></div>
-            <div style={{ textAlign: 'right', marginTop: 16, fontSize: '10pt' }}>서명: ________________________ (인)</div>
-          </div>
-
-          <div style={{ border: '1px solid #aaa', borderRadius: 4, padding: '16px 20px', marginBottom: 24 }}>
-            <p style={{ fontWeight: 700, fontSize: '11pt', marginBottom: 12 }}>임대인</p>
-            <div className="sr">이름: 유재훈</div>
-            <div className="sr">연락처: 010-____-____</div>
-            <div style={{ textAlign: 'right', marginTop: 16, fontSize: '10pt' }}>서명: ________________________ (인)</div>
-          </div>
-
-          <div style={{ borderTop: '1.5px solid #111', paddingTop: 14 }}>
-            <p style={{ fontWeight: 700, fontSize: '10pt', marginBottom: 10 }}>별지 특약 서명</p>
-            <p style={{ fontSize: '9pt', color: '#666', marginBottom: 12 }}>상기 별지 특약 사항을 모두 확인하였으며 이에 동의합니다.</p>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: '9.5pt' }}>임차인: ________________________ (인)</div>
-              <div style={{ fontSize: '9.5pt' }}>임대인: 유재훈 (인)</div>
+          {/* 별지 서명란 */}
+          <div style={{ borderTop:'1.5px solid #111',paddingTop:8,marginTop:8 }}>
+            <p style={{ fontWeight:700,fontSize:'9pt',marginBottom:6 }}>별지 특약 서명</p>
+            <p style={{ fontSize:'8pt',color:'#666',marginBottom:8 }}>상기 별지 특약 사항을 모두 확인하였으며 이에 동의합니다.</p>
+            <div style={{ display:'flex',justifyContent:'space-between' }}>
+              <div style={{ fontSize:'8.5pt' }}>임차인: ________________________ (인)</div>
+              <div style={{ fontSize:'8.5pt' }}>임대인: 유재훈 (인)</div>
             </div>
           </div>
         </div>
