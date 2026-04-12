@@ -128,30 +128,57 @@ export default function ContractPage() {
     <>
       <style>{`
         @media print {
-          @page { size: A4; margin: 8mm 14mm 6mm 14mm; }
-          html, body { width:210mm!important; margin:0!important; padding:0!important; font-size:9pt!important; line-height:1.55!important; }
-          body > div, #__next, main { max-width:100%!important; width:100%!important; padding:0!important; margin:0!important; }
-          .ct-wrap { padding:0!important; font-size:9pt!important; line-height:1.55!important; }
-          .ct-wrap h1 { font-size:14pt!important; margin:4px 0 6px!important; }
-          .ct-wrap p, .ct-wrap li { font-size:8.5pt!important; line-height:1.55!important; margin:2px 0!important; }
-          .ct-wrap td, .ct-wrap th { padding:3px 6px!important; font-size:8.5pt!important; }
-          .ct-wrap ol { margin:2px 0!important; }
-          .ct-wrap ol li { margin:2px 0!important; padding:0!important; }
-          .ct-wrap .sh-title { font-size:9.5pt!important; margin:5px 0 3px!important; }
-          .ct-wrap .sh2-title { font-size:9pt!important; margin:4px 0 2px!important; }
-          .ct-wrap .abox-print { padding:4px 8px!important; margin:4px 0!important; }
-          .ct-wrap .sign-box { padding:6px 10px!important; margin-bottom:6px!important; }
-          .ct-wrap .sign-row { margin-bottom:2px!important; font-size:8.5pt!important; }
-          .no-print { display:none!important; }
-          nav, footer, header, [class*="bottom"], [class*="tab"], [class*="nav"], [class*="bar"], [data-testid*="nav"] { display:none!important; }
-          .signature-section { page-break-before:avoid!important; page-break-inside:avoid!important; margin-bottom:0!important; padding-bottom:0!important; }
-          .account-section { margin-bottom:0!important; padding-bottom:0!important; }
-          .byeolji-section { page-break-before:always!important; display:flex!important; flex-direction:column!important; min-height:260mm!important; }
-          .byeolji-section .byeolji-title { text-align:center!important; font-size:14pt!important; margin:16px 0 8px!important; }
-          .byeolji-section .byeolji-intro { text-align:center!important; font-size:8.5pt!important; line-height:1.7!important; margin-bottom:14px!important; }
-          .byeolji-section ol { flex:1!important; display:flex!important; flex-direction:column!important; justify-content:space-between!important; }
-          .byeolji-section ol li { margin-bottom:5px!important; line-height:1.6!important; font-size:8.5pt!important; }
-          .byeolji-signature { margin-top:20px!important; page-break-inside:avoid!important; }
+          @page { size: A4; margin: 6mm 12mm !important; }
+          * { -webkit-print-color-adjust: exact; }
+
+          nav, header, footer, button,
+          [class*="nav"], [class*="tab"],
+          [class*="bottom"], [class*="bar"],
+          [class*="header"], [class*="btn"],
+          .no-print { display: none !important; height: 0 !important; }
+
+          body, html {
+            font-size: 10.5pt !important;
+            line-height: 1.6 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 210mm !important;
+          }
+          body > div, #__next, main {
+            max-width: 100% !important;
+            width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          .ct-wrap { padding: 0 !important; }
+
+          h1 { font-size: 16pt !important; margin: 0 0 8px !important; }
+          h2 { font-size: 11pt !important; margin: 6px 0 3px !important; }
+          p  { font-size: 10pt !important; margin: 2px 0 !important; }
+          li { font-size: 10pt !important; margin: 2px 0 !important; line-height: 1.55 !important; }
+          td, th { padding: 4px 8px !important; font-size: 10pt !important; }
+
+          .sh-title { font-size: 11pt !important; margin: 6px 0 3px !important; }
+          .sh2-title { font-size: 10pt !important; margin: 4px 0 2px !important; }
+          .sign-box { padding: 8px 12px !important; }
+          .sign-row { font-size: 10pt !important; }
+
+          .signature-section {
+            page-break-before: avoid !important;
+            page-break-inside: avoid !important;
+            margin-top: 8px !important;
+          }
+
+          .byeolji-section {
+            page-break-before: always !important;
+          }
+          .byeolji-section li {
+            font-size: 10pt !important;
+            line-height: 1.6 !important;
+            margin-bottom: 4px !important;
+          }
+          .byeolji-title { font-size: 16pt !important; }
+          .byeolji-intro { font-size: 10pt !important; }
         }
       `}</style>
 
