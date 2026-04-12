@@ -19,7 +19,7 @@ export default function BottomNav() {
     return pathname.startsWith(href);
   };
 
-  const hideOnPaths = ['/houses/', '/tenants/', '/issues/', '/apply'];
+  const hideOnPaths = ['/houses/', '/tenants/', '/issues/', '/apply', '/payments'];
   const isSubPage = hideOnPaths.some(
     (p) => pathname.startsWith(p) && pathname !== '/tenants' && pathname !== '/issues'
   );
