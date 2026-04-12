@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Printer, Pencil, Save } from 'lucide-react'
+import { ArrowLeft, Printer, Pencil, Save, CheckCircle } from 'lucide-react'
 
 interface TenantData {
   id: string; houseName: string; roomCode: string; name: string; phone: string;
@@ -22,6 +22,8 @@ export default function ContractPage() {
   const [house, setHouse] = useState<HouseData | null>(null)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
+  const [tagging, setTagging] = useState(false)
+  const [tagResult, setTagResult] = useState<string | null>(null)
 
   const [f, setF] = useState({
     name: '', phone: '', birthDate: '', homeAddress: '',
@@ -85,6 +87,29 @@ export default function ContractPage() {
     }).catch(() => {}).finally(() => setLoading(false))
   }, [tenantId])
 
+  const handleTagAsTenant = async () => {
+    if (!confirm(`${f.name} (${f.phone})을 채널톡에서 "입주자"로 태그할까요?`)) return
+    setTagging(true)
+    setTagResult(null)
+    try {
+      const res = await fetch('/api/channeltalk/tag-tenant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: f.name, phone: f.phone }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setTagResult('✅ 채널톡 입주자 태그 완료!')
+      } else {
+        setTagResult(`❌ ${data.error}`)
+      }
+    } catch {
+      setTagResult('❌ 오류가 발생했습니다')
+    } finally {
+      setTagging(false)
+    }
+  }
+
   if (loading) return <div style={{ display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',color:'#999' }}>불러오는 중...</div>
   if (!tenant) return <div style={{ display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',color:'#999' }}>입주자를 찾을 수 없습니다</div>
 
@@ -128,53 +153,30 @@ export default function ContractPage() {
     <>
       <style>{`
         @media print {
-          @page { size: A4; margin: 8mm 14mm; }
-          * { -webkit-print-color-adjust: exact; }
-
-          nav, header, footer, button,
-          [class*="nav"], [class*="tab"],
-          [class*="bottom"], [class*="bar"],
-          .no-print { display: none !important; height: 0 !important; }
-
-          body, html {
-            font-size: 9.5pt !important;
-            line-height: 1.55 !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            width: 210mm !important;
-          }
-          body > div, #__next, main {
-            max-width: 100% !important;
-            width: 100% !important;
-            padding: 0 !important;
-            margin: 0 !important;
-          }
-          .ct-wrap { padding: 0 !important; }
-
-          h1 { font-size: 15pt !important; margin: 0 0 6px !important; }
-          p  { font-size: 9pt !important; margin: 1px 0 !important; }
-          li { font-size: 9pt !important; margin: 1px 0 !important; line-height: 1.55 !important; }
-          td, th { padding: 3px 6px !important; font-size: 9pt !important; }
-
-          .sh-title { font-size: 10pt !important; margin: 5px 0 2px !important; }
-          .sh2-title { font-size: 9.5pt !important; margin: 4px 0 2px !important; }
-          .sign-box { padding: 8px 12px !important; }
-          .sign-row { font-size: 9pt !important; }
-
-          .signature-section {
-            page-break-before: avoid !important;
-            page-break-inside: avoid !important;
-            margin-top: 6px !important;
-          }
-
-          .page2-section {
-            page-break-before: always !important;
-          }
-          .page2-section li {
-            font-size: 9pt !important;
-            line-height: 1.55 !important;
-            margin-bottom: 1px !important;
-          }
+          @page { size: A4; margin: 8mm 14mm 6mm 14mm; }
+          html, body { width:210mm!important; margin:0!important; padding:0!important; font-size:9pt!important; line-height:1.55!important; }
+          body > div, #__next, main { max-width:100%!important; width:100%!important; padding:0!important; margin:0!important; }
+          .ct-wrap { padding:0!important; font-size:9pt!important; line-height:1.55!important; }
+          .ct-wrap h1 { font-size:14pt!important; margin:4px 0 6px!important; }
+          .ct-wrap p, .ct-wrap li { font-size:8.5pt!important; line-height:1.55!important; margin:2px 0!important; }
+          .ct-wrap td, .ct-wrap th { padding:3px 6px!important; font-size:8.5pt!important; }
+          .ct-wrap ol { margin:2px 0!important; }
+          .ct-wrap ol li { margin:2px 0!important; padding:0!important; }
+          .ct-wrap .sh-title { font-size:9.5pt!important; margin:5px 0 3px!important; }
+          .ct-wrap .sh2-title { font-size:9pt!important; margin:4px 0 2px!important; }
+          .ct-wrap .abox-print { padding:4px 8px!important; margin:4px 0!important; }
+          .ct-wrap .sign-box { padding:6px 10px!important; margin-bottom:6px!important; }
+          .ct-wrap .sign-row { margin-bottom:2px!important; font-size:8.5pt!important; }
+          .no-print { display:none!important; }
+          nav, footer, header, [class*="bottom"], [class*="tab"], [class*="nav"], [class*="bar"], [data-testid*="nav"] { display:none!important; }
+          .signature-section { page-break-before:avoid!important; page-break-inside:avoid!important; margin-bottom:0!important; padding-bottom:0!important; }
+          .account-section { margin-bottom:0!important; padding-bottom:0!important; }
+          .byeolji-section { page-break-before:always!important; display:flex!important; flex-direction:column!important; min-height:260mm!important; }
+          .byeolji-section .byeolji-title { text-align:center!important; font-size:14pt!important; margin:16px 0 8px!important; }
+          .byeolji-section .byeolji-intro { text-align:center!important; font-size:8.5pt!important; line-height:1.7!important; margin-bottom:14px!important; }
+          .byeolji-section ol { flex:1!important; display:flex!important; flex-direction:column!important; justify-content:space-between!important; }
+          .byeolji-section ol li { margin-bottom:5px!important; line-height:1.6!important; font-size:8.5pt!important; }
+          .byeolji-signature { margin-top:20px!important; page-break-inside:avoid!important; }
         }
       `}</style>
 
@@ -185,6 +187,11 @@ export default function ContractPage() {
           <span style={{ fontSize:15,fontWeight:700 }}>{f.name} 계약서</span>
         </div>
         <div style={{ display:'flex',alignItems:'center',gap:8 }}>
+          <button onClick={handleTagAsTenant} disabled={tagging}
+            style={{ display:'flex',alignItems:'center',gap:4,padding:'6px 12px',borderRadius:8,fontSize:12,fontWeight:600,border:'none',cursor:'pointer',background:'#e8faf2',color:'#0e6245' }}>
+            <CheckCircle size={12} />{tagging ? '처리중...' : '채널톡 입주자 등록'}
+          </button>
+          {tagResult && <span style={{ fontSize:12,color: tagResult.startsWith('✅') ? '#0e6245' : '#E53E3E' }}>{tagResult}</span>}
           <button onClick={() => setEditing(!editing)}
             style={{ display:'flex',alignItems:'center',gap:4,padding:'6px 12px',borderRadius:8,fontSize:12,fontWeight:600,border:'none',cursor:'pointer',background:editing?'#e8faf2':'#f2f4f6',color:editing?'#0e6245':'#666' }}>
             {editing ? <Save size={12} /> : <Pencil size={12} />}{editing ? '완료' : '수정'}
@@ -241,7 +248,15 @@ export default function ContractPage() {
         <div className="sh2-title" style={S.sh2}>제9항 [제공자의 의무]</div>
         <p style={S.body}>임대인(제공자)은 거주 가능한 상태로 집을 유지·관리할 의무가 있으며, 시설이 저하되는 상황이 발생할 경우 최대한 빠르게 복구한다.</p>
 
-        {/* 서명란 */}
+        <div className="sh-title" style={S.sh}>제3조. 특약 사항</div>
+        <ol style={S.ol}>
+          {specialTerms.map((t, i) => (
+            <li key={i} style={S.li}>
+              {editing ? <textarea style={{ width:'100%',fontSize:'8.5pt',lineHeight:1.55,border:'1px solid #3182F6',borderRadius:3,padding:'2px 4px',background:'#EBF3FE' }} rows={2} value={t} onChange={e => { const c = [...specialTerms]; c[i] = e.target.value; setSpecialTerms(c) }} /> : t}
+            </li>
+          ))}
+        </ol>
+
         <div className="signature-section">
         <p style={{ textAlign:'right',margin:'4px 0',fontSize:'7.5pt' }}>계약일: {todayStr}</p>
         <div style={{ display:'flex',gap:8,marginBottom:4 }}>
@@ -263,23 +278,11 @@ export default function ContractPage() {
           <p style={{ margin:0 }}>■ 임대료(월세) 납입계좌: {house?.landlordName || '-'} (계약서 참조)</p>
           <p style={{ margin:0 }}>■ 관리비 납입계좌: 케이뱅크 유재훈 100-166-670094</p>
         </div>
-        </div>{/* end signature-section */}
+        </div>
 
-        {/* ═══════════ PAGE 2: 특약 + 별지 ═══════════ */}
-        <div className="page2-section">
-          <div className="sh-title" style={S.sh}>제3조. 특약 사항</div>
-          <ol style={S.ol}>
-            {specialTerms.map((t, i) => (
-              <li key={i} style={S.li}>
-                {editing ? <textarea style={{ width:'100%',fontSize:'9pt',lineHeight:1.5,border:'1px solid #3182F6',borderRadius:3,padding:'2px 4px',background:'#EBF3FE' }} rows={2} value={t} onChange={e => { const c = [...specialTerms]; c[i] = e.target.value; setSpecialTerms(c) }} /> : t}
-              </li>
-            ))}
-          </ol>
-
-          <div style={{ height:1,background:'#aaa',margin:'10px 0' }} />
-
-          <h1 style={{ ...S.h1, margin:'8px 0 4px' }}>쉐어하우스 별지 특약</h1>
-          <p style={{ textAlign:'center',fontSize:'8pt',color:'#555',margin:'4px 0 8px',lineHeight:1.6 }}>
+        <div className="byeolji-section">
+          <h1 className="byeolji-title" style={S.h1}>쉐어하우스 별지 특약</h1>
+          <p className="byeolji-intro" style={{ textAlign:'center',fontSize:'8pt',color:'#555',margin:'6px 0 14px',lineHeight:1.7 }}>
             이용자는 쉐어하우스 일원으로서 / 제공자는 쉐어하우스의 대표로서<br />
             마음이 편한 집을 &lsquo;함께&rsquo; 만들어 가는 데 적극 협조할 것을 약속합니다. 계약서를 읽은 후 동의할 경우 서명
           </p>
@@ -287,22 +290,21 @@ export default function ContractPage() {
           <ol style={S.ol}>
             {appendixTerms.map((t, i) => (
               <li key={i} style={S.li}>
-                {editing ? <textarea style={{ width:'100%',fontSize:'9pt',lineHeight:1.5,border:'1px solid #3182F6',borderRadius:3,padding:'2px 4px',background:'#EBF3FE' }} rows={3} value={t} onChange={e => { const c = [...appendixTerms]; c[i] = e.target.value; setAppendixTerms(c) }} /> : t}
+                {editing ? <textarea style={{ width:'100%',fontSize:'8.5pt',lineHeight:1.55,border:'1px solid #3182F6',borderRadius:3,padding:'2px 4px',background:'#EBF3FE' }} rows={3} value={t} onChange={e => { const c = [...appendixTerms]; c[i] = e.target.value; setAppendixTerms(c) }} /> : t}
               </li>
             ))}
           </ol>
 
-          <p style={{ margin:'4px 0',fontSize:'8pt',fontStyle:'italic' }}>
+          <p style={{ margin:'4px 0',fontSize:'7.5pt',fontStyle:'italic' }}>
             운영에 관하여 변동이 있을 시 제공자는 최소 4주 전에 고지 의무를 가진다.
           </p>
 
-          {/* 별지 서명란 */}
-          <div style={{ borderTop:'1.5px solid #111',paddingTop:8,marginTop:10 }}>
-            <p style={{ fontWeight:700,fontSize:'9pt',marginBottom:4 }}>별지 특약 서명</p>
-            <p style={{ fontSize:'8pt',color:'#666',marginBottom:6 }}>상기 별지 특약 사항을 모두 확인하였으며 이에 동의합니다.</p>
+          <div className="byeolji-signature" style={{ borderTop:'1.5px solid #111',paddingTop:8,marginTop:20 }}>
+            <p style={{ fontWeight:700,fontSize:'8pt',marginBottom:4 }}>별지 특약 서명</p>
+            <p style={{ fontSize:'7.5pt',color:'#666',marginBottom:8 }}>상기 별지 특약 사항을 모두 확인하였으며 이에 동의합니다.</p>
             <div style={{ display:'flex',justifyContent:'space-between' }}>
-              <div style={{ fontSize:'9pt' }}>임차인: ________________________ (인)</div>
-              <div style={{ fontSize:'9pt' }}>임대인: 유재훈 (인)</div>
+              <div style={{ fontSize:'8.5pt' }}>임차인: ________________________ (인)</div>
+              <div style={{ fontSize:'8.5pt' }}>임대인: 유재훈 (인)</div>
             </div>
           </div>
         </div>
