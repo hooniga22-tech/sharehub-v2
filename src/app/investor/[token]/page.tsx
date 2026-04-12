@@ -1,217 +1,140 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
-import { ChevronLeft, ChevronRight, AlertTriangle, Users, Loader2 } from 'lucide-react'
+import { useState, useMemo } from 'react';
+import { useParams } from 'next/navigation';
+import { ChevronDown, ChevronUp } from 'lucide-react';
+import { mockHouses, mockInvestors, calcProfit, calcInvShare, fmt } from '@/../data/mockRevenue';
 
-interface MonthData {
-  year: number; month: number; income: number; buildingRent: number;
-  utility: number; totalExpense: number; profit: number; investorProfit: number; hasUtility: boolean;
-}
-interface PageData {
-  investor: { name: string; houseName: string; ratio: number; phone: string }
-  house: { name: string; district: string; buildingRent: number; isConsignment: boolean }
-  currentMonth: MonthData
-  monthlyData: MonthData[]
-  tenantSummary: { activeTenants: number; exitSoon: number }
-  year: number; month: number
-}
+const BLUE = '#3182f6', GRAY = '#8b95a1';
 
-const toMan = (n: number) => Math.round(n / 10000).toLocaleString() + '만'
-function fmtProfit(n: number) {
-  if (n >= 0) return `+${toMan(n)}`
-  return `(${toMan(Math.abs(n))})`
-}
+export default function InvestorTokenPage() {
+  const { token } = useParams<{ token: string }>();
+  const investor = mockInvestors.find(i => i.token === token);
 
-export default function InvestorPortalPage() {
-  const params = useParams()
-  const token = params.token as string
-  const [data, setData] = useState<PageData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [notFound, setNotFound] = useState(false)
-  const [monthOffset, setMonthOffset] = useState(0)
+  const [month, setMonth] = useState(6);
+  const [year] = useState(2025);
+  const [openMonths, setOpenMonths] = useState<Record<string, boolean>>({});
 
-  const now = new Date()
-  const targetDate = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1)
-  const year = targetDate.getFullYear()
-  const month = targetDate.getMonth() + 1
+  if (!investor) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#F7F8FA', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <p style={{ color: '#BBB', fontSize: 15 }}>존재하지 않는 페이지입니다</p>
+      </div>
+    );
+  }
 
-  useEffect(() => {
-    setLoading(true)
-    fetch(`/api/investor-portal/${token}?year=${year}&month=${month}`)
-      .then(r => r.json())
-      .then(d => {
-        if (d.error) { setNotFound(true); return }
-        setData(d)
-      })
-      .catch(() => setNotFound(true))
-      .finally(() => setLoading(false))
-  }, [token, year, month])
+  const myHouses = mockHouses.filter(h => h.investor?.token === token);
+  const yk = `${year}-${month}`;
 
-  if (loading && !data) return (
-    <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center">
-      <Loader2 size={24} className="animate-spin text-gray-400" />
-    </div>
-  )
+  const monthData = myHouses.map(h => ({
+    house: h,
+    profit: calcProfit(h, yk),
+    myShare: calcInvShare(h, yk),
+  }));
+  const totalShare = monthData.reduce((s, d) => s + d.myShare, 0);
+  const totalProfit = monthData.reduce((s, d) => s + d.profit, 0);
 
-  if (notFound || !data) return (
-    <div className="min-h-screen bg-[#F9FAFB] flex flex-col items-center justify-center px-8 text-center">
-      <p className="text-[16px] font-bold text-gray-600">유효하지 않은 링크입니다.</p>
-      <p className="text-[13px] text-gray-400 mt-1">운영자에게 문의해주세요.</p>
-    </div>
-  )
+  const prevMonths = useMemo(() => {
+    return [5, 4, 3].map(m => {
+      const k = `${year}-${m}`;
+      const data = myHouses.map(h => ({
+        house: h,
+        profit: calcProfit(h, k),
+        myShare: calcInvShare(h, k),
+      }));
+      return { m, total: data.reduce((s, d) => s + d.myShare, 0), data };
+    }).filter(x => x.total > 0);
+  }, [year, myHouses]);
 
-  const { investor, house, currentMonth: cm, monthlyData, tenantSummary } = data
+  const togMonth = (key: string) => setOpenMonths(prev => ({ ...prev, [key]: !prev[key] }));
+
+  const prevMonth = () => setMonth(m => m > 1 ? m - 1 : m);
+  const nextMonth = () => setMonth(m => m < 12 ? m + 1 : m);
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB]">
-      <div className="max-w-[480px] mx-auto px-5 py-6">
-        {/* Header */}
-        <div className="mb-5">
-          <p className="text-[13px] text-gray-400 font-medium">ShareHub 투자 현황</p>
-          <h1 className="text-[22px] font-bold mt-1">{investor.name}님</h1>
-          <div className="flex items-center gap-2 mt-1.5">
-            <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[12px] font-medium">{investor.houseName}</span>
-            <span className="px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600 text-[12px] font-medium">투자비율 {investor.ratio}%</span>
+    <div style={{ minHeight: '100vh', background: '#F7F8FA' }}>
+      {/* Blue Header */}
+      <div style={{ background: BLUE, padding: '24px 20px 0', color: '#fff' }}>
+        <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>{investor.name} 님</div>
+        <div style={{ fontSize: 13, opacity: 0.8, marginBottom: 16 }}>투자 지점 {myHouses.length}곳</div>
+
+        {/* Month Nav */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+          <button onClick={prevMonth} style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid rgba(255,255,255,0.3)', background: 'transparent', fontSize: 15, cursor: 'pointer', color: '#fff' }}>‹</button>
+          <div style={{ flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 600, color: '#fff' }}>{year}년 {month}월</div>
+          <button onClick={nextMonth} style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid rgba(255,255,255,0.3)', background: 'transparent', fontSize: 15, cursor: 'pointer', color: '#fff' }}>›</button>
+        </div>
+
+        {/* Total Share Card */}
+        <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 14, padding: 20, marginBottom: 0 }}>
+          <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>이달 내 배분금</div>
+          <div style={{ fontSize: 26, fontWeight: 700, marginBottom: 4 }}>{fmt(totalShare)}</div>
+          <div style={{ fontSize: 12, opacity: 0.7 }}>전체 순이익 {fmt(totalProfit)} 중 내 몫</div>
+        </div>
+
+        {/* Transition to white */}
+        <div style={{ height: 20, background: '#F7F8FA', borderRadius: '16px 16px 0 0', marginTop: 16 }} />
+      </div>
+
+      {/* Content */}
+      <div style={{ padding: '0 16px 16px' }}>
+        {/* This Month Houses */}
+        <div style={{ background: '#fff', borderRadius: 14, padding: 20, marginBottom: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>이달 지점별 내역</div>
+          {monthData.map((d, i) => (
+            <div key={d.house.id}>
+              {i > 0 && <div style={{ height: 1, background: '#F5F5F5', margin: '12px 0' }} />}
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>{d.house.name}</div>
+                    <div style={{ fontSize: 12, color: GRAY }}>{d.house.gu} · {Math.round(d.house.investor!.ratio * 100)}% 배분</div>
+                  </div>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: BLUE }}>{fmt(d.myShare)}</span>
+                </div>
+                <div style={{ fontSize: 11, color: GRAY, marginBottom: 6 }}>순이익 {fmt(d.profit)}</div>
+                <div style={{ height: 4, borderRadius: 2, background: '#F2F4F6', overflow: 'hidden' }}>
+                  <div style={{ width: `${d.house.investor!.ratio * 100}%`, height: '100%', borderRadius: 2, background: BLUE }} />
+                </div>
+              </div>
+            </div>
+          ))}
+          <div style={{ height: 1, background: '#E8E8E8', margin: '12px 0' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>합계</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: BLUE }}>{fmt(totalShare)}</span>
           </div>
         </div>
 
-        {/* Month Selector */}
-        <div className="flex items-center justify-center gap-5 py-3 mb-4">
-          <button onClick={() => setMonthOffset(monthOffset - 1)}
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-white border border-gray-200">
-            <ChevronLeft size={18} className="text-gray-600" />
-          </button>
-          <span className="text-[16px] font-bold">{year}년 {month}월</span>
-          <button onClick={() => setMonthOffset(monthOffset + 1)}
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-white border border-gray-200">
-            <ChevronRight size={18} className="text-gray-600" />
-          </button>
-        </div>
-
-        {/* Section 1: Profit Summary */}
-        <section className="rounded-2xl bg-[#3182F6] p-5 mb-4">
-          <p className="text-[13px] text-white/70">이번달 투자 수익</p>
-          <p className="text-[30px] font-bold text-white mt-1">{toMan(cm.investorProfit)}원</p>
-          <p className="text-[12px] text-white/60 mt-1">
-            순이익 {toMan(cm.profit)} × 투자비율 {investor.ratio}%
-          </p>
-          {!cm.hasUtility && (
-            <div className="flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-lg bg-white/15">
-              <AlertTriangle size={12} className="text-amber-300" />
-              <span className="text-[11px] text-amber-200">공과금 미입력 (참고용)</span>
-            </div>
-          )}
-        </section>
-
-        {/* Section 2: Detail Breakdown */}
-        <section className="bg-white rounded-2xl p-5 shadow-sm mb-4">
-          <h2 className="text-[15px] font-bold mb-4">이번달 수입/지출 내역</h2>
-          <div className="flex flex-col gap-2.5">
-            <Row label="총 수입 (월세+관리비)" value={`+${toMan(cm.income)}`} color="text-blue-600" />
-            <Row label="집월세"
-              value={house.isConsignment ? '위탁운영 (해당없음)' : `-${toMan(cm.buildingRent)}`}
-              color={house.isConsignment ? 'text-gray-400' : 'text-red-500'} />
-            <Row label="공과금"
-              value={cm.hasUtility ? `-${toMan(cm.utility)}` : '-'}
-              color={cm.hasUtility ? 'text-red-500' : 'text-gray-400'} />
-            <div className="border-t border-gray-100 pt-2.5">
-              <Row label="순이익" value={`${toMan(cm.profit)}원`} color="text-gray-900" bold />
-            </div>
-            <div className="bg-blue-50 rounded-xl px-4 py-3 flex justify-between items-center">
-              <span className="text-[13px] font-semibold text-blue-600">투자자 수익 ({investor.ratio}%)</span>
-              <span className="text-[17px] font-bold text-blue-600">{toMan(cm.investorProfit)}원</span>
-            </div>
+        {/* Previous Months */}
+        {prevMonths.length > 0 && (
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: GRAY, marginBottom: 8, textAlign: 'center' }}>── 이전 달 기록 ──</div>
+            {prevMonths.map(pm => {
+              const key = `prev-${pm.m}`;
+              const isOpen = openMonths[key] ?? false;
+              return (
+                <div key={key} style={{ background: '#fff', borderRadius: 12, marginBottom: 8, overflow: 'hidden' }}>
+                  <button onClick={() => togMonth(key)}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{pm.m}월</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 12, color: GRAY }}>{pm.data.length}개 지점 · {fmt(pm.total)}</span>
+                      {isOpen ? <ChevronUp size={14} color="#999" /> : <ChevronDown size={14} color="#999" />}
+                    </div>
+                  </button>
+                  {isOpen && pm.data.map(d => (
+                    <div key={d.house.id} style={{ padding: '8px 16px', borderTop: '1px solid #F5F5F5', display: 'flex', justifyContent: 'space-between', opacity: 0.8 }}>
+                      <span style={{ fontSize: 12 }}>{d.house.name}</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: BLUE }}>{fmt(d.myShare)}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
           </div>
-        </section>
-
-        {/* Section 3: Tenant Summary */}
-        <section className="bg-white rounded-2xl p-5 shadow-sm mb-4">
-          <h2 className="text-[15px] font-bold mb-3">입주 현황</h2>
-          <div className="flex gap-4">
-            <div className="flex-1 text-center">
-              <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-1.5">
-                <Users size={18} className="text-green-600" />
-              </div>
-              <p className="text-[11px] text-gray-400">입주중</p>
-              <p className="text-[20px] font-bold text-green-600">{tenantSummary.activeTenants}명</p>
-            </div>
-            <div className="flex-1 text-center">
-              <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-1.5">
-                <AlertTriangle size={18} className="text-amber-500" />
-              </div>
-              <p className="text-[11px] text-gray-400">만료 임박</p>
-              <p className="text-[20px] font-bold text-amber-500">{tenantSummary.exitSoon}명</p>
-            </div>
-          </div>
-        </section>
-
-        {/* Section 4: Monthly Trend */}
-        <section className="bg-white rounded-2xl p-5 shadow-sm mb-4">
-          <h2 className="text-[15px] font-bold mb-3">월별 투자 수익 추이</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-[12px]">
-              <thead>
-                <tr className="text-gray-400 border-b border-gray-100">
-                  <th className="text-left py-2 font-medium">월</th>
-                  <th className="text-right py-2 font-medium">수입</th>
-                  <th className="text-right py-2 font-medium">지출</th>
-                  <th className="text-right py-2 font-medium">순이익</th>
-                  <th className="text-right py-2 font-medium">투자수익</th>
-                </tr>
-              </thead>
-              <tbody>
-                {monthlyData.map((m, i) => {
-                  const isCurrent = m.year === year && m.month === month
-                  return (
-                    <tr key={i} className={`border-b border-gray-50 ${isCurrent ? 'bg-blue-50' : ''}`}>
-                      <td className={`py-2.5 ${isCurrent ? 'font-bold text-blue-600' : 'text-gray-600'}`}>
-                        {m.month}월
-                      </td>
-                      <td className="text-right py-2.5 text-gray-700">{toMan(m.income)}</td>
-                      <td className="text-right py-2.5 text-gray-700">
-                        {m.hasUtility ? toMan(m.totalExpense) : <span className="text-gray-400">미입력</span>}
-                      </td>
-                      <td className="text-right py-2.5 font-medium">
-                        {m.hasUtility ? (
-                          <span className={m.profit >= 0 ? 'text-blue-600' : 'text-red-500'}>{toMan(m.profit)}</span>
-                        ) : <span className="text-gray-400">미입력</span>}
-                      </td>
-                      <td className="text-right py-2.5 font-bold">
-                        {m.hasUtility ? (
-                          <span className={m.investorProfit >= 0 ? 'text-blue-600' : 'text-red-500'}>{toMan(m.investorProfit)}</span>
-                        ) : <span className="text-gray-400">미입력</span>}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        {/* Section 5: Notice */}
-        <section className="bg-gray-100 rounded-2xl p-5 mb-6">
-          <div className="flex flex-col gap-1.5 text-[12px] text-gray-500">
-            <p>• 본 자료는 매월 운영 현황을 기준으로 자동 집계됩니다.</p>
-            <p>• 공과금 입력 전에는 순이익이 과대 계상될 수 있습니다.</p>
-            <p>• 문의사항은 운영자에게 연락해 주세요.</p>
-          </div>
-        </section>
-
-        <footer className="text-center py-4">
-          <p className="text-[11px] text-gray-400">© 2026 ShareHub</p>
-        </footer>
+        )}
       </div>
     </div>
-  )
-}
-
-function Row({ label, value, color, bold }: { label: string; value: string; color: string; bold?: boolean }) {
-  return (
-    <div className="flex justify-between items-center">
-      <span className="text-[13px] text-gray-500">{label}</span>
-      <span className={`text-[14px] ${bold ? 'font-bold' : 'font-medium'} ${color}`}>{value}</span>
-    </div>
-  )
+  );
 }
