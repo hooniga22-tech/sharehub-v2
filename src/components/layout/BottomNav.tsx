@@ -19,7 +19,7 @@ export default function BottomNav() {
     return pathname.startsWith(href);
   };
 
-  const hideOnPaths = ['/houses/', '/tenants/', '/issues/', '/apply', '/payments', '/workers', '/worker', '/utility', '/revenue', '/investor', '/vacancy', '/duty'];
+  const hideOnPaths = ['/houses/', '/tenants/', '/issues/', '/apply', '/payments', '/workers', '/worker', '/utility', '/revenue', '/investor', '/vacancy', '/duty', '/opex'];
   const isSubPage = hideOnPaths.some(
     (p) => pathname.startsWith(p) && pathname !== '/tenants' && pathname !== '/issues'
   );
