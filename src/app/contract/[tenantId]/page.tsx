@@ -1,211 +1,310 @@
 'use client'
+
 import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
+import { ArrowLeft, Printer, Pencil, Save, CheckCircle } from 'lucide-react'
+
+interface TenantData {
+  id: string; houseName: string; roomCode: string; name: string; phone: string;
+  rent: number; managementFee: number; deposit: number;
+  startDate: string; endDate: string; status: string; nationality: string; memo: string;
+}
+interface HouseData {
+  name: string; address: string; landlordName: string; memo: string;
+}
 
 export default function ContractPage() {
-  const { tenantId } = useParams()
-  const [tenant, setTenant] = useState<any>(null)
+  const params = useParams()
+  const router = useRouter()
+  const tenantId = params.tenantId as string
+
+  const [tenant, setTenant] = useState<TenantData | null>(null)
+  const [house, setHouse] = useState<HouseData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState(false)
+  const [tagging, setTagging] = useState(false)
+  const [tagResult, setTagResult] = useState<string | null>(null)
+
+  const [f, setF] = useState({
+    name: '', phone: '', birthDate: '', homeAddress: '',
+    guardianName: '', guardianRelation: '', guardianPhone: '',
+    rent: 0, mgmt: 0, deposit: 0, startDate: '', endDate: '', roomCode: '',
+  })
+
+  const defaultSpecialTerms = [
+    '임차인은 임대인의 동의 없이 전대 또는 양도할 수 없다.',
+    '임차인은 퇴실 30일 전에 서면 또는 카카오톡으로 통보해야 하며, 미통보 시 1개월 월세에 해당하는 위약금이 발생할 수 있다.',
+    '반려동물 반입 및 흡연은 엄격히 금지된다.',
+    '공동생활 수칙 반복 위반, 타인에 피해를 주는 행위, 절도 등이 확인될 경우 경고 후 최대 2주 이내 강제퇴실 조치될 수 있다.',
+    '개인 부주의로 인한 파손은 본인 부담으로 배상하며, 파손자 불명 시 전체 입주자가 1/N로 부담한다.',
+    '퇴실 시 원상복구 의무를 지며, 보증금에서 미납금·파손 배상금을 공제 후 7일 이내 반환한다.',
+    '본 계약에 명시되지 않은 사항은 주택임대차보호법 및 민법에 따른다.',
+    '관리비에 포함된 항목: 인터넷, 정수기, 청소용역비 (공과금은 별도 청구)',
+    '관리비에 포함되지 않은 항목: 전기세, 가스비, 수도세 (입주자 1/N 분담)',
+    '냉방/난방을 과도하게 사용할 경우 추가 관리비가 부과될 수 있다.',
+    '입주 시 제공되는 비품(침대, 매트리스, 책상, 의자 등)은 퇴실 시 원상태로 반환해야 한다.',
+    '매트리스는 반드시 방수 커버를 씌워 사용해야 하며, 오염 시 파손으로 간주하여 배상한다.',
+    '공용공간(주방, 화장실, 거실) 사용 후 즉시 정리·청소를 원칙으로 한다.',
+    '세탁기·건조기 사용 후 세탁물을 즉시 수거해야 하며, 방치 시 타인이 꺼낼 수 있다.',
+    '택배는 각자 관리하며, 공용공간에 방치된 택배로 인한 분실은 책임지지 않는다.',
+    '야간(22:00~08:00) 소음을 자제하고, 반복 민원 시 경고 후 퇴실 조치될 수 있다.',
+    '계약 기간 중 월세 또는 관리비를 2회 이상 연체할 경우, 임대인은 계약을 해지할 수 있다.',
+  ]
+
+  const defaultAppendixTerms = [
+    '[제공자 의무] 쉐어하우스는 집을 소분하여 임대하는 주거 형태로, 제공자는 임대인과 동일하게 주거 가능한 상태로 집을 유지·관리할 의무가 있다. 거주 시설이 저하되는 상황이 발생할 경우 최대한 빠르게 복구하며, 재난 또는 건물 문제로 24시간 이상 거주가 불가능한 상황이 이어질 경우 해당 일수만큼 월세를 일할 계산하여 이용자에게 보상한다.',
+    '[공동 거주자의 최소 의무] 하우스메이트 간에 서로 배려하고 문제는 소통으로 해결하며, 최소한의 의무 [청소 / 소음 / 언어 사용 / 따뜻한 인사]를 지킬 것을 약속한다. 쉐어메이트 또는 제공자와 지속적으로 불화가 있을 경우, 제공자의 판단에 따라 강제퇴실 조치되며 최대 2주 이내에 퇴실해야 한다.',
+    '[강제 퇴실] 애완동물 반입, 흡연, 공동 생활 수칙 미준수, 쉐어메이트 또는 제공자에게 과도한 불편·불쾌함을 주는 행위, 타인의 물건을 허락 없이 사용하거나 절도하는 행위가 확인될 경우 경고 또는 강제 퇴실 조치가 취해질 수 있다. 강제 퇴실 시 이용자는 1주일 이내로 퇴실해야 한다.',
+    '[파손과 배상] 개인 공간 및 공용 공간의 파손 또는 수리가 필요한 경우, 파손자가 배상한다. 파손자가 불명확할 경우 이용자 전원이 배상 비용을 1/N로 부담한다.',
+    '[관리와 보상] 집에 대한 유지·관리는 하우스메이트 모두의 의무다. (예: 변기 막힘 / 청결 유지 / 머리카락으로 인한 배수 문제 등) 하우스가 일정 수준 이하의 청결로 지속될 경우 경고 후 이용자 1/N 부담으로 청소업체가 투입될 수 있다. 제공자의 안내를 따르지 않아 발생한 곰팡이, 동파, 파손, 도난 등의 피해에 대해 관리자는 보상 의무가 없다.',
+    '[정리와 청결] 공용공간에 개인 물건은 배정된 구역 외에 두지 않으며, 공용공간 사용 후 즉시 원상복구(설거지, 물건 정리 등)를 원칙으로 한다. 반복 위반 시 경고 후 관리인 판단에 따라 처분이 가능하다. 매트리스는 반드시 방수 커버를 씌워 사용해야 하며, 매트리스 오염은 파손으로 간주하여 배상해야 한다.',
+    '[수납] 수납공간에 수용 가능한 양의 짐만 반입해야 하며, 초과되는 짐으로 룸메이트에게 피해를 주어서는 안 된다. 배정된 수납공간을 초과하는 짐을 가져올 경우 유료 짐보관 서비스를 별도로 이용해야 한다.',
+    '[금전활동 금지] 이용자 사이에서의 금전거래, 물품 판매, 보험·영업활동 일체를 금지한다. 적발 시 즉시 강제 퇴실에 동의하며, 강제 퇴실 시 1개월 이내로 퇴실해야 한다. 내부 거래로 인한 피해는 제공자가 책임지지 않는다.',
+    '[쉐어하우스의 개념] 본 계약은 전·월세 개념이 아닌 방을 나눠 사용하는 형태로, 월세 세액공제 대상에 해당되지 않는다.',
+    '[운영진 권한] 운영진은 항상 하우스 출입 비밀번호를 공유받아야 하며, 이용자는 운영자의 출입을 통제할 수 없다. 단, 운영진은 출입 전 반드시 사전 고지해야 하며 비상 상황에 한해 고지 없이 출입이 가능하다.',
+    '[협력] 운영진이 없는 단체 채팅방 개설, 내부 분란 조장, 쉐어메이트를 비하하는 언어 사용 등의 행위를 하지 않는다. 불편 사항이 있을 경우 제공자와 직접 소통하여 해결한다.',
+    '[전입신고] 쉐어하우스는 여러 사람이 방을 소분하여 거주하는 형태로 각각의 세대주를 나눌 수 없기 때문에 전입신고가 불가하며, 이에 동의한다.',
+  ]
+
+  const [specialTerms, setSpecialTerms] = useState(defaultSpecialTerms)
+  const [appendixTerms, setAppendixTerms] = useState(defaultAppendixTerms)
 
   useEffect(() => {
-    fetch(`/api/tenants?id=${tenantId}`)
-      .then(r => r.json())
-      .then(data => { setTenant(data); setLoading(false) })
-      .catch(() => setLoading(false))
+    Promise.all([
+      fetch(`/api/tenants/${tenantId}`).then(r => r.json()),
+      fetch('/api/houses').then(r => r.json()),
+    ]).then(([t, houses]) => {
+      if (t.error) return
+      setTenant(t)
+      const h = Array.isArray(houses) ? houses.find((h: HouseData) => h.name === t.houseName) : null
+      setHouse(h || null)
+      setF({
+        name: t.name, phone: t.phone, birthDate: '', homeAddress: '',
+        guardianName: '', guardianRelation: '', guardianPhone: '',
+        rent: t.rent, mgmt: t.managementFee, deposit: t.deposit || 2000000,
+        startDate: t.startDate, endDate: t.endDate, roomCode: t.roomCode,
+      })
+    }).catch(() => {}).finally(() => setLoading(false))
   }, [tenantId])
 
-  if (loading) return <div style={{textAlign:'center',padding:'80px 0',color:'#8b95a1',fontSize:13}}>불러오는 중...</div>
-  if (!tenant) return <div style={{textAlign:'center',padding:'80px 0',color:'#f04452',fontSize:13}}>입주자를 찾을 수 없어요</div>
+  const handleTagAsTenant = async () => {
+    if (!confirm(`${f.name} (${f.phone})을 채널톡에서 "입주자"로 태그할까요?`)) return
+    setTagging(true)
+    setTagResult(null)
+    try {
+      const res = await fetch('/api/channeltalk/tag-tenant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: f.name, phone: f.phone, houseName: tenant?.houseName }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setTagResult(`✅ 완료! 태그: ${data.tags?.join(', ')}`)
+      } else {
+        setTagResult(`❌ ${data.error}`)
+      }
+    } catch {
+      setTagResult('❌ 오류가 발생했습니다')
+    } finally {
+      setTagging(false)
+    }
+  }
+
+  if (loading) return <div style={{ display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',color:'#999' }}>불러오는 중...</div>
+  if (!tenant) return <div style={{ display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',color:'#999' }}>입주자를 찾을 수 없습니다</div>
+
+  const deposit = f.deposit || 2000000
+  const contractDeposit = 500000
+  const balance = deposit - contractDeposit
+  const rent = f.rent || 0
+  const mgmt = f.mgmt || 0
+  const startDate = new Date(f.startDate)
+  const daysInMonth = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0).getDate()
+  const remainDays = daysInMonth - startDate.getDate() + 1
+  const proratedRent = Math.round(rent * remainDays / daysInMonth)
+  const proratedMgmt = Math.round(mgmt * remainDays / daysInMonth)
+  const won = (n: number) => n.toLocaleString('ko-KR')
 
   const today = new Date()
-  const dateStr = `${today.getFullYear()}. ${today.getMonth()+1}. ${today.getDate()}`
-  const name    = tenant['이름'] || ''
-  const phone   = tenant['연락처'] || ''
-  const house   = tenant['지점명'] || ''
-  const room    = tenant['방코드'] || ''
-  const rent    = Number(tenant['월세']) || 0
-  const mgmt    = Number(tenant['관리비']) || 0
-  const deposit = Number(tenant['보증금']) || 0
-  const moveIn  = tenant['입주일'] || ''
-  const moveOut = tenant['퇴실일'] || ''
+  const todayStr = `${today.getFullYear()}년 ${today.getMonth() + 1}월 ${today.getDate()}일`
 
-  const moveInDate = new Date(moveIn)
-  const lastDay = new Date(moveInDate.getFullYear(), moveInDate.getMonth()+1, 0).getDate() || 30
-  const remainDays = Math.max(1, lastDay - moveInDate.getDate() + 1)
-  const firstRent = Math.round(rent / lastDay * remainDays)
-  const firstMgmt = Math.round(mgmt / lastDay * remainDays)
-  const contractFee = 500000
-  const balance = deposit - contractFee + firstRent + mgmt
-  const fmt = (n: number) => '₩' + n.toLocaleString()
+  const EI = ({ v, onChange }: { v: string; onChange: (v: string) => void }) =>
+    editing ? <input style={{ border:'1px solid #3182F6',borderRadius:3,padding:'1px 5px',fontSize:'inherit',background:'#EBF3FE',outline:'none' }} value={v} onChange={e => onChange(e.target.value)} /> : <>{v}</>
+  const EN = ({ v, onChange }: { v: number; onChange: (v: number) => void }) =>
+    editing ? <input type="number" style={{ border:'1px solid #3182F6',borderRadius:3,padding:'1px 5px',fontSize:'inherit',background:'#EBF3FE',outline:'none',width:100 }} value={v} onChange={e => onChange(Number(e.target.value) || 0)} /> : <>{won(v)}</>
+
+  const S: Record<string, React.CSSProperties> = {
+    ct: { fontFamily:"'Malgun Gothic','맑은 고딕','Noto Sans KR',sans-serif", fontSize:'8pt', lineHeight:1.45, color:'#111', maxWidth:750, margin:'0 auto', padding:24, background:'#fff' },
+    h1: { fontSize:'13pt', textAlign:'center', fontWeight:700, margin:'4px 0 2px' },
+    sub: { fontSize:'8pt', textAlign:'center', color:'#666', marginBottom:8 },
+    sh: { fontSize:'8.5pt', fontWeight:700, margin:'4px 0 2px', borderBottom:'1.5px solid #111', paddingBottom:1 },
+    sh2: { fontSize:'8pt', fontWeight:700, margin:'3px 0 1px' },
+    td: { border:'1px solid #aaa', padding:'2px 5px', fontSize:'7.5pt' },
+    th: { border:'1px solid #aaa', padding:'2px 5px', fontSize:'7.5pt', background:'#f5f5f5', fontWeight:700, width:'22%', textAlign:'left' as const },
+    body: { fontSize:'7.5pt', lineHeight:1.45, margin:'1px 0' },
+    abox: { background:'#f9f9f9', border:'1px solid #ddd', borderRadius:4, padding:'4px 8px', margin:'4px 0', fontSize:'7.5pt' },
+    sign: { border:'1px solid #aaa', borderRadius:4, padding:'6px 10px', marginBottom:6 },
+    sr: { marginBottom:2, fontSize:'7.5pt' },
+    ol: { paddingLeft:14, margin:'1px 0' },
+    li: { marginBottom:1, fontSize:'7.5pt', lineHeight:1.45 },
+  }
 
   return (
     <>
-      <div className="no-print" style={{position:'fixed',top:16,right:16,zIndex:999,display:'flex',gap:8}}>
-        <button onClick={() => history.back()} style={{padding:'10px 20px',borderRadius:8,border:'1px solid #ddd',background:'#fff',fontSize:14,fontWeight:600,cursor:'pointer'}}>← 뒤로</button>
-        <button onClick={() => window.print()} style={{padding:'10px 20px',borderRadius:8,border:'none',background:'#3182f6',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer'}}>🖨️ PDF 출력</button>
-      </div>
-
-      <div id="contract-wrap">
-        {/* ━━━ 1페이지 ━━━ */}
-        <div className="page page1">
-          <h1 className="main-title">쉐어메이트 계약서</h1>
-          <p className="sub-title">Share Mate Contract</p>
-          <p className="intro">다음과 같이 합의하여 쉐어메이트 계약을 체결한다.</p>
-
-          <div className="section-title">제 1 조. 거주공간의 표시</div>
-          <table className="info-table"><tbody>
-            <tr><td className="lbl">소재지 (주소)</td><td>서울시 {house} 소재</td></tr>
-            <tr><td className="lbl">하우스명</td><td>{house}</td></tr>
-            <tr><td className="lbl">임대 부분</td><td>{room}</td></tr>
-          </tbody></table>
-
-          <div className="section-title">제 2 조. 계약 내용</div>
-          <p className="clause-intro">위 부동산의 임대차에 대하여 임대인과 임차인은 합의에 의하여 아래와 같이 계약을 체결한다.</p>
-          <table className="info-table"><tbody>
-            <tr><td className="lbl">보증금</td><td>{fmt(deposit)} — 퇴실 시 최대 7일 이내 반환</td></tr>
-            <tr><td className="lbl">월세</td><td>{fmt(rent)} / 월</td></tr>
-            <tr><td className="lbl">첫달 일할 월세</td><td>{fmt(firstRent)} ({remainDays}일 / {lastDay}일)</td></tr>
-            <tr><td className="lbl">계약금</td><td>{fmt(contractFee)} — 계약 시 납부</td></tr>
-            <tr><td className="lbl">잔금</td><td style={{color:'#c00',fontWeight:600}}>{fmt(balance)} — 입주 시 납부</td></tr>
-            <tr><td className="lbl">관리비</td><td>{fmt(mgmt)} / 월</td></tr>
-            <tr><td className="lbl">첫달 일할 관리비</td><td>{fmt(firstMgmt)} ({remainDays}일 / {lastDay}일)</td></tr>
-          </tbody></table>
-
-          <p className="clause"><b>제2항 [존속기간]</b> 임대인은 위 부동산을 {moveIn}까지 임차인에게 인도하며, 임대차 기간은 인도일로부터 {moveOut}까지로 한다.</p>
-          <p className="clause"><b>제3항 [기간 한정]</b> 계약금은 계약과 동시에 납부하고, 잔금은 입주일에 납부한다.</p>
-          <p className="clause"><b>제4항 [계약의 해지]</b> 임차인이 중도금을 지불하기 전까지, 임대인은 계약금의 배액을 상환하고, 임차인은 계약금을 포기하고 계약을 해제할 수 있다.</p>
-          <p className="clause"><b>제5항 [계약의 종료]</b> 계약 종료 후, 임차인은 부동산을 원상 복구하여 반환하고, 임대인은 보증금을 반환한다.</p>
-          <p className="clause"><b>제6항 [채무 불이행]</b> 불이행 시 상대방은 서면으로 최고하고, 이행하지 않으면 계약을 해제하며 손해배상을 청구할 수 있다.</p>
-          <p className="clause"><b>제7항 [중도 해지]</b> 퇴실 30일 전 서면/카카오톡 통보 필수. 미통보 시 1개월 월세 위약금 발생.</p>
-          <p className="clause"><b>제8항 [입주 당일]</b> 집기·시설물 상태 확인 후 이상 시 즉시 임대인에게 고지.</p>
-          <p className="clause"><b>제9항 [제공자의 의무]</b> 임대인은 거주 가능한 상태로 유지·관리하며 시설 저하 시 빠르게 복구한다.</p>
-
-          <div className="section-title">제 3 조. 특약 사항</div>
-          <ol className="terms">
-            <li>임차인은 임대인의 동의 없이 전대 또는 양도할 수 없다.</li>
-            <li>퇴실 30일 전 서면/카카오톡 통보 필수. 미통보 시 1개월 월세 위약금.</li>
-            <li>반려동물 반입 및 흡연은 엄격히 금지된다.</li>
-            <li>공동생활 수칙 반복 위반, 피해 행위, 절도 시 경고 후 최대 2주 이내 강제퇴실.</li>
-            <li>개인 부주의 파손은 본인 부담. 파손자 불명 시 입주자 1/N 부담.</li>
-            <li>퇴실 시 원상복구 의무. 보증금에서 미납금·파손 배상금 공제 후 7일 이내 반환.</li>
-            <li>본 계약에 명시되지 않은 사항은 주택임대차보호법 및 민법에 따른다.</li>
-            <li>관리비 포함: 인터넷, 정수기, 청소용역비 (공과금 별도)</li>
-            <li>관리비 미포함: 전기세, 가스비, 수도세 (입주자 1/N 분담)</li>
-            <li>냉방/난방 과도 사용 시 추가 관리비 부과 가능.</li>
-            <li>입주 시 제공 비품(침대, 매트리스, 책상, 의자 등)은 퇴실 시 원상태 반환.</li>
-            <li>매트리스 방수 커버 필수. 오염 시 파손으로 간주하여 배상.</li>
-            <li>공용공간 사용 후 즉시 정리·청소 원칙.</li>
-            <li>세탁기·건조기 사용 후 세탁물 즉시 수거. 방치 시 타인 수거 가능.</li>
-            <li>택배 각자 관리. 공용공간 방치 택배 분실 책임 없음.</li>
-            <li>야간(22:00~08:00) 소음 자제. 반복 민원 시 경고 후 퇴실 조치.</li>
-            <li>월세/관리비 2회 이상 연체 시 임대인은 계약을 해지할 수 있다.</li>
-          </ol>
-
-          <p className="date-right">계약일: {dateStr}</p>
-          <div className="sign-area">
-            <div className="sign-box">
-              <div className="sign-title">임차인</div>
-              <div className="sign-line">이름: {name}</div>
-              <div className="sign-line">연락처: {phone}</div>
-              <div className="sign-sig">서명: ________________________ (인)</div>
-            </div>
-            <div className="sign-box">
-              <div className="sign-title">임대인</div>
-              <div className="sign-line">이름: 유재훈</div>
-              <div className="sign-line">연락처: 010-____-____</div>
-              <div className="sign-sig">서명: ________________________ (인)</div>
-            </div>
-          </div>
-          <div className="account-box">
-            <div>■ 임대료(월세) 납입계좌: — (계약서 참조)</div>
-            <div>■ 관리비 납입계좌: 케이뱅크 유재훈 100-166-670094</div>
-          </div>
-        </div>
-
-        {/* ━━━ 2페이지: 별지 특약 ━━━ */}
-        <div className="page page2">
-          <h1 className="byeolji-title">쉐어하우스 별지 특약</h1>
-          <p className="byeolji-intro">이용자는 쉐어하우스 일원으로서 / 제공자는 쉐어하우스의 대표로서<br/>마음이 편한 집을 &lsquo;함께&rsquo; 만들어 가는데 적극 협조할 것을 약속합니다<br/>계약서를 읽은 후 동의할 경우 서명</p>
-          <ol className="byeolji-terms">
-            <li><b>[제공자 의무]</b> 쉐어하우스는 집을 소분하여 임대하는 주거 형태로, 제공자는 주거 가능한 상태로 유지·관리할 의무가 있다. 재난/건물 문제로 24시간 이상 거주 불가 시 해당 일수만큼 월세 일할계산으로 보상한다.</li>
-            <li><b>[공동 거주자의 최소 의무]</b> 하우스메이트 간 배려하고 소통으로 해결하며, [청소/소음/언어사용/따뜻한 인사]를 지킨다. 지속적 불화 시 제공자 판단하에 강제퇴실, 최대 2주 이내 퇴실.</li>
-            <li><b>[강제 퇴실]</b> 애완동물 반입, 흡연, 수칙 미준수, 과도한 불편/절도 시 경고 또는 강제퇴실. 강제퇴실 시 1주일 이내 퇴실.</li>
-            <li><b>[파손과 배상]</b> 파손자가 배상. 파손자 불명 시 이용자 전원 1/N 부담.</li>
-            <li><b>[관리와 보상]</b> 유지·관리는 모두의 의무. 청결 미달 시 경고 후 1/N 부담 청소업체 투입 가능. 안내 미준수로 인한 피해는 관리자 보상 의무 없음.</li>
-            <li><b>[정리와 청결]</b> 공용공간 개인물건 배정구역 외 금지. 사용 후 즉시 원상복구 원칙. 매트리스 방수커버 필수, 오염 시 파손 간주 배상.</li>
-            <li><b>[수납]</b> 수납공간 수용 가능한 양만 반입. 초과 짐으로 룸메이트 피해 금지. 초과 시 유료 짐보관 서비스 이용.</li>
-            <li><b>[금전활동 금지]</b> 이용자 간 금전거래·물품판매·보험영업 일체 금지. 적발 시 즉시 강제퇴실, 1개월 내 퇴실. 내부 거래 피해는 제공자 무책임.</li>
-            <li><b>[쉐어하우스의 개념]</b> 본 계약은 전·월세 개념이 아닌 방을 나눠 사용하는 형태로, 월세 세액공제 대상 아님.</li>
-            <li><b>[운영진 권한]</b> 운영진은 출입 비밀번호를 공유받으며, 이용자는 출입을 통제할 수 없다. 출입 전 사전 고지 필수, 비상 상황에 한해 고지 없이 출입 가능.</li>
-            <li><b>[협력]</b> 운영진 없는 단체 채팅방 개설, 분란 조장, 비하 언어 사용 금지. 불편 사항은 제공자와 직접 소통.</li>
-            <li><b>[전입신고]</b> 쉐어하우스는 각각의 세대주를 나눌 수 없어 전입신고 불가하며, 이에 동의한다.</li>
-          </ol>
-          <p className="byeolji-oath">운영에 관하여 변동이 있을 시 제공자는 최소 4주 이전에 고지 의무를 가진다.</p>
-          <div className="byeolji-sign-area">
-            <div className="byeolji-sign-title">별지 특약 서명</div>
-            <p className="byeolji-sign-desc">상기 별지 특약 사항을 모두 확인하였으며 이에 동의합니다.</p>
-            <div className="byeolji-sign-row">
-              <span>임차인: ________________________ (인)</span>
-              <span>임대인: 유재훈 (인)</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
-        #contract-wrap { font-family:'Noto Sans KR','Malgun Gothic',sans-serif; color:#000; background:#fff; }
-        .page { width:794px; min-height:1123px; margin:20px auto; padding:40px 50px; box-sizing:border-box; background:#fff; box-shadow:0 2px 12px rgba(0,0,0,.15); font-size:9.5pt; line-height:1.55; }
-        .main-title { font-size:18pt; text-align:center; font-weight:700; margin:0 0 2px; letter-spacing:2px; }
-        .sub-title { font-size:9pt; text-align:center; color:#555; margin:0 0 8px; }
-        .intro { font-size:9pt; margin:0 0 8px; }
-        .clause-intro { font-size:8.5pt; margin:2px 0 4px; }
-        .section-title { font-size:10pt; font-weight:700; border-bottom:1px solid #333; padding-bottom:2px; margin:8px 0 4px; }
-        .info-table { width:100%; border-collapse:collapse; margin:4px 0 6px; font-size:8.5pt; }
-        .info-table td { border:0.5px solid #aaa; padding:3px 8px; }
-        .info-table .lbl { background:#f5f5f5; font-weight:600; width:28%; }
-        .clause { font-size:8.5pt; margin:2px 0; line-height:1.5; }
-        .clause b { font-weight:700; }
-        .terms { font-size:8pt; margin:2px 0 4px; padding-left:18px; }
-        .terms li { margin:1.5px 0; line-height:1.5; }
-        .date-right { text-align:right; font-size:8.5pt; margin:6px 0 4px; }
-        .sign-area { display:flex; gap:10px; margin:4px 0; }
-        .sign-box { flex:1; border:0.5px solid #aaa; padding:8px 12px; font-size:8.5pt; }
-        .sign-title { font-weight:700; font-size:9pt; margin-bottom:4px; }
-        .sign-line { margin:2px 0; }
-        .sign-sig { text-align:right; margin-top:8px; }
-        .account-box { border:0.5px solid #aaa; padding:5px 10px; margin-top:6px; font-size:8pt; line-height:1.7; }
-        .byeolji-title { font-size:16pt; font-weight:700; text-align:center; margin:0 0 6px; }
-        .byeolji-intro { font-size:8.5pt; text-align:center; line-height:1.7; margin:0 0 10px; color:#333; border-bottom:0.5px solid #ccc; padding-bottom:8px; }
-        .byeolji-terms { font-size:8.5pt; margin:0 0 8px; padding-left:18px; }
-        .byeolji-terms li { margin-bottom:5px; line-height:1.6; }
-        .byeolji-terms b { font-weight:700; }
-        .byeolji-oath { font-size:8.5pt; font-weight:700; margin:8px 0 10px; border-top:0.5px solid #ccc; padding-top:8px; }
-        .byeolji-sign-area { border-top:0.5px solid #333; padding-top:8px; }
-        .byeolji-sign-title { font-size:9.5pt; font-weight:700; margin-bottom:3px; }
-        .byeolji-sign-desc { font-size:8.5pt; margin-bottom:6px; }
-        .byeolji-sign-row { display:flex; justify-content:space-between; font-size:8.5pt; }
         @media print {
-          @page { size:A4; margin:7mm 13mm; }
+          @page { size: A4; margin: 8mm 14mm 6mm 14mm; }
+          html, body { width:210mm!important; margin:0!important; padding:0!important; font-size:9pt!important; line-height:1.55!important; }
+          body > div, #__next, main { max-width:100%!important; width:100%!important; padding:0!important; margin:0!important; }
+          .ct-wrap { padding:0!important; font-size:9pt!important; line-height:1.55!important; }
+          .ct-wrap h1 { font-size:14pt!important; margin:4px 0 6px!important; }
+          .ct-wrap p, .ct-wrap li { font-size:8.5pt!important; line-height:1.55!important; margin:2px 0!important; }
+          .ct-wrap td, .ct-wrap th { padding:3px 6px!important; font-size:8.5pt!important; }
+          .ct-wrap ol { margin:2px 0!important; }
+          .ct-wrap ol li { margin:2px 0!important; padding:0!important; }
+          .ct-wrap .sh-title { font-size:9.5pt!important; margin:5px 0 3px!important; }
+          .ct-wrap .sh2-title { font-size:9pt!important; margin:4px 0 2px!important; }
+          .ct-wrap .abox-print { padding:4px 8px!important; margin:4px 0!important; }
+          .ct-wrap .sign-box { padding:6px 10px!important; margin-bottom:6px!important; }
+          .ct-wrap .sign-row { margin-bottom:2px!important; font-size:8.5pt!important; }
           .no-print { display:none!important; }
-          nav,footer,header,button,[class*="nav"],[class*="tab"],[class*="bottom"],[class*="bar"] { display:none!important; }
-          #contract-wrap { width:100%; }
-          .page { width:100%; min-height:0; margin:0; padding:0; box-shadow:none; font-size:8.5pt; line-height:1.45; }
-          .page1 { page-break-after:always; }
-          .page2 { page-break-before:always; }
-          .main-title { font-size:15pt; margin:0 0 2px; }
-          .section-title { margin:5px 0 3px; font-size:9pt; }
-          .clause { font-size:7.5pt; margin:1.5px 0; }
-          .terms { font-size:7.5pt; }
-          .terms li { margin:1px 0; }
-          .info-table td { padding:2px 5px; font-size:7.5pt; }
-          .sign-box { padding:5px 8px; font-size:7.5pt; }
-          .account-box { font-size:7.5pt; padding:4px 8px; }
-          .byeolji-title { font-size:14pt; }
-          .byeolji-terms li { margin-bottom:4px; font-size:8pt; line-height:1.55; }
-          .byeolji-intro { font-size:8pt; }
+          nav, footer, header, [class*="bottom"], [class*="tab"], [class*="nav"], [class*="bar"], [data-testid*="nav"] { display:none!important; }
+          .signature-section { page-break-before:avoid!important; page-break-inside:avoid!important; margin-bottom:0!important; padding-bottom:0!important; }
+          .account-section { margin-bottom:0!important; padding-bottom:0!important; }
+          .byeolji-section { page-break-before:always!important; display:flex!important; flex-direction:column!important; min-height:260mm!important; }
+          .byeolji-section .byeolji-title { text-align:center!important; font-size:14pt!important; margin:16px 0 8px!important; }
+          .byeolji-section .byeolji-intro { text-align:center!important; font-size:8.5pt!important; line-height:1.7!important; margin-bottom:14px!important; }
+          .byeolji-section ol { flex:1!important; display:flex!important; flex-direction:column!important; justify-content:space-between!important; }
+          .byeolji-section ol li { margin-bottom:5px!important; line-height:1.6!important; font-size:8.5pt!important; }
+          .byeolji-signature { margin-top:20px!important; page-break-inside:avoid!important; }
         }
       `}</style>
+
+      {/* Control Bar */}
+      <div className="no-print" style={{ position:'sticky',top:0,zIndex:10,background:'#fff',borderBottom:'1px solid #eee',padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',maxWidth:750,margin:'0 auto' }}>
+        <div style={{ display:'flex',alignItems:'center',gap:12 }}>
+          <button onClick={() => router.back()} style={{ background:'none',border:'none',cursor:'pointer' }}><ArrowLeft size={20} color="#666" /></button>
+          <span style={{ fontSize:15,fontWeight:700 }}>{f.name} 계약서</span>
+        </div>
+        <div style={{ display:'flex',alignItems:'center',gap:8 }}>
+          <button onClick={handleTagAsTenant} disabled={tagging}
+            style={{ display:'flex',alignItems:'center',gap:4,padding:'6px 12px',borderRadius:8,fontSize:12,fontWeight:600,border:'none',cursor:'pointer',background:'#e8faf2',color:'#0e6245' }}>
+            <CheckCircle size={12} />{tagging ? '처리중...' : '채널톡 입주자 등록'}
+          </button>
+          {tagResult && <span style={{ fontSize:12,color: tagResult.startsWith('✅') ? '#0e6245' : '#E53E3E' }}>{tagResult}</span>}
+          <button onClick={() => setEditing(!editing)}
+            style={{ display:'flex',alignItems:'center',gap:4,padding:'6px 12px',borderRadius:8,fontSize:12,fontWeight:600,border:'none',cursor:'pointer',background:editing?'#e8faf2':'#f2f4f6',color:editing?'#0e6245':'#666' }}>
+            {editing ? <Save size={12} /> : <Pencil size={12} />}{editing ? '완료' : '수정'}
+          </button>
+          <button onClick={() => window.print()}
+            style={{ display:'flex',alignItems:'center',gap:4,padding:'6px 12px',borderRadius:8,background:'#3182F6',color:'#fff',fontSize:12,fontWeight:600,border:'none',cursor:'pointer' }}>
+            <Printer size={12} /> PDF 출력
+          </button>
+        </div>
+      </div>
+
+      {/* ═══════════ PAGE 1 ═══════════ */}
+      <div className="ct-wrap" style={S.ct}>
+        <h1 style={S.h1}>쉐어메이트 계약서</h1>
+        <p style={S.sub}>Share Mate Contract</p>
+
+        <div className="sh-title" style={S.sh}>제1조. 거주공간의 표시</div>
+        <table style={{ width:'100%',borderCollapse:'collapse',margin:'4px 0' }}>
+          <tbody>
+            <tr><th style={S.th}>소재지 (주소)</th><td style={S.td}>{house?.address || '-'}</td></tr>
+            <tr><th style={S.th}>하우스명</th><td style={S.td}>{tenant.houseName}</td></tr>
+            <tr><th style={S.th}>임대 부분</th><td style={S.td}><EI v={f.roomCode} onChange={v => setF(p => ({ ...p, roomCode: v }))} /></td></tr>
+          </tbody>
+        </table>
+
+        <div className="sh-title" style={S.sh}>제2조. 계약 내용</div>
+        <p style={S.body}>위 부동산의 임대차에 대하여 임대인과 임차인은 합의에 의하여 아래와 같이 계약을 체결한다.</p>
+        <table style={{ width:'100%',borderCollapse:'collapse',margin:'4px 0' }}>
+          <tbody>
+            <tr><th style={S.th}>보증금</th><td style={S.td}>₩<EN v={deposit} onChange={v => setF(p => ({ ...p, deposit: v }))} /> — 퇴실 시 최대 7일 이내 반환</td></tr>
+            <tr><th style={S.th}>월세</th><td style={S.td}>₩<EN v={rent} onChange={v => setF(p => ({ ...p, rent: v }))} /> / 월</td></tr>
+            <tr><th style={S.th}>첫달 일할 월세</th><td style={S.td}>₩{won(proratedRent)} ({remainDays}일 ÷ {daysInMonth}일)</td></tr>
+            <tr><th style={S.th}>계약금</th><td style={S.td}>₩500,000 — 계약 시 납부</td></tr>
+            <tr><th style={S.th}>잔금</th><td style={{ ...S.td, color:'#E53E3E',fontWeight:700 }}>₩{won(balance)} — 입주 시 납부</td></tr>
+            <tr><th style={S.th}>관리비</th><td style={S.td}>₩<EN v={mgmt} onChange={v => setF(p => ({ ...p, mgmt: v }))} /> / 월</td></tr>
+            <tr><th style={S.th}>첫달 일할 관리비</th><td style={S.td}>₩{won(proratedMgmt)} ({remainDays}일 ÷ {daysInMonth}일)</td></tr>
+          </tbody>
+        </table>
+
+        <div className="sh2-title" style={S.sh2}>제2항 [존속기간]</div>
+        <p style={S.body}>임대인은 위 부동산을 임대차 목적대로 사용·수익할 수 있는 상태로 <EI v={f.startDate} onChange={v => setF(p => ({ ...p, startDate: v }))} /> 까지 임차인에게 인도하며, 임대차 기간은 인도일로부터 <EI v={f.endDate} onChange={v => setF(p => ({ ...p, endDate: v }))} /> 까지로 한다.</p>
+        <div className="sh2-title" style={S.sh2}>제3항 [기간 한정]</div>
+        <p style={S.body}>계약금은 계약과 동시에 납부하고, 잔금은 입주일에 납부한다.</p>
+        <div className="sh2-title" style={S.sh2}>제4항 [계약 해지]</div>
+        <p style={S.body}>임차인이 임대인에게 중도금을 지급하기 전까지, 임대인은 계약금의 배액을 상환하고, 임차인은 계약금을 포기하고 이 계약을 해제할 수 있다.</p>
+        <div className="sh2-title" style={S.sh2}>제5항 [계약 종료]</div>
+        <p style={S.body}>임대차 계약이 종료된 경우, 임차인은 위 부동산을 원상으로 회복하여 임대인에게 반환한다. 이와 동시에 임대인은 보증금을 임차인에게 반환한다.</p>
+        <div className="sh2-title" style={S.sh2}>제6항 [채무 불이행]</div>
+        <p style={S.body}>임대인 또는 임차인이 본 계약상의 내용에 대하여 불이행이 있을 경우 그 상대방은 서면으로 최고하고, 이행하지 않으면 계약을 해제하며 손해배상을 청구할 수 있다.</p>
+        <div className="sh2-title" style={S.sh2}>제7항 [계약 중도 해지]</div>
+        <p style={S.body}>임차인의 사정으로 계약을 중도 해지할 경우, 퇴실 30일 전에 서면 또는 카카오톡으로 통보해야 하며, 미통보 시 1개월 월세에 해당하는 위약금이 발생할 수 있다.</p>
+        <div className="sh2-title" style={S.sh2}>제8항 [입주 당일]</div>
+        <p style={S.body}>입주 당일 집기 및 시설물의 상태를 확인하고, 이상이 있을 경우 즉시 임대인에게 알려야 한다.</p>
+        <div className="sh2-title" style={S.sh2}>제9항 [제공자의 의무]</div>
+        <p style={S.body}>임대인(제공자)은 거주 가능한 상태로 집을 유지·관리할 의무가 있으며, 시설이 저하되는 상황이 발생할 경우 최대한 빠르게 복구한다.</p>
+
+        <div className="sh-title" style={S.sh}>제3조. 특약 사항</div>
+        <ol style={S.ol}>
+          {specialTerms.map((t, i) => (
+            <li key={i} style={S.li}>
+              {editing ? <textarea style={{ width:'100%',fontSize:'8.5pt',lineHeight:1.55,border:'1px solid #3182F6',borderRadius:3,padding:'2px 4px',background:'#EBF3FE' }} rows={2} value={t} onChange={e => { const c = [...specialTerms]; c[i] = e.target.value; setSpecialTerms(c) }} /> : t}
+            </li>
+          ))}
+        </ol>
+
+        <div className="signature-section">
+        <p style={{ textAlign:'right',margin:'4px 0',fontSize:'7.5pt' }}>계약일: {todayStr}</p>
+        <div style={{ display:'flex',gap:8,marginBottom:4 }}>
+          <div className="sign-box" style={{ ...S.sign, flex:1 }}>
+            <p style={{ fontWeight:700,fontSize:'9pt',marginBottom:6 }}>임차인</p>
+            <div className="sign-row" style={S.sr}>이름: <EI v={f.name} onChange={v => setF(p => ({ ...p, name: v }))} /></div>
+            <div className="sign-row" style={S.sr}>연락처: <EI v={f.phone} onChange={v => setF(p => ({ ...p, phone: v }))} /></div>
+            <div style={{ textAlign:'right',marginTop:6,fontSize:'8.5pt' }}>서명: __________________ (인)</div>
+          </div>
+          <div className="sign-box" style={{ ...S.sign, flex:1 }}>
+            <p style={{ fontWeight:700,fontSize:'9pt',marginBottom:6 }}>임대인</p>
+            <div className="sign-row" style={S.sr}>이름: 유재훈</div>
+            <div className="sign-row" style={S.sr}>연락처: 010-____-____</div>
+            <div style={{ textAlign:'right',marginTop:6,fontSize:'8.5pt' }}>서명: __________________ (인)</div>
+          </div>
+        </div>
+        <div className="abox-print account-section" style={S.abox}>
+          <p style={{ margin:0 }}>■ 임대료(월세) 납입계좌: {house?.landlordName || '-'} (계약서 참조)</p>
+          <p style={{ margin:0 }}>■ 관리비 납입계좌: 케이뱅크 유재훈 100-166-670094</p>
+        </div>
+        </div>
+
+        <div className="byeolji-section">
+          <h1 className="byeolji-title" style={S.h1}>쉐어하우스 별지 특약</h1>
+          <p className="byeolji-intro" style={{ textAlign:'center',fontSize:'8pt',color:'#555',margin:'6px 0 14px',lineHeight:1.7 }}>
+            이용자는 쉐어하우스 일원으로서 / 제공자는 쉐어하우스의 대표로서<br />
+            마음이 편한 집을 &lsquo;함께&rsquo; 만들어 가는 데 적극 협조할 것을 약속합니다. 계약서를 읽은 후 동의할 경우 서명
+          </p>
+          <ol style={S.ol}>
+            {appendixTerms.map((t, i) => (
+              <li key={i} style={S.li}>
+                {editing ? <textarea style={{ width:'100%',fontSize:'8.5pt',lineHeight:1.55,border:'1px solid #3182F6',borderRadius:3,padding:'2px 4px',background:'#EBF3FE' }} rows={3} value={t} onChange={e => { const c = [...appendixTerms]; c[i] = e.target.value; setAppendixTerms(c) }} /> : t}
+              </li>
+            ))}
+          </ol>
+          <p style={{ margin:'4px 0',fontSize:'7.5pt',fontStyle:'italic' }}>
+            운영에 관하여 변동이 있을 시 제공자는 최소 4주 전에 고지 의무를 가진다.
+          </p>
+          <div className="byeolji-signature" style={{ borderTop:'1.5px solid #111',paddingTop:8,marginTop:20 }}>
+            <p style={{ fontWeight:700,fontSize:'8pt',marginBottom:4 }}>별지 특약 서명</p>
+            <p style={{ fontSize:'7.5pt',color:'#666',marginBottom:8 }}>상기 별지 특약 사항을 모두 확인하였으며 이에 동의합니다.</p>
+            <div style={{ display:'flex',justifyContent:'space-between' }}>
+              <div style={{ fontSize:'8.5pt' }}>임차인: ________________________ (인)</div>
+              <div style={{ fontSize:'8.5pt' }}>임대인: 유재훈 (인)</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </>
   )
 }
