@@ -1,71 +1,71 @@
 import { NextResponse } from 'next/server'
-import { getSheetData, appendRow } from '@/lib/sheets'
-
-function getMonday(date: Date) {
-  const d = new Date(date)
-  const day = d.getDay()
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-  d.setDate(diff)
-  d.setHours(0, 0, 0, 0)
-  return d
-}
-function addWeeks(date: Date, weeks: number) {
-  const d = new Date(date)
-  d.setDate(d.getDate() + weeks * 7)
-  return d
-}
-function fmtDate(d: Date) { return d.toISOString().split('T')[0] }
+import { getSheetData } from '@/lib/sheets'
 
 export async function POST(req: Request) {
   try {
-    const { houseName, weeksAhead = 12, workerWeeks = [] } = await req.json()
+    const { house, weeksAhead = 8 } = await req.json()
 
+    // 입주중 입주자 (방코드 순)
     const tenantRows = await getSheetData('입주자')
-    const existingDuty = await getSheetData('당번')
+    const tenants = tenantRows
+      .filter(r => r[2] === house && (r[8] === '입주중' || r[8] === '계약중'))
+      .sort((a, b) => (a[3] || '') > (b[3] || '') ? 1 : -1)
 
-    const activeTenants = tenantRows
-      .filter(r => r[2]?.trim() === houseName && r[11] === '입주중')
-      .map(r => ({ id: r[0], name: r[4], roomCode: r[3] }))
+    // 청소 용역 날짜
+    const workerRows = await getSheetData('용역')
+    const cleanDates = workerRows
+      .filter(r => r[2] === house && (r[4] || '').includes('청소'))
+      .map(r => r[1] || '')
 
-    if (activeTenants.length === 0) {
-      return NextResponse.json({ error: '활성 입주자 없음' }, { status: 400 })
-    }
+    // 기존 당번
+    const dutyRows = await getSheetData('당번')
+    const existing = dutyRows.filter(r => r[1] === house).map(r => r[2])
 
-    const existingWeeks = new Set(
-      existingDuty.filter(r => r[1]?.trim() === houseName).map(r => r[5])
-    )
+    // 이번주 월요일
+    const today = new Date()
+    const dow = today.getDay()
+    const monday = new Date(today)
+    monday.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1))
+    monday.setHours(0, 0, 0, 0)
 
-    const startMonday = getMonday(new Date())
-    const results = []
+    const newDuties = []
     let tenantIdx = 0
 
     for (let w = 0; w < weeksAhead; w++) {
-      const weekStart = addWeeks(startMonday, w)
+      const weekStart = new Date(monday)
+      weekStart.setDate(monday.getDate() + w * 7)
+      const weekStartStr = weekStart.toISOString().split('T')[0]
+
+      if (existing.includes(weekStartStr)) continue
+
+      // 청소주 확인
       const weekEnd = new Date(weekStart)
-      weekEnd.setDate(weekEnd.getDate() + 6)
-      const wsStr = fmtDate(weekStart)
-      const weStr = fmtDate(weekEnd)
+      weekEnd.setDate(weekStart.getDate() + 6)
+      const isCleaningWeek = cleanDates.some(d => {
+        const date = new Date(d)
+        return date >= weekStart && date <= weekEnd
+      })
 
-      if (existingWeeks.has(wsStr)) continue
-
-      if (workerWeeks.includes(wsStr)) {
-        const id = `duty_${Date.now()}_${w}`
-        await appendRow('당번', [id, houseName, '', '', '', wsStr, weStr, 'Y', '', 'N', '청소용역'])
-        await new Promise(r => setTimeout(r, 80))
-        results.push({ weekStart: wsStr, type: 'skip_worker' })
+      if (isCleaningWeek) {
+        newDuties.push({ 지점명: house, 주차시작일: weekStartStr, 방코드: '', 입주자명: '', 당번유형: '청소주', 완료여부: '스킵' })
         continue
       }
 
-      const tenant = activeTenants[tenantIdx % activeTenants.length]
+      if (tenants.length === 0) continue
+
+      const t = tenants[tenantIdx % tenants.length]
+      newDuties.push({
+        지점명: house, 주차시작일: weekStartStr,
+        방코드: t[3] || '', 입주자명: t[5] || '',
+        당번유형: '당번',
+        완료여부: weekStartStr < today.toISOString().split('T')[0] ? '미완료' : '예정',
+      })
       tenantIdx++
-      const id = `duty_${Date.now()}_${w}`
-      await appendRow('당번', [id, houseName, tenant.id, tenant.name, tenant.roomCode, wsStr, weStr, 'N', '', 'N', ''])
-      await new Promise(r => setTimeout(r, 80))
-      results.push({ weekStart: wsStr, tenantName: tenant.name, type: 'assigned' })
     }
 
-    return NextResponse.json({ ok: true, count: results.length, results })
+    return NextResponse.json({ duties: newDuties, count: newDuties.length })
   } catch (e) {
+    console.error(e)
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }
 }
