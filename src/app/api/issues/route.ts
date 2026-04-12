@@ -3,13 +3,17 @@ import { getSheetData, appendRow } from '@/lib/sheets'
 
 // row: [0]이슈ID [1]지점명 [2]방코드 [3]제목 [4]내용 [5]카테고리 [6]상태 [7]담당자 [8]등록일 [9]완료일 [10]비용 [11]메모
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url)
+    const house = searchParams.get('house')
+    const room = searchParams.get('room')
+
     const rows = await getSheetData('이슈')
     const houses = await getSheetData('지점')
     const houseNames = houses.map(r => r[1]?.trim()).filter(Boolean)
 
-    const issues = rows.map((r, i) => ({
+    let issues = rows.map((r, i) => ({
       rowIndex: i,
       id: r[0] || '',
       houseName: r[1] || '',
@@ -24,6 +28,11 @@ export async function GET() {
       cost: Number(r[10]) || 0,
       memo: r[11] || '',
     }))
+
+    if (house) issues = issues.filter(i => i.houseName === house)
+    if (room) issues = issues.filter(i => i.roomCode === room)
+
+    issues.sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1))
 
     return NextResponse.json({ issues, houseNames })
   } catch (e) {
