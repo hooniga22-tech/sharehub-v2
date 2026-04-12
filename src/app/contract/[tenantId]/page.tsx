@@ -24,6 +24,7 @@ export default function ContractPage() {
   const [editing, setEditing] = useState(false)
   const [tagging, setTagging] = useState(false)
   const [tagResult, setTagResult] = useState<string | null>(null)
+  const [contractFee, setContractFee] = useState(500000)
 
   const [f, setF] = useState({
     name: '', phone: '', birthDate: '', homeAddress: '',
@@ -114,15 +115,25 @@ export default function ContractPage() {
   if (!tenant) return <div style={{ display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',color:'#999' }}>입주자를 찾을 수 없습니다</div>
 
   const deposit = f.deposit || 2000000
-  const contractDeposit = 500000
-  const balance = deposit - contractDeposit
   const rent = f.rent || 0
   const mgmt = f.mgmt || 0
-  const startDate = new Date(f.startDate)
-  const daysInMonth = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0).getDate()
-  const remainDays = daysInMonth - startDate.getDate() + 1
-  const proratedRent = Math.round(rent * remainDays / daysInMonth)
-  const proratedMgmt = Math.round(mgmt * remainDays / daysInMonth)
+
+  const calcFirst = (moveInStr: string, r: number, m: number) => {
+    const moveInD = new Date(moveInStr)
+    const day = moveInD.getDate()
+    const lastDay = new Date(moveInD.getFullYear(), moveInD.getMonth() + 1, 0).getDate()
+    const remain = lastDay - day + 1
+    const dailyRent = Math.round(r / lastDay)
+    const dailyMgmt = Math.round(m / lastDay)
+    if (remain >= 10) {
+      return { rentAmount: dailyRent * remain, mgmtAmount: dailyMgmt * remain, label: `${day}일~${lastDay}일 일할계산`, includeNext: false, day, lastDay, remain }
+    } else {
+      return { rentAmount: dailyRent * remain + r, mgmtAmount: dailyMgmt * remain + m, label: `${day}일~${lastDay}일 일할 + 다음달 전체`, includeNext: true, day, lastDay, remain }
+    }
+  }
+
+  const first = calcFirst(f.startDate, rent, mgmt)
+  const balance = deposit - contractFee + first.rentAmount + first.mgmtAmount
   const won = (n: number) => n.toLocaleString('ko-KR')
 
   const today = new Date()
@@ -223,11 +234,11 @@ export default function ContractPage() {
           <tbody>
             <tr><th style={S.th}>보증금</th><td style={S.td}>₩<EN v={deposit} onChange={v => setF(p => ({ ...p, deposit: v }))} /> — 퇴실 시 최대 7일 이내 반환</td></tr>
             <tr><th style={S.th}>월세</th><td style={S.td}>₩<EN v={rent} onChange={v => setF(p => ({ ...p, rent: v }))} /> / 월</td></tr>
-            <tr><th style={S.th}>첫달 일할 월세</th><td style={S.td}>₩{won(proratedRent)} ({remainDays}일 ÷ {daysInMonth}일)</td></tr>
-            <tr><th style={S.th}>계약금</th><td style={S.td}>₩500,000 — 계약 시 납부</td></tr>
+            <tr><th style={S.th}>첫달 월세</th><td style={S.td}>₩{won(first.rentAmount)} ({first.label})</td></tr>
+            <tr><th style={S.th}>계약금</th><td style={S.td}>{editing ? <span>₩<input type="number" value={contractFee} onChange={e => setContractFee(Number(e.target.value) || 0)} style={{ border:'1px solid #3182F6',borderRadius:3,padding:'1px 5px',fontSize:'inherit',background:'#EBF3FE',outline:'none',width:80 }} /></span> : <>₩{won(contractFee)}</>} — 계약 시 납부</td></tr>
             <tr><th style={S.th}>잔금</th><td style={{ ...S.td, color:'#E53E3E',fontWeight:700 }}>₩{won(balance)} — 입주 시 납부</td></tr>
             <tr><th style={S.th}>관리비</th><td style={S.td}>₩<EN v={mgmt} onChange={v => setF(p => ({ ...p, mgmt: v }))} /> / 월</td></tr>
-            <tr><th style={S.th}>첫달 일할 관리비</th><td style={S.td}>₩{won(proratedMgmt)} ({remainDays}일 ÷ {daysInMonth}일)</td></tr>
+            <tr><th style={S.th}>첫달 관리비</th><td style={S.td}>₩{won(first.mgmtAmount)} ({first.label})</td></tr>
           </tbody>
         </table>
 
