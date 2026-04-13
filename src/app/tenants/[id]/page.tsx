@@ -54,6 +54,7 @@ export default function TenantDetailPage() {
   const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
   const [toast, setToast] = useState('');
   const [oldPayOpen, setOldPayOpen] = useState(false);
+  const [initPayOpen, setInitPayOpen] = useState(false);
   const [bal1Open, setBal1Open] = useState(false);
   const [bal2Open, setBal2Open] = useState(false);
 
@@ -273,61 +274,73 @@ export default function TenantDetailPage() {
               </>
             )}
 
-            {/* 잔금① 보증금잔액 + 월세 일할 */}
+            {/* 초기 납부 내역 아코디언 */}
             {moveInDate && (
-              <div style={{ borderTop: '1px solid #e5e8eb', marginTop: 4 }}>
-                <div onClick={() => setBal1Open(!bal1Open)} style={{ display: 'flex', alignItems: 'center', padding: '13px 0', borderBottom: '1px solid #f2f3f5', gap: 8, cursor: 'pointer' }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28', minWidth: 80, flexShrink: 0 }}>잔금①</span>
-                  <span style={{ fontSize: 12, color: '#4e5968', flex: 1 }}>보증금잔액 + 월세 일할</span>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: GREEN, flexShrink: 0 }}>완료</span>
-                </div>
-                {bal1Open && (
-                  <div style={{ background: '#f2f3f5', borderRadius: 10, padding: '10px 12px', margin: '4px 0 8px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555', marginBottom: 6 }}>
-                      <span>보증금 잔액</span>
-                      <span style={{ fontWeight: 600 }}>{fmt(depositBalance)}</span>
+              <>
+                <button onClick={() => setInitPayOpen(!initPayOpen)}
+                  style={{ width: '100%', background: '#f2f3f5', border: 'none', borderRadius: 0, padding: '10px 16px', cursor: 'pointer', fontSize: 12, color: GRAY, fontWeight: 500, fontFamily: 'inherit', textAlign: 'center' }}>
+                  초기 납부 내역 {initPayOpen ? '▲' : '▼'}
+                </button>
+                {initPayOpen && (
+                  <div>
+                    {/* 잔금① */}
+                    <div onClick={() => setBal1Open(!bal1Open)} style={{ display: 'flex', alignItems: 'center', padding: '13px 0', borderBottom: '1px solid #f2f3f5', gap: 8, cursor: 'pointer' }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28', minWidth: 80, flexShrink: 0 }}>잔금①</span>
+                      <span style={{ fontSize: 12, color: '#4e5968', flex: 1 }}>보증금잔액 + 월세 일할</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: '#191f28', flexShrink: 0, marginRight: 8 }}>{fmt(depositBalance + firstRent)}</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: GREEN, flexShrink: 0 }}>완료</span>
                     </div>
-                    <div style={{ height: 1, background: '#e5e8eb', margin: '6px 0' }} />
-                    <div style={{ fontSize: 11, color: GRAY, marginBottom: 6 }}>
-                      월세 일할 ({moveDay}일 ~ {days}일, {rem}/{days}일)
+                    {bal1Open && (
+                      <div style={{ background: '#f2f3f5', borderRadius: 10, padding: '10px 12px', margin: '4px 0 8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555', marginBottom: 6 }}>
+                          <span>보증금 잔액</span>
+                          <span style={{ fontWeight: 600 }}>{fmt(depositBalance)}</span>
+                        </div>
+                        <div style={{ height: 1, background: '#e5e8eb', margin: '6px 0' }} />
+                        <div style={{ fontSize: 11, color: GRAY, marginBottom: 6 }}>
+                          월세 일할 ({moveDay}일 ~ {days}일, {rem}/{days}일)
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555', marginBottom: 6 }}>
+                          <span>월세 일할</span>
+                          <span style={{ fontWeight: 600 }}>{fmt(firstRent)}</span>
+                        </div>
+                        <div style={{ height: 1, background: '#e5e8eb', margin: '6px 0' }} />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, color: BLUE }}>
+                          <span>합계</span>
+                          <span>{fmt(depositBalance + firstRent)}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 잔금② */}
+                    <div onClick={() => setBal2Open(!bal2Open)} style={{ display: 'flex', alignItems: 'center', padding: '13px 0', borderBottom: '1px solid #f2f3f5', gap: 8, cursor: 'pointer' }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28', minWidth: 80, flexShrink: 0 }}>잔금②</span>
+                      <span style={{ fontSize: 12, color: '#00b493', flex: 1 }}>관리비 일할</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: '#191f28', flexShrink: 0, marginRight: 8 }}>{fmt(firstMgmt)}</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: GREEN, flexShrink: 0 }}>완료</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555', marginBottom: 6 }}>
-                      <span>월세 일할</span>
-                      <span style={{ fontWeight: 600 }}>{fmt(firstRent)}</span>
-                    </div>
-                    <div style={{ height: 1, background: '#e5e8eb', margin: '6px 0' }} />
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, color: BLUE }}>
-                      <span>합계</span>
-                      <span>{fmt(depositBalance + firstRent)}</span>
+                    {bal2Open && (
+                      <div style={{ background: '#f2f3f5', borderRadius: 10, padding: '10px 12px', margin: '4px 0 8px' }}>
+                        <div style={{ fontSize: 11, color: GRAY, marginBottom: 6 }}>
+                          관리비 일할 ({moveDay}일 ~ {days}일, {rem}/{days}일)
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555' }}>
+                          <span>관리비 일할</span>
+                          <span style={{ fontWeight: 600 }}>{fmt(firstMgmt)}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 계약금 */}
+                    <div style={{ display: 'flex', alignItems: 'center', padding: '13px 0', gap: 8 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28', minWidth: 80, flexShrink: 0 }}>계약금</span>
+                      <span style={{ flex: 1 }} />
+                      <span style={{ fontSize: 12, fontWeight: 600, color: '#191f28', flexShrink: 0, marginRight: 8 }}>500,000원</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: GREEN, flexShrink: 0 }}>완료</span>
                     </div>
                   </div>
                 )}
-
-                {/* 잔금② 관리비 일할 */}
-                <div onClick={() => setBal2Open(!bal2Open)} style={{ display: 'flex', alignItems: 'center', padding: '13px 0', borderBottom: '1px solid #f2f3f5', gap: 8, cursor: 'pointer' }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28', minWidth: 80, flexShrink: 0 }}>잔금②</span>
-                  <span style={{ fontSize: 12, color: '#00b493', flex: 1 }}>관리비 일할</span>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: GREEN, flexShrink: 0 }}>완료</span>
-                </div>
-                {bal2Open && (
-                  <div style={{ background: '#f2f3f5', borderRadius: 10, padding: '10px 12px', margin: '4px 0 8px' }}>
-                    <div style={{ fontSize: 11, color: GRAY, marginBottom: 6 }}>
-                      관리비 일할 ({moveDay}일 ~ {days}일, {rem}/{days}일)
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555' }}>
-                      <span>관리비 일할</span>
-                      <span style={{ fontWeight: 600 }}>{fmt(firstMgmt)}</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* 계약금 */}
-                <div style={{ display: 'flex', alignItems: 'center', padding: '13px 0', gap: 8 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28', minWidth: 80, flexShrink: 0 }}>계약금</span>
-                  <span style={{ fontSize: 12, color: '#4e5968', flex: 1 }}>500,000원</span>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: GREEN, flexShrink: 0 }}>완료</span>
-                </div>
-              </div>
+              </>
             )}
 
             {monthList.length === 0 && !moveInDate && (
