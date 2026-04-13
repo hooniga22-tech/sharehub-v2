@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
+import useSWR from 'swr';
+import { fetcher } from '@/lib/fetcher';
 import { Search, ChevronDown, ChevronUp, X } from 'lucide-react';
 import Link from 'next/link';
 import Avatar from '@/components/ui/Avatar';
@@ -17,23 +19,17 @@ type FilterTab = 'occupied' | 'vacant' | 'checkout';
 const fmtWon = (n: number) => n.toLocaleString() + '원';
 
 export default function TenantsPage() {
-  const [tenants, setTenants] = useState<Tenant[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const { data: rawTenants, isLoading: loading, error: swrError } = useSWR<Tenant[]>('/api/tenants', fetcher, {
+    refreshInterval: 0,
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
+  });
+  const tenants = Array.isArray(rawTenants) ? rawTenants : [];
+  const error = swrError ? '데이터를 불러오지 못했어요' : '';
   const [filter, setFilter] = useState<FilterTab>('occupied');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
-
-  useEffect(() => {
-    fetch('/api/tenants')
-      .then(r => r.json())
-      .then(data => {
-        setTenants(Array.isArray(data) ? data : []);
-        setLoading(false);
-      })
-      .catch(() => { setError('데이터를 불러오지 못했어요'); setLoading(false); });
-  }, []);
 
   const occupied = tenants.filter(t => t['상태'] === '입주중' || t['상태'] === '계약중');
   const checkout = tenants.filter(t => t['상태'] === '퇴실예정');

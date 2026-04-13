@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import useSWR from 'swr';
+import { fetcher } from '@/lib/fetcher';
 import { useParams } from 'next/navigation';
 
 const BLUE = '#3182f6', GRAY = '#8b95a1', GREEN = '#00c471', RED = '#f04452', ORANGE = '#f59f00';
@@ -58,9 +60,18 @@ const BottomSheet = ({ title, onClose, children }: { title: string; onClose: () 
 export default function TenantPortalPage() {
   const { token } = useParams<{ token: string }>();
 
-  const [tenant, setTenant] = useState<any>(null);
-  const [house, setHouse] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: tenantData, isLoading: tenantLoading } = useSWR(
+    token ? `/api/tenants?token=${token}` : null, fetcher,
+    { refreshInterval: 0, revalidateOnFocus: true, revalidateOnReconnect: true }
+  );
+  const tenant = tenantData?.error ? null : tenantData;
+  const { data: housesData } = useSWR(
+    tenant ? '/api/houses' : null, fetcher,
+    { refreshInterval: 0, revalidateOnFocus: true, revalidateOnReconnect: true }
+  );
+  const house = Array.isArray(housesData) ? housesData.find((h: any) => h['지점명'] === tenant?.['지점명']) : null;
+  const loading = tenantLoading;
+
   const [lang, setLang] = useState<'ko' | 'en'>('ko');
   const [toast, setToast] = useState('');
   const [noticeOpen, setNoticeOpen] = useState(true);
@@ -75,22 +86,6 @@ export default function TenantPortalPage() {
   const t = (k: string, e: string) => ko ? k : e;
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
   const copyText = (text: string) => { navigator.clipboard?.writeText(text); showToast(t('복사됐어요!', 'Copied!')); };
-
-  useEffect(() => {
-    fetch(`/api/tenants?token=${token}`)
-      .then(r => r.json())
-      .then(async (data) => {
-        if (data.error) { setLoading(false); return; }
-        setTenant(data);
-        try {
-          const houses = await fetch('/api/houses').then(r => r.json());
-          const found = Array.isArray(houses) ? houses.find((h: any) => h['지점명'] === data['지점명']) : null;
-          if (found) setHouse(found);
-        } catch { /* */ }
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, [token]);
 
   const submitSupply = async () => {
     if (!selSupplies.length || !tenant) return;

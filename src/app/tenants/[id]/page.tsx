@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import useSWR from 'swr';
+import { fetcher } from '@/lib/fetcher';
 import { useParams, useRouter } from 'next/navigation';
 import { Phone, MessageSquare, FileText, Plus, X, Check } from 'lucide-react';
 
@@ -26,10 +28,23 @@ const statusBadge: Record<string, { bg: string; color: string }> = {
 export default function TenantDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [tenant, setTenant] = useState<Tenant | null>(null);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [issues, setIssues] = useState<Issue[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  const { data: tenant, isLoading: tenantLoading, mutate: mutateTenant } = useSWR<Tenant | null>(
+    id ? `/api/tenants?id=${id}` : null, fetcher,
+    { refreshInterval: 0, revalidateOnFocus: true, revalidateOnReconnect: true }
+  );
+  const { data: rawPayments, mutate: mutatePayments } = useSWR<Payment[]>(
+    id ? `/api/payments?tenantId=${id}` : null, fetcher,
+    { refreshInterval: 0, revalidateOnFocus: true, revalidateOnReconnect: true }
+  );
+  const payments = Array.isArray(rawPayments) ? rawPayments : [];
+  const { data: issueData } = useSWR(
+    tenant ? `/api/issues?house=${encodeURIComponent(tenant.지점명 || '')}&room=${encodeURIComponent(tenant.방코드 || '')}` : null, fetcher,
+    { refreshInterval: 0, revalidateOnFocus: true, revalidateOnReconnect: true }
+  );
+  const issues: Issue[] = issueData?.issues || [];
+  const loading = tenantLoading;
+
   const [memo, setMemo] = useState('');
   const [editMemo, setEditMemo] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -41,29 +56,13 @@ export default function TenantDetailPage() {
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2200); };
 
   useEffect(() => {
+    if (tenant?.메모 !== undefined) setMemo(tenant.메모 || '');
+  }, [tenant?.메모]);
+
+  useEffect(() => {
     document.body.style.overflow = paySheet ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
   }, [paySheet]);
-
-  useEffect(() => {
-    Promise.all([
-      fetch(`/api/tenants?id=${id}`).then(r => r.ok ? r.json() : null),
-      fetch(`/api/payments?tenantId=${id}`).then(r => r.json()),
-    ]).then(([tenantData, paymentData]) => {
-      setTenant(tenantData);
-      setMemo(tenantData?.메모 || '');
-      setPayments(Array.isArray(paymentData) ? paymentData : []);
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, [id]);
-
-  useEffect(() => {
-    if (!tenant) return;
-    fetch(`/api/issues?house=${encodeURIComponent(tenant.지점명 || '')}&room=${encodeURIComponent(tenant.방코드 || '')}`)
-      .then(r => r.json())
-      .then(data => setIssues(data.issues || []))
-      .catch(() => {});
-  }, [tenant]);
 
   const handleSaveMemo = async () => {
     if (!tenant) return;
@@ -72,7 +71,7 @@ export default function TenantDetailPage() {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: tenant.입주자ID, 메모: memo }),
     });
-    setTenant(prev => prev ? { ...prev, 메모: memo } : prev);
+    mutateTenant({ ...tenant, 메모: memo }, false);
     setSaving(false); setEditMemo(false);
     showToast('메모가 저장됐어요');
   };
@@ -83,9 +82,9 @@ export default function TenantDetailPage() {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: paySheet.수납ID, 납부여부: '납부', 납부일: payDate, 납부방법: payMethod }),
     });
-    setPayments(prev => prev.map(p =>
+    mutatePayments(payments.map(p =>
       p.수납ID === paySheet.수납ID ? { ...p, 납부여부: '납부', 납부일: payDate, 납부방법: payMethod } : p
-    ));
+    ), false);
     setPaySheet(null);
     showToast('납부 등록 완료!');
   };
