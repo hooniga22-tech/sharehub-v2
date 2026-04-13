@@ -96,7 +96,7 @@ export default function HouseDetailPage() {
 
   const houseName = house['지점명'] || '';
   const active = tenants.filter(t => t['상태'] === '입주중' || t['상태'] === '계약중').length;
-  const leaving = tenants.filter(t => t['상태'] === '퇴실예정').length;
+  const leaving = tenants.filter(t => t['상태'] === '공실예정').length;
   const totalRooms = Number(house['총방수']) || tenants.length || 1;
   const vacancy = Math.max(0, totalRooms - active - leaving);
 
@@ -189,7 +189,7 @@ export default function HouseDetailPage() {
         {tab === 1 && (
           <>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
-              {[{ l: '입주중', v: active, c: GREEN }, { l: '공실', v: vacancy, c: vacancy > 0 ? RED : GRAY }, { l: '퇴실예정', v: leaving, c: leaving > 0 ? ORANGE : GRAY }].map(k => (
+              {[{ l: '입주중', v: active, c: GREEN }, { l: '공실', v: vacancy, c: vacancy > 0 ? RED : GRAY }, { l: '공실예정', v: leaving, c: leaving > 0 ? ORANGE : GRAY }].map(k => (
                 <div key={k.l} style={{ background: '#fff', borderRadius: 12, padding: '14px 12px', textAlign: 'center' }}>
                   <div style={{ fontSize: 11, color: GRAY, marginBottom: 4 }}>{k.l}</div>
                   <div style={{ fontSize: 22, fontWeight: 700, color: k.c }}>{k.v}</div>
@@ -203,8 +203,7 @@ export default function HouseDetailPage() {
                 const statusCfg: Record<string, { bg: string; color: string; label: string }> = {
                   '입주중': { bg: '#e8faf2', color: GREEN, label: '입주중' },
                   '계약중': { bg: '#e8faf2', color: GREEN, label: '계약중' },
-                  '퇴실예정': { bg: '#fff8e1', color: ORANGE, label: '퇴실예정' },
-                  '공실예정': { bg: '#f2f4f6', color: GRAY, label: '공실예정' },
+                  '공실예정': { bg: '#fff8e1', color: ORANGE, label: '공실예정' },
                 };
                 const sc = statusCfg[status] || statusCfg['입주중'];
                 return (

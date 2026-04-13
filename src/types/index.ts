@@ -12,7 +12,7 @@ export interface Tenant {
   id: string; roomId: string; houseName: string; roomCode: string;
   name: string; phone: string; rent: number; managementFee: number;
   deposit: number; startDate: string; endDate: string;
-  status: '입주중' | '퇴실예정' | '퇴실'; nationality: string; memo: string; token: string;
+  status: '입주중' | '공실예정' | '퇴실'; nationality: string; memo: string; token: string;
 }
 export interface Cost {
   id: string; houseId: string; houseName: string; year: number; month: number;

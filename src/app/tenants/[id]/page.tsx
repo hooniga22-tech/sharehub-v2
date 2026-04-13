@@ -21,7 +21,7 @@ const calcDday = (dateStr: string): number => {
 const statusBadge: Record<string, { bg: string; color: string }> = {
   '입주중': { bg: '#e8faf2', color: '#0e6245' },
   '계약중': { bg: '#e8faf2', color: '#0e6245' },
-  '퇴실예정': { bg: '#fff8e1', color: '#b7791f' },
+  '공실예정': { bg: '#fff8e1', color: '#b7791f' },
   '퇴실완료': { bg: '#f2f4f6', color: GRAY },
 };
 

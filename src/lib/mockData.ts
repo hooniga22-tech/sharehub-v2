@@ -76,7 +76,7 @@ export const districts: District[] = [
   },
 ];
 
-// --- 퇴실예정 ---
+// --- 공실예정 ---
 export const upcomingCheckouts = [
   { name: '이○○', house: '이문하우스', room: '205호', date: '4/15', tenantId: 'tenant-3' },
   { name: '최○○', house: '워너비하우스', room: 'C1호', date: '4/20', tenantId: 'tenant-4' },

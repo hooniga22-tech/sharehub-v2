@@ -32,7 +32,7 @@ export default function TenantsPage() {
   const [searchFocused, setSearchFocused] = useState(false);
 
   const occupied = tenants.filter(t => t['상태'] === '입주중' || t['상태'] === '계약중');
-  const checkout = tenants.filter(t => t['상태'] === '퇴실예정');
+  const checkout = tenants.filter(t => t['상태'] === '공실예정');
 
   // Group by 지점명
   const byHouse = useMemo(() => {
@@ -59,7 +59,7 @@ export default function TenantsPage() {
 
   const tabs: { key: FilterTab; label: string; count: number }[] = [
     { key: 'occupied', label: '입주중', count: occupied.length },
-    { key: 'checkout', label: '퇴실예정', count: checkout.length },
+    { key: 'checkout', label: '공실예정', count: checkout.length },
     { key: 'vacant', label: '전체', count: tenants.length },
   ];
 
@@ -184,7 +184,7 @@ export default function TenantsPage() {
             );
           })}
 
-          {/* 퇴실예정 */}
+          {/* 공실예정 */}
           {filter === 'checkout' && (
             checkout.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

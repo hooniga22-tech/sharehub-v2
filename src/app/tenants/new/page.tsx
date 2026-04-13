@@ -260,7 +260,7 @@ export default function NewTenantPage() {
                 <div>
                   <label className="text-[13px] font-semibold mb-1.5 block">상태</label>
                   <div className="flex gap-2">
-                    {['입주중', '퇴실예정'].map(s => (
+                    {['입주중', '공실예정'].map(s => (
                       <button key={s} onClick={() => setStatus(s)}
                         className={`flex-1 py-3 rounded-xl text-[13px] font-semibold border transition-colors ${
                           status === s

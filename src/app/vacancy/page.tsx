@@ -45,7 +45,7 @@ export default function VacancyPage() {
   }, []);
 
   const vacantNow = vacs.filter(v => v.공실유형 === '현재공실');
-  const vacantSoon = vacs.filter(v => v.공실유형 === '퇴실예정');
+  const vacantSoon = vacs.filter(v => v.공실유형 === '공실예정');
   const withProspect = vacs.filter(v => v.예정자명);
 
   const openProspect = (v: Vac) => {
@@ -92,7 +92,7 @@ export default function VacancyPage() {
     showToast('✅ 입주 확정 완료!');
   };
 
-  const tabLabels = [`공실현황 ${vacantNow.length}`, `퇴실예정 ${vacantSoon.length}`, `입주예정 ${withProspect.length}`];
+  const tabLabels = [`공실현황 ${vacantNow.length}`, `공실예정 ${vacantSoon.length}`, `입주예정 ${withProspect.length}`];
 
   const VacCard = ({ v }: { v: Vac }) => {
     const hasProspect = !!v.예정자명;
@@ -240,7 +240,7 @@ export default function VacancyPage() {
             <div style={{ textAlign: 'center', padding: '60px 0' }}>
               <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
               <div style={{ fontSize: 16, fontWeight: 600, color: '#333', marginBottom: 4 }}>입주 예정자가 없어요</div>
-              <div style={{ fontSize: 13, color: GRAY }}>공실/퇴실예정 탭에서 등록해보세요</div>
+              <div style={{ fontSize: 13, color: GRAY }}>공실/공실예정 탭에서 등록해보세요</div>
             </div>
           )
         )}
