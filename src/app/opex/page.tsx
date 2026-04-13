@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, X, Check } from 'lucide-react';
 
@@ -24,6 +24,8 @@ export default function ExpensePage() {
   const [opex, setOpex] = useState<Opex[]>([]);
   const [utility, setUtility] = useState<Util[]>([]);
   const [houses, setHouses] = useState<string[]>([]);
+  const [houseGuMap, setHouseGuMap] = useState<Record<string, string>>({});
+  const [gu, setGu] = useState('전체');
   const [loading, setLoading] = useState(true);
   const [year] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
@@ -46,11 +48,15 @@ export default function ExpensePage() {
       fetch(`/api/opex?year=${year}&month=${month}`).then(r => r.json()),
       fetch(`/api/utility?year=${year}&month=${month}`).then(r => r.json()),
       fetch('/api/tenants').then(r => r.json()),
-    ]).then(([opexData, utilData, tenantData]) => {
+      fetch('/api/houses').then(r => r.json()),
+    ]).then(([opexData, utilData, tenantData, houseData]) => {
       setOpex((Array.isArray(opexData) ? opexData : []).filter((d: Opex) => d.지출ID !== 'deleted'));
       setUtility(Array.isArray(utilData) ? utilData : []);
       const names = [...new Set((Array.isArray(tenantData) ? tenantData : []).map((t: { 지점명?: string }) => t.지점명))].filter(Boolean) as string[];
       setHouses(names.sort());
+      const map: Record<string, string> = {};
+      (Array.isArray(houseData) ? houseData : []).forEach((h: any) => { if (h['지점명'] && h['구']) map[h['지점명']] = h['구']; });
+      setHouseGuMap(map);
       setLoading(false);
     }).catch(() => setLoading(false));
   };
@@ -66,8 +72,12 @@ export default function ExpensePage() {
     setShowForm(false); resetForm(); fetchData();
   };
 
-  const utilTotal = utility.reduce((a, u) => a + ['전기', '가스', '수도', '인터넷', '정수기'].reduce((b, k) => b + (Number((u as Record<string, string>)[k]) || 0), 0), 0);
-  const opexTotal = opex.reduce((a, d) => a + (Number(d.금액) || 0), 0);
+  const guList = useMemo(() => [...new Set(Object.values(houseGuMap).filter(Boolean))].sort(), [houseGuMap]);
+  const filteredUtility = useMemo(() => gu === '전체' ? utility : utility.filter(u => houseGuMap[u.지점명] === gu), [utility, gu, houseGuMap]);
+  const filteredOpex = useMemo(() => gu === '전체' ? opex : opex.filter(d => houseGuMap[d.지점명] === gu), [opex, gu, houseGuMap]);
+
+  const utilTotal = filteredUtility.reduce((a, u) => a + ['전기', '가스', '수도', '인터넷', '정수기'].reduce((b, k) => b + (Number((u as Record<string, string>)[k]) || 0), 0), 0);
+  const opexTotal = filteredOpex.reduce((a, d) => a + (Number(d.금액) || 0), 0);
   const grandTotal = utilTotal + opexTotal;
   const stepLabels = ['지점', '분류', '금액', '확인'];
 
@@ -102,6 +112,13 @@ export default function ExpensePage() {
           <div style={{ flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 600 }}>{year}년 {month}월</div>
           <button onClick={() => setMonth(m => m < 12 ? m + 1 : m)} style={{ width: 28, height: 28, borderRadius: 7, border: '1px solid #e5e8eb', background: '#fff', fontSize: 14, cursor: 'pointer', color: '#191f28', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
         </div>
+        {guList.length > 0 && (
+          <div style={{ display: 'flex', overflowX: 'auto', gap: 6, padding: '0 16px 12px', scrollbarWidth: 'none' }}>
+            {['전체', ...guList].map(g => (
+              <button key={g} onClick={() => setGu(g)} style={{ padding: '6px 14px', borderRadius: 100, border: gu === g ? '1px solid #191f28' : '1px solid #e5e8eb', background: gu === g ? '#191f28' : '#fff', color: gu === g ? '#fff' : '#4e5968', fontSize: 13, fontWeight: gu === g ? 600 : 400, whiteSpace: 'nowrap', flexShrink: 0, cursor: 'pointer', fontFamily: 'inherit' }}>{g}</button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div style={{ padding: 16 }}>
@@ -200,11 +217,11 @@ export default function ExpensePage() {
         </div>
 
         {/* 공과금 */}
-        {utility.length > 0 && (
+        {filteredUtility.length > 0 && (
           <>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#666', marginBottom: 8 }}>공과금</div>
             <div style={{ background: '#fff', borderRadius: 14, overflow: 'hidden', marginBottom: 16 }}>
-              {utility.map((u, i) => {
+              {filteredUtility.map((u, i) => {
                 const total = ['전기', '가스', '수도', '인터넷', '정수기'].reduce((a, k) => a + (Number((u as Record<string, string>)[k]) || 0), 0);
                 return (
                   <div key={u.ID || i}>
@@ -230,11 +247,11 @@ export default function ExpensePage() {
         )}
 
         {/* 기타지출 */}
-        {opex.length > 0 && (
+        {filteredOpex.length > 0 && (
           <>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#666', marginBottom: 8 }}>기타지출</div>
             <div style={{ background: '#fff', borderRadius: 14, overflow: 'hidden' }}>
-              {opex.map((d, i) => {
+              {filteredOpex.map((d, i) => {
                 const cc = CAT_COLOR[d.카테고리] || CAT_COLOR['기타'];
                 return (
                   <div key={d.지출ID}>
@@ -256,7 +273,7 @@ export default function ExpensePage() {
           </>
         )}
 
-        {utility.length === 0 && opex.length === 0 && (
+        {filteredUtility.length === 0 && filteredOpex.length === 0 && (
           <div style={{ textAlign: 'center', padding: '60px 0', color: GRAY }}><p style={{ fontSize: 14 }}>이달 지출 내역이 없어요</p></div>
         )}
       </div>

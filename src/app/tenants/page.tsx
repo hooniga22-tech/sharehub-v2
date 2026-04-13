@@ -30,9 +30,13 @@ export default function TenantsPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
+  const [gu, setGu] = useState('전체');
 
-  const occupied = tenants.filter(t => t['상태'] === '입주중' || t['상태'] === '계약중');
-  const checkout = tenants.filter(t => t['상태'] === '공실예정');
+  const guList = useMemo(() => [...new Set(tenants.map(t => t['구']).filter(Boolean))].sort(), [tenants]);
+  const guFiltered = useMemo(() => gu === '전체' ? tenants : tenants.filter(t => t['구'] === gu), [tenants, gu]);
+
+  const occupied = guFiltered.filter(t => t['상태'] === '입주중' || t['상태'] === '계약중');
+  const checkout = guFiltered.filter(t => t['상태'] === '공실예정');
 
   // Group by 지점명
   const byHouse = useMemo(() => {
@@ -50,17 +54,17 @@ export default function TenantsPage() {
   const searchResults = useMemo(() => {
     if (!isSearching) return [];
     const q = search.trim().toLowerCase();
-    return tenants.filter(t =>
+    return guFiltered.filter(t =>
       t['이름']?.toLowerCase().includes(q) ||
       t['지점명']?.toLowerCase().includes(q) ||
       t['방코드']?.toLowerCase().includes(q)
     );
-  }, [search, isSearching, tenants]);
+  }, [search, isSearching, guFiltered]);
 
   const tabs: { key: FilterTab; label: string; count: number }[] = [
     { key: 'occupied', label: '입주중', count: occupied.length },
     { key: 'checkout', label: '공실예정', count: checkout.length },
-    { key: 'vacant', label: '전체', count: tenants.length },
+    { key: 'vacant', label: '전체', count: guFiltered.length },
   ];
 
   if (loading) {
@@ -100,6 +104,15 @@ export default function TenantsPage() {
             <button onClick={() => { setSearch(''); setSearchFocused(false); }} style={{ fontSize: 14, color: '#3182F6', fontWeight: 500, whiteSpace: 'nowrap', background: 'none', border: 'none', cursor: 'pointer' }}>취소</button>
           )}
         </div>
+
+        {/* 구 필터 칩 */}
+        {!isSearching && guList.length > 0 && (
+          <div style={{ display: 'flex', overflowX: 'auto', gap: 6, padding: '0 16px 12px', scrollbarWidth: 'none' }}>
+            {['전체', ...guList].map(g => (
+              <button key={g} onClick={() => setGu(g)} style={{ padding: '6px 14px', borderRadius: 100, border: gu === g ? '1px solid #191f28' : '1px solid #e5e8eb', background: gu === g ? '#191f28' : '#fff', color: gu === g ? '#fff' : '#4e5968', fontSize: 13, fontWeight: gu === g ? 600 : 400, whiteSpace: 'nowrap', flexShrink: 0, cursor: 'pointer', fontFamily: 'inherit' }}>{g}</button>
+            ))}
+          </div>
+        )}
 
         {/* 필터 탭 */}
         {!isSearching && (
@@ -210,7 +223,7 @@ export default function TenantsPage() {
           {/* 전체 */}
           {filter === 'vacant' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {tenants.map(t => (
+              {guFiltered.map(t => (
                 <Link key={t['입주자ID']} href={`/tenants/${t['입주자ID']}`}
                   style={{ background: '#fff', padding: 16, borderRadius: 16, display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none', color: 'inherit' }}>
                   <Avatar name={t['이름']} size={40} />

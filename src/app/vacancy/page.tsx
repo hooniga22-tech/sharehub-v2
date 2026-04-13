@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { X, FileText, Check } from 'lucide-react';
 
@@ -22,6 +22,8 @@ export default function VacancyPage() {
   const [memoSheet, setMemoSheet] = useState<Vac | null>(null);
   const [detailSheet, setDetailSheet] = useState<Vac | null>(null);
   const [toast, setToast] = useState('');
+  const [gu, setGu] = useState('전체');
+  const [guMap, setGuMap] = useState<Record<string, string>>({});
 
   const [pName, setPName] = useState('');
   const [pPhone, setPPhone] = useState('');
@@ -38,15 +40,24 @@ export default function VacancyPage() {
   }, [anySheet]);
 
   useEffect(() => {
-    fetch('/api/vacancies').then(r => r.json()).then(data => {
-      setVacs(Array.isArray(data) ? data : []);
+    Promise.all([
+      fetch('/api/vacancies').then(r => r.json()),
+      fetch('/api/houses').then(r => r.json()),
+    ]).then(([vacData, houseData]) => {
+      setVacs(Array.isArray(vacData) ? vacData : []);
+      const map: Record<string, string> = {};
+      (Array.isArray(houseData) ? houseData : []).forEach((h: any) => { if (h['지점명'] && h['구']) map[h['지점명']] = h['구']; });
+      setGuMap(map);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
 
-  const vacantNow = vacs.filter(v => v.공실유형 === '현재공실');
-  const vacantSoon = vacs.filter(v => v.공실유형 === '공실예정');
-  const withProspect = vacs.filter(v => v.예정자명);
+  const guList = useMemo(() => [...new Set(Object.values(guMap).filter(Boolean))].sort(), [guMap]);
+  const guFiltered = useMemo(() => gu === '전체' ? vacs : vacs.filter(v => guMap[v.지점명] === gu), [vacs, gu, guMap]);
+
+  const vacantNow = guFiltered.filter(v => v.공실유형 === '현재공실');
+  const vacantSoon = guFiltered.filter(v => v.공실유형 === '공실예정');
+  const withProspect = guFiltered.filter(v => v.예정자명);
 
   const openProspect = (v: Vac) => {
     setProspectSheet(v);
@@ -169,6 +180,14 @@ export default function VacancyPage() {
           </button>
         ))}
       </div>
+
+      {guList.length > 0 && (
+        <div style={{ display: 'flex', overflowX: 'auto', gap: 6, padding: '12px 16px', scrollbarWidth: 'none', background: '#F7F8FA' }}>
+          {['전체', ...guList].map(g => (
+            <button key={g} onClick={() => setGu(g)} style={{ padding: '6px 14px', borderRadius: 100, border: gu === g ? '1px solid #191f28' : '1px solid #e5e8eb', background: gu === g ? '#191f28' : '#fff', color: gu === g ? '#fff' : '#4e5968', fontSize: 13, fontWeight: gu === g ? 600 : 400, whiteSpace: 'nowrap', flexShrink: 0, cursor: 'pointer', fontFamily: 'inherit' }}>{g}</button>
+          ))}
+        </div>
+      )}
 
       <div style={{ padding: 16 }}>
         {tab === 0 && (

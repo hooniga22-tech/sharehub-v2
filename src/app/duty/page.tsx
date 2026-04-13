@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronRight, X, Check, Undo2, ShieldOff, RefreshCw } from 'lucide-react';
 
@@ -30,6 +30,8 @@ export default function DutyPage() {
   const [duties, setDuties] = useState<Duty[]>([]);
   const [thisWeek, setThisWeek] = useState('');
   const [houses, setHouses] = useState<string[]>([]);
+  const [houseGuMap, setHouseGuMap] = useState<Record<string, string>>({});
+  const [gu, setGu] = useState('전체');
   const [loading, setLoading] = useState(false);
   const [exemptSheet, setExemptSheet] = useState<string | null>(null);
   const [exemptReason, setExemptReason] = useState('');
@@ -38,9 +40,15 @@ export default function DutyPage() {
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2200); };
 
   useEffect(() => {
-    fetch('/api/tenants').then(r => r.json()).then(data => {
-      const names = [...new Set((Array.isArray(data) ? data : []).map((t: { 지점명?: string }) => t.지점명))].filter(Boolean) as string[];
+    Promise.all([
+      fetch('/api/tenants').then(r => r.json()),
+      fetch('/api/houses').then(r => r.json()),
+    ]).then(([tenantData, houseData]) => {
+      const names = [...new Set((Array.isArray(tenantData) ? tenantData : []).map((t: { 지점명?: string }) => t.지점명))].filter(Boolean) as string[];
       setHouses(names.sort());
+      const map: Record<string, string> = {};
+      (Array.isArray(houseData) ? houseData : []).forEach((h: any) => { if (h['지점명'] && h['구']) map[h['지점명']] = h['구']; });
+      setHouseGuMap(map);
     });
   }, []);
 
@@ -105,6 +113,9 @@ export default function DutyPage() {
   const futureSlots = duties.filter(d => d.주차시작일 > thisWeek);
   const pastSlots = duties.filter(d => d.주차시작일 < thisWeek).sort((a, b) => b.주차시작일.localeCompare(a.주차시작일));
 
+  const guList = useMemo(() => [...new Set(Object.values(houseGuMap).filter(Boolean))].sort(), [houseGuMap]);
+  const filteredHouses = useMemo(() => gu === '전체' ? houses : houses.filter(h => houseGuMap[h] === gu), [houses, gu, houseGuMap]);
+
   // House selection
   if (!selHouse) {
     return (
@@ -113,9 +124,16 @@ export default function DutyPage() {
           <button onClick={() => router.push('/manage')} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', padding: 4, color: '#191919' }}>←</button>
           <span style={{ fontSize: 16, fontWeight: 700 }}>당번 관리</span>
         </div>
+        {guList.length > 0 && (
+          <div style={{ display: 'flex', overflowX: 'auto', gap: 6, padding: '12px 16px', scrollbarWidth: 'none', background: '#F7F8FA' }}>
+            {['전체', ...guList].map(g => (
+              <button key={g} onClick={() => setGu(g)} style={{ padding: '6px 14px', borderRadius: 100, border: gu === g ? '1px solid #191f28' : '1px solid #e5e8eb', background: gu === g ? '#191f28' : '#fff', color: gu === g ? '#fff' : '#4e5968', fontSize: 13, fontWeight: gu === g ? 600 : 400, whiteSpace: 'nowrap', flexShrink: 0, cursor: 'pointer', fontFamily: 'inherit' }}>{g}</button>
+            ))}
+          </div>
+        )}
         <div style={{ padding: 16 }}>
           <div style={{ background: '#fff', borderRadius: 14, overflow: 'hidden' }}>
-            {houses.map((h, i) => (
+            {filteredHouses.map((h, i) => (
               <div key={h}>
                 {i > 0 && <div style={{ height: 1, background: '#F5F5F5', margin: '0 20px' }} />}
                 <button onClick={() => { setSelHouse(h); setTab(0); fetchDuty(h); }}

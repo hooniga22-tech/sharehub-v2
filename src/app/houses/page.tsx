@@ -49,9 +49,9 @@ export default function HousesPage() {
     <div style={{ background: '#f5f5f5', minHeight: '100vh' }}>
       <div style={{ background: '#fff', padding: '14px 16px 10px', borderBottom: '1px solid #f2f4f6', position: 'sticky', top: 0, zIndex: 10 }}>
         <div style={{ fontSize: 17, fontWeight: 700, color: '#191f28', marginBottom: 10 }}>지점 관리</div>
-        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', padding: '0 0 12px', scrollbarWidth: 'none' }}>
           {['전체', ...guList].map(g => (
-            <button key={g} onClick={() => setGu(g)} style={{ padding: '5px 13px', borderRadius: 20, border: 'none', background: gu === g ? BLUE : '#f2f4f6', color: gu === g ? '#fff' : GRAY, fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>{g}</button>
+            <button key={g} onClick={() => setGu(g)} style={{ padding: '6px 14px', borderRadius: 100, border: gu === g ? '1px solid #191f28' : '1px solid #e5e8eb', background: gu === g ? '#191f28' : '#fff', color: gu === g ? '#fff' : '#4e5968', fontSize: 13, fontWeight: gu === g ? 600 : 400, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, fontFamily: 'inherit' }}>{g}</button>
           ))}
         </div>
       </div>
