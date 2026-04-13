@@ -6,7 +6,7 @@ import { useParams } from 'next/navigation';
 const BLUE = '#3182f6', GRAY = '#8b95a1', GREEN = '#00c471', RED = '#f04452', ORANGE = '#f59f00';
 const fmt = (n: number) => n.toLocaleString() + '원';
 
-const SUPPLIES = ['화장지', '주방세제', '세탁세제', '수세미', '고무장갑', '쓰레기봉투', '기타'];
+const SUPPLIES = ['화장지', '주방세제', '세탁세제', '수세미', '고무장갑', '기타'];
 
 const Toast = ({ msg }: { msg: string }) => (
   <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: '#191f28', color: '#fff', padding: '10px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600, zIndex: 999, whiteSpace: 'nowrap' }}>{msg}</div>
@@ -351,68 +351,53 @@ export default function TenantPortalPage() {
         </Card>
 
         {/* Supplies */}
-        <Card>
-          <CardTitle title={t('비품 신청', 'Supply Request')} />
-          <div style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {SUPPLIES.map(s => (
-                <button key={s} onClick={() => setSelSupplies(p => p.includes(s) ? p.filter(x => x !== s) : [...p, s])}
-                  style={{ padding: '6px 13px', borderRadius: 20, border: `1.5px solid ${selSupplies.includes(s) ? BLUE : '#e5e8eb'}`, background: selSupplies.includes(s) ? '#ebf3ff' : '#fff', color: selSupplies.includes(s) ? BLUE : '#191f28', fontSize: 12, fontWeight: selSupplies.includes(s) ? 700 : 400, cursor: 'pointer' }}>
+        <div style={{ background: '#fff', borderRadius: 16, padding: '18px 16px' }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#191f28', marginBottom: 14 }}>{t('비품 신청', 'Supply Request')}</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {SUPPLIES.map(s => {
+              const sel = selSupplies.includes(s);
+              return (
+                <button key={s} onClick={() => setSelSupplies(p => sel ? p.filter(x => x !== s) : [...p, s])}
+                  style={{ padding: '7px 14px', borderRadius: 8, border: `1px solid ${sel ? '#191f28' : '#e5e8eb'}`, background: sel ? '#191f28' : '#fff', color: sel ? '#fff' : '#4e5968', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
                   {s}
                 </button>
-              ))}
-            </div>
-            {selSupplies.includes('기타') && (
-              <input value={etcText} onChange={e => setEtcText(e.target.value)} placeholder={t('필요한 물품을 입력해 주세요', 'Enter item name')}
-                style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e8eb', borderRadius: 8, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
-            )}
-            <div style={{ fontSize: 11, color: GRAY, lineHeight: 1.5 }}>{t('쓰레기봉투 구매 시 기타에 계좌정보를 입력해 주세요.', 'For trash bags, include account info in \'Other\'.')}</div>
-            <button onClick={submitSupply}
-              style={{ width: '100%', padding: 13, borderRadius: 10, border: 'none', background: selSupplies.length ? BLUE : '#e5e8eb', color: '#fff', fontSize: 14, fontWeight: 700, cursor: selSupplies.length ? 'pointer' : 'not-allowed' }}>
-              {t('신청하기', 'Request')}
-            </button>
+              );
+            })}
           </div>
-        </Card>
+          {selSupplies.includes('기타') && (
+            <input value={etcText} onChange={e => setEtcText(e.target.value)} placeholder={t('필요한 물품을 입력해 주세요', 'Enter item name')}
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e8eb', borderRadius: 8, fontSize: 13, outline: 'none', boxSizing: 'border-box', marginTop: 10 }} />
+          )}
+          <button onClick={submitSupply}
+            style={{ width: '100%', padding: '12px 0', borderRadius: 10, border: 'none', background: selSupplies.length ? '#191f28' : '#f2f3f5', color: selSupplies.length ? '#fff' : '#8b95a1', fontSize: 14, fontWeight: 600, cursor: selSupplies.length ? 'pointer' : 'not-allowed', marginTop: 14 }}>
+            {t('신청하기', 'Request')}
+          </button>
+        </div>
 
         {/* Issues */}
-        <Card>
-          <CardTitle title={t('불편사항 신청', 'Report Issue')} />
-          <div style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div onClick={() => setIssueSheet('수리')} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', borderRadius: 10, background: '#fff8f0', border: '1px solid #ffe0cc', cursor: 'pointer' }}>
+        <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden' }}>
+          <div style={{ padding: '16px 16px 8px', fontSize: 15, fontWeight: 700, color: '#191f28' }}>{t('불편사항 신청', 'Report Issue')}</div>
+          {[
+            { key: '수리', label: t('수리 신청', 'Repair Request'), sub: t('시설 고장·파손 신고', 'Report facility damage'), action: () => setIssueSheet('수리') },
+            { key: '청소', label: t('청소 요청', 'Cleaning Request'), sub: t('공용공간 청소 요청', 'Common area cleaning'), action: () => window.open('/apply/cleaning', '_blank') },
+            { key: '기타', label: t('기타 문의', 'Other Inquiry'), sub: t('그 외 문의사항', 'Other inquiries'), action: () => setIssueSheet('기타') },
+          ].map(item => (
+            <div key={item.key} onClick={item.action} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderTop: '1px solid #f2f3f5', cursor: 'pointer' }}>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: RED, marginBottom: 2 }}>{t('수리', 'Repair')}</div>
-                <div style={{ fontSize: 11, color: GRAY }}>{t('시설 고장·파손 신고', 'Report facility damage')}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#191f28' }}>{item.label}</div>
+                <div style={{ fontSize: 12, color: '#8b95a1', marginTop: 2 }}>{item.sub}</div>
               </div>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 18L15 12L9 6" stroke={RED} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 18L15 12L9 6" stroke="#8b95a1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <div onClick={() => window.open('/apply/cleaning', '_blank')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '14px 8px', borderRadius: 10, background: '#f0f9ff', border: '1px solid #bae6fd', cursor: 'pointer', textAlign: 'center' }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#0369a1', marginBottom: 2 }}>{t('방청소 신청', 'Room Cleaning')}</div>
-                <div style={{ fontSize: 11, color: GRAY }}>{t('신청서 작성', 'Fill out form')}</div>
-              </div>
-              <div onClick={() => window.open('/apply/aircon', '_blank')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '14px 8px', borderRadius: 10, background: '#f0f4ff', border: '1px solid #c7d2fe', cursor: 'pointer', textAlign: 'center' }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#4338ca', marginBottom: 2 }}>{t('에어컨 신청', 'A/C Request')}</div>
-                <div style={{ fontSize: 11, color: GRAY }}>{t('신청서 작성', 'Fill out form')}</div>
-              </div>
-            </div>
-
-            <div onClick={() => setIssueSheet('기타')} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', borderRadius: 10, background: '#f8f9fa', border: '1px solid #e5e8eb', cursor: 'pointer' }}>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#191f28', marginBottom: 2 }}>{t('기타', 'Other')}</div>
-                <div style={{ fontSize: 11, color: GRAY }}>{t('그 외 문의사항', 'Other inquiries')}</div>
-              </div>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 18L15 12L9 6" stroke={GRAY} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            </div>
-          </div>
-        </Card>
+          ))}
+        </div>
 
         {/* Bottom Buttons */}
-        <button onClick={() => window.open('https://pf.kakao.com/_xnxnNxj/chat', '_blank')} style={{ width: '100%', padding: 15, borderRadius: 14, border: 'none', background: '#3182f6', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+        <button onClick={() => window.open('https://pf.kakao.com/_xnxnNxj/chat', '_blank')} style={{ width: '100%', padding: '15px 0', borderRadius: 12, border: 'none', background: '#3182f6', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
           {t('매니저에게 문의하기', 'Contact Manager')}
         </button>
 
-        <button onClick={() => window.open('/apply/checkout', '_blank')} style={{ width: '100%', padding: '12px 0', borderRadius: 10, border: '1px solid rgba(240,68,82,0.3)', background: '#fff0f1', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#f04452', textAlign: 'center', fontFamily: 'inherit' }}>
+        <button onClick={() => window.open('/apply/checkout', '_blank')} style={{ width: '100%', padding: '14px 0', borderRadius: 12, border: '1px solid #e5e8eb', background: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer', color: '#8b95a1', textAlign: 'center', fontFamily: 'inherit' }}>
           {t('퇴실 신청', 'Move-out Request')}
         </button>
       </div>
