@@ -179,7 +179,7 @@ export default function TenantPortalPage() {
             <div style={{ fontSize: 13, color: '#191f28', fontWeight: 600, marginBottom: 4 }}>{t('카카오톡으로 문의해 주세요', 'Please contact us via KakaoTalk')}</div>
             <div style={{ fontSize: 12, color: GRAY }}>{t('사진 첨부 후 매니저가 빠르게 처리해 드려요', 'Attach photos and we\'ll handle it quickly')}</div>
           </div>
-          <button onClick={() => { setIssueSheet(null); window.open('http://pf.kakao.com/_xnxnNxj', '_blank'); }}
+          <button onClick={() => { setIssueSheet(null); window.open('https://pf.kakao.com/_xnxnNxj/chat', '_blank'); }}
             style={{ width: '100%', padding: 14, borderRadius: 12, border: 'none', background: '#3182f6', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
             {t('매니저에게 문의하기', 'Contact Manager')}
           </button>
@@ -386,14 +386,14 @@ export default function TenantPortalPage() {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 18L15 12L9 6" stroke={RED} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </div>
 
-            <div onClick={() => window.open('/apply/cleaning', '_blank')} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', borderRadius: 10, background: '#f0f9ff', border: '1px solid #bae6fd', cursor: 'pointer' }}>
-              <div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div onClick={() => window.open('/apply/cleaning', '_blank')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '14px 8px', borderRadius: 10, background: '#f0f9ff', border: '1px solid #bae6fd', cursor: 'pointer', textAlign: 'center' }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: '#0369a1', marginBottom: 2 }}>{t('방청소 신청', 'Room Cleaning')}</div>
-                <div style={{ fontSize: 11, color: GRAY }}>{t('신청서 작성 후 배정됩니다', 'Fill out form to request')}</div>
+                <div style={{ fontSize: 11, color: GRAY }}>{t('신청서 작성', 'Fill out form')}</div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ fontSize: 11, color: BLUE, fontWeight: 600 }}>{t('신청서', 'Form')}</span>
-                <LinkIcon />
+              <div onClick={() => window.open('/apply/aircon', '_blank')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '14px 8px', borderRadius: 10, background: '#f0f4ff', border: '1px solid #c7d2fe', cursor: 'pointer', textAlign: 'center' }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#4338ca', marginBottom: 2 }}>{t('에어컨 신청', 'A/C Request')}</div>
+                <div style={{ fontSize: 11, color: GRAY }}>{t('신청서 작성', 'Fill out form')}</div>
               </div>
             </div>
 
@@ -408,16 +408,7 @@ export default function TenantPortalPage() {
         </Card>
 
         {/* Bottom Buttons */}
-        <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={() => window.open('/apply/cleaning', '_blank')} style={{ flex: 1, padding: '12px 0', borderRadius: 10, border: '1px solid #e5e8eb', background: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#191f28', textAlign: 'center', fontFamily: 'inherit' }}>
-            {t('방청소 신청', 'Room Cleaning')}
-          </button>
-          <button onClick={() => window.open('/apply/aircon', '_blank')} style={{ flex: 1, padding: '12px 0', borderRadius: 10, border: '1px solid #e5e8eb', background: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#191f28', textAlign: 'center', fontFamily: 'inherit' }}>
-            {t('에어컨 신청', 'A/C Request')}
-          </button>
-        </div>
-
-        <button onClick={() => window.open('http://pf.kakao.com/_xnxnNxj', '_blank')} style={{ width: '100%', padding: 15, borderRadius: 14, border: 'none', background: '#3182f6', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+        <button onClick={() => window.open('https://pf.kakao.com/_xnxnNxj/chat', '_blank')} style={{ width: '100%', padding: 15, borderRadius: 14, border: 'none', background: '#3182f6', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
           {t('매니저에게 문의하기', 'Contact Manager')}
         </button>
 
