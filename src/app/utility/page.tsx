@@ -20,7 +20,7 @@ export default function UtilityPage() {
   const router = useRouter();
   const [tab, setTab] = useState(0);
   const [month, setMonth] = useState(new Date().getMonth() + 1);
-  const [year] = useState(new Date().getFullYear());
+  const [year, setYear] = useState(new Date().getFullYear());
   const [data, setData] = useState<UtilData[]>([]);
   const [allData, setAllData] = useState<UtilData[]>([]); // For trend tab
   const [houses, setHouses] = useState<HouseInfo[]>([]);
@@ -147,14 +147,19 @@ export default function UtilityPage() {
             <button onClick={() => router.push('/manage')} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', padding: 4, color: '#191919' }}>←</button>
             <span style={{ fontSize: 16, fontWeight: 700 }}>공과금 관리</span>
           </div>
-          <div style={{ display: 'flex', gap: 4 }}>
-            {[month - 2, month - 1, month].filter(m => m > 0).map(m => (
-              <button key={m} onClick={() => setMonth(m)}
-                style={{ padding: '6px 12px', borderRadius: 16, border: 'none', background: month === m ? BLUE : '#F2F4F6', color: month === m ? '#fff' : '#666', fontSize: 12, fontWeight: month === m ? 600 : 400, cursor: 'pointer', fontFamily: 'inherit' }}>
-                {m}월
-              </button>
-            ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <button onClick={() => setYear(y => y - 1)} style={{ border: 'none', background: 'none', fontSize: 16, color: '#4e5968', cursor: 'pointer', padding: '0 4px' }}>‹</button>
+            <span style={{ fontSize: 16, fontWeight: 600, color: '#4e5968' }}>{year}</span>
+            <button onClick={() => setYear(y => y + 1)} style={{ border: 'none', background: 'none', fontSize: 16, color: '#4e5968', cursor: 'pointer', padding: '0 4px' }}>›</button>
           </div>
+        </div>
+        <div style={{ overflowX: 'auto', display: 'flex', gap: 6, padding: '0 16px 12px', scrollbarWidth: 'none' } as React.CSSProperties}>
+          {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+            <button key={m} onClick={() => setMonth(m)}
+              style={{ padding: '7px 14px', borderRadius: 100, border: `1px solid ${month === m ? '#3182f6' : '#e5e8eb'}`, background: month === m ? '#3182f6' : '#fff', color: month === m ? '#fff' : '#4e5968', fontSize: 13, fontWeight: month === m ? 600 : 400, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', flexShrink: 0 }}>
+              {m}월
+            </button>
+          ))}
         </div>
         <div style={{ display: 'flex', background: '#fff', borderTop: '1px solid #F0F0F0' }}>
           {tabLabels.map((label, i) => (
