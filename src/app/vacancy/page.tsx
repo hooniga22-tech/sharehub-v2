@@ -59,20 +59,14 @@ export default function VacancyPage() {
   const guList = useMemo(() => [...new Set(Object.values(guMap).filter(Boolean))].sort(), [guMap]);
   const guFiltered = useMemo(() => gu === '전체' ? vacs : vacs.filter(v => guMap[v.지점명] === gu), [vacs, gu, guMap]);
 
-  const today = useMemo(() => new Date().toISOString().split('T')[0], []);
   const guFilteredTenants = useMemo(() => gu === '전체' ? tenants : tenants.filter(t => guMap[t['지점명']] === gu), [tenants, gu, guMap]);
 
-  // 공실현황: 상태==='공실' or 이름==='즉시입주'
-  const vacantNowTenants = useMemo(() => guFilteredTenants.filter(t => t['상태'] === '공실' || t['이름'] === '즉시입주'), [guFilteredTenants]);
+  // 공실현황: 상태==='공실'
+  const vacantNowTenants = useMemo(() => guFilteredTenants.filter(t => t['상태'] === '공실'), [guFilteredTenants]);
   // 공실예정: 상태==='공실예정'
   const vacantSoonTenants = useMemo(() => guFilteredTenants.filter(t => t['상태'] === '공실예정'), [guFilteredTenants]);
-  // 입주예정: 상태==='입주중' and 입주일 > today
-  const moveInSoonTenants = useMemo(() => guFilteredTenants.filter(t => t['상태'] === '입주중' && t['입주일'] && t['입주일'] > today), [guFilteredTenants, today]);
-
-  // Keep vacancy data for existing features
-  const vacantNow = guFiltered.filter(v => v.공실유형 === '현재공실');
-  const vacantSoon = guFiltered.filter(v => v.공실유형 === '공실예정');
-  const withProspect = guFiltered.filter(v => v.예정자명);
+  // 전체공실: 위 둘 합산
+  const allVacantTenants = useMemo(() => guFilteredTenants.filter(t => t['상태'] === '공실' || t['상태'] === '공실예정'), [guFilteredTenants]);
 
   const openProspect = (v: Vac) => {
     setProspectSheet(v);
@@ -118,7 +112,9 @@ export default function VacancyPage() {
     showToast('✅ 입주 확정 완료!');
   };
 
-  const tabLabels = [`공실현황 ${vacantNowTenants.length}`, `공실예정 ${vacantSoonTenants.length}`, `입주예정 ${moveInSoonTenants.length}`];
+  const tabLabels = [`공실현황 ${vacantNowTenants.length}`, `공실예정 ${vacantSoonTenants.length}`, `전체공실 ${allVacantTenants.length}`];
+
+  const fmt = (n: number) => n.toLocaleString() + '원';
 
   const VacCard = ({ v }: { v: Vac }) => {
     const hasProspect = !!v.예정자명;
@@ -214,7 +210,8 @@ export default function VacancyPage() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
                       <div style={{ fontSize: 15, fontWeight: 700, color: '#191f28' }}>{t['지점명']} {t['방코드']}</div>
-                      <div style={{ fontSize: 12, color: GRAY, marginTop: 2 }}>{t['이름']} · {t['상태']}</div>
+                      <div style={{ fontSize: 12, color: GRAY, marginTop: 2 }}>{t['방타입'] || '-'}</div>
+                      <div style={{ fontSize: 12, color: '#4e5968', marginTop: 4 }}>월세 {fmt(Number(t['월세']) || 0)} · 관리비 {fmt(Number(t['관리비']) || 0)}</div>
                     </div>
                     <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#fee2e2', color: RED }}>공실</span>
                   </div>
@@ -223,7 +220,6 @@ export default function VacancyPage() {
             </>
           ) : (
             <div style={{ textAlign: 'center', padding: '60px 0' }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
               <div style={{ fontSize: 16, fontWeight: 600, color: '#333', marginBottom: 4 }}>현재 공실이 없어요</div>
               <div style={{ fontSize: 13, color: GRAY }}>모든 방이 입주 중이에요</div>
             </div>
@@ -239,7 +235,8 @@ export default function VacancyPage() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
                       <div style={{ fontSize: 15, fontWeight: 700, color: '#191f28' }}>{t['지점명']} {t['방코드']}</div>
-                      <div style={{ fontSize: 12, color: GRAY, marginTop: 2 }}>{t['이름']} · 퇴실 {t['퇴실일'] || '-'}</div>
+                      <div style={{ fontSize: 12, color: GRAY, marginTop: 2 }}>{t['방타입'] || '-'} · 퇴실 {t['퇴실일'] || '-'}</div>
+                      <div style={{ fontSize: 12, color: '#4e5968', marginTop: 4 }}>월세 {fmt(Number(t['월세']) || 0)} · 관리비 {fmt(Number(t['관리비']) || 0)}</div>
                     </div>
                     <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#fff8e1', color: '#b7791f' }}>공실예정</span>
                   </div>
@@ -248,33 +245,35 @@ export default function VacancyPage() {
             </>
           ) : (
             <div style={{ textAlign: 'center', padding: '60px 0' }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
               <div style={{ fontSize: 16, fontWeight: 600, color: '#333' }}>공실 예정이 없어요</div>
             </div>
           )
         )}
 
         {tab === 2 && (
-          moveInSoonTenants.length > 0 ? (
+          allVacantTenants.length > 0 ? (
             <>
-              <div style={{ fontSize: 13, fontWeight: 700, color: GREEN, marginBottom: 10 }}>입주 예정 {moveInSoonTenants.length}명</div>
-              {moveInSoonTenants.map(t => (
-                <div key={t['입주자ID']} style={{ background: '#fff', borderRadius: 14, padding: 16, marginBottom: 10, border: '1px solid #d1fae5' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: '#191f28' }}>{t['지점명']} {t['방코드']}</div>
-                      <div style={{ fontSize: 12, color: GRAY, marginTop: 2 }}>{t['이름']} · 입주 {t['입주일']}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: BLUE, marginBottom: 10 }}>전체 공실 {allVacantTenants.length}실</div>
+              {allVacantTenants.map(t => {
+                const isNow = t['상태'] === '공실';
+                return (
+                  <div key={t['입주자ID']} style={{ background: '#fff', borderRadius: 14, padding: 16, marginBottom: 10, border: `1px solid ${isNow ? '#fcc' : '#fde68a'}` }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: '#191f28' }}>{t['지점명']} {t['방코드']}</div>
+                        <div style={{ fontSize: 12, color: GRAY, marginTop: 2 }}>{t['방타입'] || '-'}{!isNow && t['퇴실일'] ? ` · 퇴실 ${t['퇴실일']}` : ''}</div>
+                        <div style={{ fontSize: 12, color: '#4e5968', marginTop: 4 }}>월세 {fmt(Number(t['월세']) || 0)} · 관리비 {fmt(Number(t['관리비']) || 0)}</div>
+                      </div>
+                      <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: isNow ? '#fee2e2' : '#fff8e1', color: isNow ? RED : '#b7791f' }}>{isNow ? '공실' : '공실예정'}</span>
                     </div>
-                    <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#e8faf2', color: '#0e6245' }}>입주예정</span>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </>
           ) : (
             <div style={{ textAlign: 'center', padding: '60px 0' }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
-              <div style={{ fontSize: 16, fontWeight: 600, color: '#333', marginBottom: 4 }}>입주 예정자가 없어요</div>
-              <div style={{ fontSize: 13, color: GRAY }}>공실/공실예정 탭에서 등록해보세요</div>
+              <div style={{ fontSize: 16, fontWeight: 600, color: '#333', marginBottom: 4 }}>공실이 없어요</div>
+              <div style={{ fontSize: 13, color: GRAY }}>모든 방이 입주 중이에요</div>
             </div>
           )
         )}
