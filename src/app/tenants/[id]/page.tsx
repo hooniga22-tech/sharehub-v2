@@ -5,6 +5,7 @@ import useSWR from 'swr';
 import { fetcher } from '@/lib/fetcher';
 import { useParams, useRouter } from 'next/navigation';
 import { Phone, MessageSquare, FileText, Plus, X, Check } from 'lucide-react';
+import { getMonthlyCharge } from '@/lib/prorata';
 
 const BLUE = '#3182f6', GRAY = '#8b95a1', GREEN = '#00c471', RED = '#f04452', ORANGE = '#d97706';
 const fmt = (n: number) => n.toLocaleString() + '원';
@@ -122,6 +123,9 @@ export default function TenantDetailPage() {
   const mgmt = Number(tenant.관리비) || 0;
   const deposit = Number(tenant.보증금) || 0;
 
+  const now = new Date();
+  const charge = getMonthlyCharge(rent, mgmt, tenant.입주일 || '', now.getFullYear(), now.getMonth() + 1);
+
   const sortedPayments = [...payments].sort((a, b) => {
     const aKey = `${a.연도}.${a.월.padStart(2, '0')}`;
     const bKey = `${b.연도}.${b.월.padStart(2, '0')}`;
@@ -195,7 +199,30 @@ export default function TenantDetailPage() {
 
       {/* Section 3: Payments */}
       <div style={{ background: '#fff', padding: 16, marginBottom: 8 }}>
-        <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>이달 수납</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+          <h3 style={{ fontSize: 13, fontWeight: 700 }}>이달 수납</h3>
+          {charge.isProrata && (
+            <span style={{ padding: '2px 7px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#fff8e6', color: '#f59f00' }}>일할계산</span>
+          )}
+        </div>
+        {charge.isProrata && charge.detail && (
+          <div style={{ background: '#fff8ed', borderRadius: 10, padding: 12, marginBottom: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#f59f00', marginBottom: 8 }}>일할계산 내역</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555', marginBottom: 4 }}>
+              <span>월세: {fmt(rent)} ({charge.detail.days}일/{charge.detail.daysInMonth}일)</span>
+              <span style={{ fontWeight: 600 }}>{fmt(charge.detail.rentPart)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555', marginBottom: 8 }}>
+              <span>관리비: {fmt(mgmt)} ({charge.detail.days}일/{charge.detail.daysInMonth}일)</span>
+              <span style={{ fontWeight: 600 }}>{fmt(charge.detail.mgmtPart)}</span>
+            </div>
+            <div style={{ height: 1, background: '#f0e4cc', marginBottom: 8 }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, color: '#f59f00' }}>
+              <span>합계</span>
+              <span>{fmt(charge.detail.total)}</span>
+            </div>
+          </div>
+        )}
         {sortedPayments.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {sortedPayments.map((p, i) => {
@@ -300,7 +327,26 @@ export default function TenantDetailPage() {
               <span style={{ fontSize: 16, fontWeight: 700 }}>납부 등록</span>
               <button onClick={() => setPaySheet(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="#999" /></button>
             </div>
-            <div style={{ fontSize: 13, color: GRAY, marginBottom: 20 }}>{tenant.이름} · {paySheet.연도}년 {paySheet.월}월분</div>
+            <div style={{ fontSize: 13, color: GRAY, marginBottom: charge.isProrata ? 12 : 20 }}>{tenant.이름} · {paySheet.연도}년 {paySheet.월}월분</div>
+
+            {charge.isProrata && charge.detail && (
+              <div style={{ background: '#fff8ed', borderRadius: 10, padding: 12, marginBottom: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#f59f00', marginBottom: 8 }}>일할계산 적용</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555', marginBottom: 4 }}>
+                  <span>월세 ({charge.detail.days}일/{charge.detail.daysInMonth}일)</span>
+                  <span style={{ fontWeight: 600 }}>{fmt(charge.detail.rentPart)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555', marginBottom: 4 }}>
+                  <span>관리비 ({charge.detail.days}일/{charge.detail.daysInMonth}일)</span>
+                  <span style={{ fontWeight: 600 }}>{fmt(charge.detail.mgmtPart)}</span>
+                </div>
+                <div style={{ height: 1, background: '#f0e4cc', margin: '8px 0' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, color: '#f59f00' }}>
+                  <span>청구금액</span>
+                  <span>{fmt(charge.detail.total)}</span>
+                </div>
+              </div>
+            )}
 
             <div style={{ marginBottom: 16 }}>
               <label style={{ fontSize: 13, fontWeight: 600, color: '#333', display: 'block', marginBottom: 8 }}>납부 방법</label>

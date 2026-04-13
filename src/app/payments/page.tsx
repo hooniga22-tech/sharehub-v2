@@ -3,13 +3,14 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Upload, Plus, ChevronDown, ChevronUp, ChevronRight, Check, X, FileSpreadsheet } from 'lucide-react';
+import { getMonthlyCharge } from '@/lib/prorata';
 
 const BLUE = '#3182f6', RED = '#f04452', GREEN = '#00c471', GRAY = '#8b95a1';
 const fmt = (n: number) => n.toLocaleString() + '원';
 
 type Tab = 'all' | 'unpaid' | 'paid';
 type Payment = { 수납ID: string; 입주자ID: string; 지점명: string; 방코드: string; 입주자명: string; 연도: string; 월: string; 월세금액: string; 관리비금액: string; 납부여부: string; 납부일: string; 납부방법: string; 메모: string };
-type Tenant = { 입주자ID: string; 구: string; 지점명: string; 방코드: string; 이름: string; 상태: string; 월세: string; 관리비: string };
+type Tenant = { 입주자ID: string; 구: string; 지점명: string; 방코드: string; 이름: string; 상태: string; 월세: string; 관리비: string; 입주일: string };
 
 export default function PaymentsPage() {
   const router = useRouter();
@@ -48,12 +49,17 @@ export default function PaymentsPage() {
     return activeTenants.map(t => {
       const pay = payments.find(p => p.입주자ID === t.입주자ID);
       const isPaid = pay?.납부여부 === '납부';
+      const r = Number(t.월세 || 0), m = Number(t.관리비 || 0);
+      const charge = getMonthlyCharge(r, m, t.입주일 || '', year, month);
       return {
         ...t,
         paymentId: pay?.수납ID || '',
         paid: isPaid,
-        rentAmount: Number(pay?.월세금액 || t.월세 || 0),
+        rentAmount: Number(pay?.월세금액 || 0) || charge.amount,
+        fullAmount: r + m,
         paidDate: pay?.납부일 || '',
+        isProrata: charge.isProrata,
+        prorataAmount: charge.amount,
       };
     });
   }, [tenants, payments]);
@@ -236,8 +242,18 @@ export default function PaymentsPage() {
                       <div style={{ fontSize: 11, color: GRAY, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.지점명} {t.방코드}</div>
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: t.paid ? GREEN : RED }}>{fmt(t.rentAmount)}</div>
-                      <span style={{ fontSize: 11, fontWeight: 600, color: t.paid ? GREEN : RED }}>{t.paid ? '납부' : '미납'}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}>
+                        {t.isProrata && <span style={{ fontSize: 14, fontWeight: 700, color: '#f59f00' }}>{fmt(t.prorataAmount)}</span>}
+                        {t.isProrata ? (
+                          <span style={{ fontSize: 11, color: GRAY, textDecoration: 'line-through' }}>{fmt(t.fullAmount)}</span>
+                        ) : (
+                          <span style={{ fontSize: 14, fontWeight: 700, color: t.paid ? GREEN : RED }}>{fmt(t.rentAmount)}</span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}>
+                        {t.isProrata && <span style={{ padding: '2px 7px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#fff8e6', color: '#f59f00' }}>일할</span>}
+                        <span style={{ fontSize: 11, fontWeight: 600, color: t.paid ? GREEN : RED }}>{t.paid ? '납부' : '미납'}</span>
+                      </div>
                     </div>
                     <ChevronRight size={16} color="#CCC" />
                   </button>
