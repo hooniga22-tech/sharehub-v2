@@ -36,20 +36,46 @@ export default function VacancyPage() {
   const tabLabels = [`공실현황 ${vacantNowTenants.length}`, `공실예정 ${vacantSoonTenants.length}`, `전체공실 ${allVacantTenants.length}`];
   const fmt = (n: number) => n.toLocaleString() + '원';
 
-  const TenantCard = ({ t }: { t: any }) => {
-    const isNow = t['상태'] === '공실';
-    const rentMgmt = (Number(t['월세']) || 0) + (Number(t['관리비']) || 0);
+  const groupByHouse = (list: any[]) => {
+    const map = new Map<string, any[]>();
+    for (const t of list) {
+      const name = t['지점명'] || '-';
+      if (!map.has(name)) map.set(name, []);
+      map.get(name)!.push(t);
+    }
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0], 'ko'));
+  };
+
+  const HouseGroup = ({ list }: { list: any[] }) => {
+    const groups = groupByHouse(list);
     return (
-      <div style={{ background: '#fff', borderRadius: 14, padding: 16, marginBottom: 10, border: `1px solid ${isNow ? '#fcc' : '#fde68a'}` }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#191f28' }}>{t['지점명']} · {t['방코드']}</div>
-            <div style={{ fontSize: 12, color: GRAY, marginTop: 2 }}>{t['방타입'] || '-'}{!isNow && t['퇴실일'] ? ` · 퇴실 ${t['퇴실일']}` : ''}</div>
-            <div style={{ fontSize: 13, color: '#4e5968', marginTop: 4 }}>{fmt(rentMgmt)}</div>
+      <>
+        {groups.map(([houseName, rooms]) => (
+          <div key={houseName} style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', marginBottom: 12, border: '1px solid #f2f3f5' }}>
+            {/* Group header */}
+            <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 16, fontWeight: 700, color: '#191f28' }}>{houseName}</span>
+              <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#fff0f0', color: RED }}>공실 {rooms.length}개</span>
+              <span style={{ fontSize: 12, color: GRAY, marginLeft: 'auto' }}>{guMap[houseName] || ''}</span>
+            </div>
+            {/* Room rows */}
+            {rooms.map((t: any, i: number) => {
+              const isNow = t['상태'] === '공실';
+              const rentMgmt = (Number(t['월세']) || 0) + (Number(t['관리비']) || 0);
+              return (
+                <div key={t['입주자ID']} style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderTop: '1px solid #f2f3f5' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28' }}>{t['방코드']}</span>
+                    <span style={{ fontSize: 12, color: GRAY, marginLeft: 6 }}>{t['방타입'] || '-'}</span>
+                    <div style={{ fontSize: 12, color: '#4e5968', marginTop: 2 }}>{fmt(rentMgmt)}{!isNow && t['퇴실일'] ? ` · 퇴실 ${t['퇴실일']}` : ''}</div>
+                  </div>
+                  <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: isNow ? '#fee2e2' : '#fff8e1', color: isNow ? RED : '#b7791f', flexShrink: 0 }}>{isNow ? '공실' : '공실예정'}</span>
+                </div>
+              );
+            })}
           </div>
-          <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: isNow ? '#fee2e2' : '#fff8e1', color: isNow ? RED : '#b7791f' }}>{isNow ? '공실' : '공실예정'}</span>
-        </div>
-      </div>
+        ))}
+      </>
     );
   };
 
@@ -94,7 +120,7 @@ export default function VacancyPage() {
           vacantNowTenants.length > 0 ? (
             <>
               <div style={{ fontSize: 13, fontWeight: 700, color: RED, marginBottom: 10 }}>현재 공실 {vacantNowTenants.length}실</div>
-              {vacantNowTenants.map(t => <TenantCard key={t['입주자ID']} t={t} />)}
+              <HouseGroup list={vacantNowTenants} />
             </>
           ) : (
             <div style={{ textAlign: 'center', padding: '60px 0' }}>
@@ -108,7 +134,7 @@ export default function VacancyPage() {
           vacantSoonTenants.length > 0 ? (
             <>
               <div style={{ fontSize: 13, fontWeight: 700, color: ORANGE, marginBottom: 10 }}>공실 예정 {vacantSoonTenants.length}실</div>
-              {vacantSoonTenants.map(t => <TenantCard key={t['입주자ID']} t={t} />)}
+              <HouseGroup list={vacantSoonTenants} />
             </>
           ) : (
             <div style={{ textAlign: 'center', padding: '60px 0' }}>
@@ -121,7 +147,7 @@ export default function VacancyPage() {
           allVacantTenants.length > 0 ? (
             <>
               <div style={{ fontSize: 13, fontWeight: 700, color: BLUE, marginBottom: 10 }}>전체 공실 {allVacantTenants.length}실</div>
-              {allVacantTenants.map(t => <TenantCard key={t['입주자ID']} t={t} />)}
+              <HouseGroup list={allVacantTenants} />
             </>
           ) : (
             <div style={{ textAlign: 'center', padding: '60px 0' }}>
