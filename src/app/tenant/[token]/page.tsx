@@ -195,8 +195,8 @@ export default function TenantPortalPage() {
             <div style={{ fontSize: 12, color: GRAY }}>{t('사진 첨부 후 매니저가 빠르게 처리해 드려요', 'Attach photos and we\'ll handle it quickly')}</div>
           </div>
           <button onClick={() => { setIssueSheet(null); handleContact(); }}
-            style={{ width: '100%', padding: 14, borderRadius: 12, border: 'none', background: '#191f28', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
-            {t('채널톡으로 사진 첨부하기', 'Attach Photos via Chat')}
+            style={{ width: '100%', padding: 14, borderRadius: 12, border: 'none', background: '#3182f6', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+            {t('매니저에게 문의하기', 'Contact Manager')}
           </button>
         </BottomSheet>
       )}
@@ -423,7 +423,7 @@ export default function TenantPortalPage() {
         </Card>
 
         {/* Contact */}
-        <button onClick={handleContact} style={{ width: '100%', padding: 16, borderRadius: 14, border: 'none', background: '#191f28', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+        <button onClick={handleContact} style={{ width: '100%', padding: 16, borderRadius: 14, border: 'none', background: '#3182f6', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
           {t('매니저에게 문의하기', 'Contact Manager')}
         </button>
 
