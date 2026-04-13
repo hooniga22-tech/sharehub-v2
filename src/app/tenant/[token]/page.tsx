@@ -2,15 +2,58 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { Copy, MessageCircle } from 'lucide-react';
 
-const BLUE = '#3182f6', GRAY = '#8b95a1', GREEN = '#00c471', RED = '#f04452';
+const BLUE = '#3182f6', GRAY = '#8b95a1', GREEN = '#00c471', RED = '#f04452', ORANGE = '#f59f00';
 const fmt = (n: number) => n.toLocaleString() + '원';
 
-const SUPPLIES_KO = ['화장지', '주방세제', '샴푸', '린스', '바디워시', '수세미', '세탁세제', '기타'];
-const SUPPLIES_EN = ['Toilet Paper', 'Dish Soap', 'Shampoo', 'Conditioner', 'Body Wash', 'Sponge', 'Laundry Det.', 'Other'];
-const CATS_KO = ['수리', '청소', '기타'];
-const CATS_EN = ['Repair', 'Cleaning', 'Other'];
+const SUPPLIES = ['화장지', '주방세제', '세탁세제', '수세미', '고무장갑', '쓰레기봉투', '기타'];
+
+const Toast = ({ msg }: { msg: string }) => (
+  <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: '#191f28', color: '#fff', padding: '10px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600, zIndex: 999, whiteSpace: 'nowrap' }}>{msg}</div>
+);
+
+const Card = ({ children, style = {} }: { children: React.ReactNode; style?: React.CSSProperties }) => (
+  <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #f2f4f6', overflow: 'hidden', ...style }}>{children}</div>
+);
+
+const CardTitle = ({ title, sub }: { title: string; sub?: string }) => (
+  <div style={{ padding: '14px 18px', borderBottom: '1px solid #f2f4f6' }}>
+    <div style={{ fontSize: 14, fontWeight: 700, color: '#191f28' }}>{title}</div>
+    {sub && <div style={{ fontSize: 11, color: GRAY, marginTop: 2 }}>{sub}</div>}
+  </div>
+);
+
+const Chevron = ({ open }: { open: boolean }) => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .2s', flexShrink: 0 }}>
+    <path d="M9 18L15 12L9 6" stroke="#c4c9d1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const CopyIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+    <rect x="9" y="9" width="13" height="13" rx="2" stroke={GRAY} strokeWidth="1.8" />
+    <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke={GRAY} strokeWidth="1.8" />
+  </svg>
+);
+
+const LinkIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+    <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" stroke={BLUE} strokeWidth="2" strokeLinecap="round" />
+    <polyline points="15 3 21 3 21 9" stroke={BLUE} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <line x1="10" y1="14" x2="21" y2="3" stroke={BLUE} strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+
+const BottomSheet = ({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) => (
+  <div style={{ position: 'fixed', inset: 0, zIndex: 300 }} onClick={onClose}>
+    <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.45)' }} />
+    <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 430, background: '#fff', borderRadius: '20px 20px 0 0', padding: '24px 20px 36px', maxHeight: '80vh', overflowY: 'auto' }}>
+      <div style={{ width: 36, height: 4, background: '#e5e8eb', borderRadius: 2, margin: '0 auto 20px' }} />
+      <div style={{ fontSize: 16, fontWeight: 700, color: '#191f28', marginBottom: 16 }}>{title}</div>
+      {children}
+    </div>
+  </div>
+);
 
 export default function TenantPortalPage() {
   const { token } = useParams<{ token: string }>();
@@ -20,89 +63,87 @@ export default function TenantPortalPage() {
   const [loading, setLoading] = useState(true);
   const [lang, setLang] = useState<'ko' | 'en'>('ko');
   const [toast, setToast] = useState('');
-
-  // Supplies
-  const [selSupplies, setSelSupplies] = useState<string[]>([]);
-  const [supplyNote, setSupplyNote] = useState('');
-
-  // Issue
-  const [issueCat, setIssueCat] = useState('수리');
+  const [noticeOpen, setNoticeOpen] = useState(true);
+  const [dutyOpen, setDutyOpen] = useState(true);
+  const [issueSheet, setIssueSheet] = useState<string | null>(null);
   const [issueTitle, setIssueTitle] = useState('');
   const [issueDesc, setIssueDesc] = useState('');
-  const [issueLoading, setIssueLoading] = useState(false);
+  const [selSupplies, setSelSupplies] = useState<string[]>([]);
+  const [etcText, setEtcText] = useState('');
 
-  const t = (ko: string, en: string) => lang === 'ko' ? ko : en;
+  const ko = lang === 'ko';
+  const t = (k: string, e: string) => ko ? k : e;
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
   const copyText = (text: string) => { navigator.clipboard?.writeText(text); showToast(t('복사됐어요!', 'Copied!')); };
 
   useEffect(() => {
     import('@/lib/channeltalk').then(({ loadChannelTalk, bootChannelTalk }) => {
       loadChannelTalk();
-
       fetch(`/api/tenants?token=${token}`)
         .then(r => r.json())
         .then(async (data) => {
           if (data.error) { setLoading(false); return; }
           setTenant(data);
-
-          // Load house info
           try {
             const houses = await fetch('/api/houses').then(r => r.json());
             const found = Array.isArray(houses) ? houses.find((h: any) => h['지점명'] === data['지점명']) : null;
             if (found) setHouse(found);
-          } catch { /* ignore */ }
-
+          } catch { /* */ }
           bootChannelTalk({
             memberId: token,
             name: data['이름'],
             mobileNumber: data['연락처'],
             tags: ['입주자', data['지점명'], data['구'] || ''].filter(Boolean),
-            customAttributes: {
-              house: data['지점명'] || '', room: data['방코드'] || '',
-              contractEnd: data['퇴실일'] || '', status: data['상태'] || '',
-            },
+            customAttributes: { house: data['지점명'] || '', room: data['방코드'] || '', contractEnd: data['퇴실일'] || '', status: data['상태'] || '' },
           });
-
           setLoading(false);
         })
         .catch(() => setLoading(false));
     });
   }, [token]);
 
-  const calcDday = (dateStr: string) => {
-    if (!dateStr) return 0;
-    return Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86400000);
-  };
-
-  const toggleSupply = (item: string) => {
-    setSelSupplies(prev => prev.includes(item) ? prev.filter(x => x !== item) : [...prev, item]);
-  };
-
-  const submitSupply = async () => {
-    if (!selSupplies.length || !tenant) return;
-    await fetch('/api/tenants/portal/supply', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, tenantName: tenant['이름'], house: tenant['지점명'], room: tenant['방코드'], items: selSupplies, note: supplyNote }),
-    });
-    setSelSupplies([]); setSupplyNote('');
-    showToast(t('신청됐어요!', 'Request submitted!'));
-  };
-
-  const submitIssue = async () => {
-    if (!issueTitle.trim() || !tenant) return;
-    setIssueLoading(true);
-    await fetch('/api/issues', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 지점명: tenant['지점명'], 방코드: tenant['방코드'], 제목: issueTitle, 내용: issueDesc, 카테고리: issueCat, 상태: '접수', 등록일: new Date().toISOString().split('T')[0] }),
-    });
-    setIssueTitle(''); setIssueDesc(''); setIssueLoading(false);
-    showToast(t('접수됐어요! 매니저가 확인 후 연락드릴게요.', 'Submitted! Manager will contact you.'));
-  };
-
   const handleContact = async () => {
     const { openChannelTalk } = await import('@/lib/channeltalk');
     openChannelTalk();
   };
+
+  const submitSupply = async () => {
+    if (!selSupplies.length || !tenant) return;
+    const items = selSupplies.map(s => s === '기타' ? `기타: ${etcText}` : s);
+    await fetch('/api/tenants/portal/supply', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, tenantName: tenant['이름'], house: tenant['지점명'], room: tenant['방코드'], items, note: etcText }),
+    });
+    setSelSupplies([]); setEtcText('');
+    showToast(t('신청됐어요!', 'Submitted!'));
+  };
+
+  const submitIssue = async () => {
+    if (!issueTitle.trim() || !tenant) return;
+    await fetch('/api/issues', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 지점명: tenant['지점명'], 방코드: tenant['방코드'], 제목: issueTitle, 내용: issueDesc, 카테고리: '기타', 상태: '접수', 등록일: new Date().toISOString().split('T')[0] }),
+    });
+    setIssueTitle(''); setIssueDesc(''); setIssueSheet(null);
+    showToast(t('접수됐어요!', 'Submitted!'));
+  };
+
+  // Schedule generation
+  const generateSchedule = () => {
+    const today = new Date();
+    const myRoom = tenant?.['방코드'] || '';
+    const rooms = ['A-1', 'A-2', 'B-1', 'B-2', 'C-1', 'C-2'];
+    const schedule: { weekStart: Date; room: string; isMine: boolean; isPast: boolean }[] = [];
+    for (let w = -4; w <= 4; w++) {
+      const monday = new Date(today);
+      monday.setDate(today.getDate() - today.getDay() + 1 + w * 7);
+      const room = rooms[((w + 8) % rooms.length)];
+      schedule.push({ weekStart: new Date(monday), room, isMine: room === myRoom, isPast: monday < today });
+    }
+    return schedule;
+  };
+
+  const fmtWeek = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
 
   if (loading) return <div style={{ minHeight: '100vh', background: '#F7F8FA', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><p style={{ color: GRAY, fontSize: 13 }}>{t('불러오는 중...', 'Loading...')}</p></div>;
 
@@ -119,153 +160,283 @@ export default function TenantPortalPage() {
   const room = tenant['방코드'] || '';
   const rent = Number(tenant['월세']) || 0;
   const mgmt = Number(tenant['관리비']) || 0;
-  const deposit = Number(tenant['보증금']) || 0;
-  const dday = calcDday(tenant['퇴실일']);
-  const supplyItems = lang === 'ko' ? SUPPLIES_KO : SUPPLIES_EN;
-  const catItems = lang === 'ko' ? CATS_KO : CATS_EN;
+  const dday = Math.max(0, Math.ceil((new Date(tenant['퇴실일'] || '').getTime() - Date.now()) / 86400000));
+  const schedule = generateSchedule();
 
-  const inputStyle: React.CSSProperties = { width: '100%', padding: '10px 12px', border: '1px solid #E8E8E8', borderRadius: 10, fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box', outline: 'none' };
+  // Notices (static for now)
+  const notices = [
+    { id: 1, title: t('이번주 수요일 보일러 점검 예정', 'Boiler inspection this Wednesday'), date: t('4월 13일', 'Apr 13'), important: true, house: houseName },
+    { id: 2, title: t('4월 공과금 고지서 발송 완료', 'April utility bills sent'), date: t('4월 1일', 'Apr 1'), important: false, house: '' },
+    { id: 3, title: t('쓰레기 분리수거 요일 변경 안내', 'Recycling day change notice'), date: t('3월 28일', 'Mar 28'), important: false, house: '' },
+  ];
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F7F8FA' }}>
-      {/* Header */}
-      <div style={{ background: '#fff', padding: '20px 20px 16px', borderBottom: '1px solid #F0F0F0' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: '#191f28' }}>{t(`안녕하세요, ${name}님 👋`, `Hello, ${name} 👋`)}</div>
-            <div style={{ fontSize: 13, color: GRAY, marginTop: 4 }}>{houseName} · {room}</div>
-          </div>
-          <button onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}
-            style={{ background: '#F2F4F6', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#555' }}>
-            {lang === 'ko' ? 'EN' : '한'}
-          </button>
-        </div>
-      </div>
+    <div style={{ maxWidth: 430, margin: '0 auto', minHeight: '100vh', background: '#f5f5f5' }}>
+      {toast && <Toast msg={toast} />}
 
-      <div style={{ padding: 16 }}>
-        {/* D-day Card */}
-        <div style={{ background: BLUE, borderRadius: 14, padding: 20, marginBottom: 12, color: '#fff' }}>
-          <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>{t('계약 잔여일', 'Days Remaining')}</div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-            <div style={{ fontSize: 32, fontWeight: 700 }}>D-{Math.max(0, dday)}</div>
-            <div style={{ textAlign: 'right', fontSize: 12, opacity: 0.8, lineHeight: 1.6 }}>
-              {tenant['입주일']} ~<br />{tenant['퇴실일']}
-            </div>
-          </div>
-          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 8 }}>
-            {t('월세', 'Rent')} {fmt(rent)} / {t('관리비', 'Mgmt')} {fmt(mgmt)}
-          </div>
-        </div>
-
-        {/* Contract Info */}
-        <div style={{ background: '#fff', borderRadius: 14, padding: '14px 18px', marginBottom: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f2f4f6' }}>
-            <span style={{ fontSize: 13, color: GRAY }}>{t('월 납부액', 'Monthly')}</span>
-            <span style={{ fontSize: 15, fontWeight: 700, color: '#191f28' }}>{fmt(rent + mgmt)}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0' }}>
-            <span style={{ fontSize: 13, color: GRAY }}>{t('보증금', 'Deposit')}</span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28' }}>{fmt(deposit)}</span>
-          </div>
-        </div>
-
-        {/* House Info */}
-        {house && (
-          <div style={{ background: '#fff', borderRadius: 14, padding: '14px 18px', marginBottom: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{t('하우스 정보', 'House Info')}</div>
+      {/* Repair Bottom Sheet */}
+      {issueSheet === '수리' && (
+        <BottomSheet title={t('수리 신청', 'Repair Request')} onClose={() => setIssueSheet(null)}>
+          <div style={{ background: '#fff8f0', borderRadius: 12, padding: '14px 16px', marginBottom: 16, fontSize: 13, color: '#191f28', lineHeight: 1.7, border: '1px solid #ffe0cc' }}>
+            <div style={{ fontWeight: 700, color: RED, marginBottom: 8 }}>{t('신청 전 확인해 주세요', 'Before requesting')}</div>
             {[
-              { l: t('현관 비번', 'Door Code'), v: house['현관비번'], copy: true },
-              { l: t('와이파이', 'WiFi'), v: house['와이파이SSID'] },
-              { l: t('비밀번호', 'Password'), v: house['와이파이PW'], copy: true },
-              { l: t('주소', 'Address'), v: house['주소'] },
-            ].map(row => (
-              <div key={row.l} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid #f2f4f6' }}>
-                <span style={{ fontSize: 12, color: GRAY }}>{row.l}</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: '#191f28', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.v || '-'}</span>
-                  {row.copy && row.v && (
-                    <button onClick={() => copyText(row.v)} style={{ background: '#f2f4f6', border: 'none', borderRadius: 6, width: 24, height: 24, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Copy size={12} color={GRAY} />
-                    </button>
-                  )}
-                </div>
+              t('어떤 문제인지 최대한 자세히 설명해 주세요.', 'Describe the problem in detail.'),
+              t('모델명이 있는 제품은 모델명도 알려주세요.', 'Include model numbers if applicable.'),
+              t('제품 모델명 사진 + 문제 발생 장면 사진을 함께 보내주세요.', 'Attach photos of the model and the issue.'),
+            ].map((txt, i) => (
+              <div key={i} style={{ display: 'flex', gap: 8, marginBottom: i < 2 ? 6 : 0 }}>
+                <div style={{ width: 4, height: 4, borderRadius: '50%', background: RED, marginTop: 6, flexShrink: 0 }} />
+                <span style={{ lineHeight: 1.6 }}>{txt}</span>
               </div>
             ))}
           </div>
-        )}
-
-        {/* Payment Notice */}
-        <div style={{ background: '#fff', borderRadius: 14, padding: '14px 18px', marginBottom: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>💰 {t('납부 안내', 'Payment Info')}</div>
-          {[
-            t('월세/관리비는 매월 1일까지 납부해 주세요.', 'Rent/management fee due by the 1st.'),
-            t('공과금은 별도 청구됩니다.', 'Utility bills are charged separately.'),
-            t('납부 계좌는 계약서를 확인해 주세요.', 'Check your contract for bank details.'),
-          ].map((text, i) => (
-            <p key={i} style={{ fontSize: 12, color: '#555', margin: '4px 0', lineHeight: 1.5 }}>• {text}</p>
-          ))}
-        </div>
-
-        {/* Duty Notice */}
-        <div style={{ background: '#fff', borderRadius: 14, padding: '14px 18px', marginBottom: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>🧹 {t('청소 당번 안내', 'Cleaning Duty')}</div>
-          {[
-            t('매주 지정된 당번이 공용구역을 청소합니다.', 'A designated person cleans shared areas weekly.'),
-            t('당번표는 단체 카톡방을 확인해 주세요.', 'Check the group chat for the schedule.'),
-            t('사진 미업로드 시 벌금 30,000원이 부과됩니다.', '30,000 KRW fine if photo not uploaded.'),
-            t('당번 교환은 당사자끼리 조율 후 매니저에게 알려주세요.', 'Swap with housemates, then notify manager.'),
-          ].map((text, i) => (
-            <p key={i} style={{ fontSize: 12, color: '#555', margin: '4px 0', lineHeight: 1.5 }}>• {text}</p>
-          ))}
-        </div>
-
-        {/* Supplies Request */}
-        <div style={{ background: '#fff', borderRadius: 14, padding: '14px 18px', marginBottom: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>📦 {t('비품 신청', 'Supply Request')}</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-            {supplyItems.map((item, i) => {
-              const selected = selSupplies.includes(SUPPLIES_KO[i]);
-              return (
-                <button key={item} onClick={() => toggleSupply(SUPPLIES_KO[i])}
-                  style={{ padding: '7px 14px', borderRadius: 20, border: `1.5px solid ${selected ? BLUE : '#E8E8E8'}`, background: selected ? '#EBF4FF' : '#fff', color: selected ? BLUE : '#555', fontSize: 12, fontWeight: selected ? 600 : 400, cursor: 'pointer', fontFamily: 'inherit' }}>
-                  {item}
-                </button>
-              );
-            })}
+          <div style={{ background: '#f8f9fa', borderRadius: 12, padding: '14px 16px', marginBottom: 16, fontSize: 13, color: GRAY, lineHeight: 1.7, textAlign: 'center' }}>
+            <div style={{ fontSize: 13, color: '#191f28', fontWeight: 600, marginBottom: 4 }}>{t('채널톡 상담으로 신청해 주세요', 'Please contact us via chat')}</div>
+            <div style={{ fontSize: 12, color: GRAY }}>{t('사진 첨부 후 매니저가 빠르게 처리해 드려요', 'Attach photos and we\'ll handle it quickly')}</div>
           </div>
-          <button onClick={submitSupply} disabled={!selSupplies.length}
-            style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', background: selSupplies.length ? BLUE : '#E8E8E8', color: selSupplies.length ? '#fff' : '#999', fontSize: 13, fontWeight: 600, cursor: selSupplies.length ? 'pointer' : 'default', fontFamily: 'inherit' }}>
-            {t('신청하기', 'Submit')}
+          <button onClick={() => { setIssueSheet(null); handleContact(); }}
+            style={{ width: '100%', padding: 14, borderRadius: 12, border: 'none', background: '#191f28', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+            {t('채널톡으로 사진 첨부하기', 'Attach Photos via Chat')}
           </button>
-        </div>
+        </BottomSheet>
+      )}
 
-        {/* Issue Report */}
-        <div style={{ background: '#fff', borderRadius: 14, padding: '14px 18px', marginBottom: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>🔧 {t('불편사항 신청', 'Report Issue')}</div>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-            {catItems.map((c, i) => (
-              <button key={c} onClick={() => setIssueCat(CATS_KO[i])}
-                style={{ flex: 1, padding: '8px 0', borderRadius: 8, border: `1.5px solid ${issueCat === CATS_KO[i] ? BLUE : '#E8E8E8'}`, background: issueCat === CATS_KO[i] ? '#EBF4FF' : '#fff', color: issueCat === CATS_KO[i] ? BLUE : '#555', fontSize: 12, fontWeight: issueCat === CATS_KO[i] ? 600 : 400, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center' }}>
-                {c}
+      {/* Other Issue Bottom Sheet */}
+      {issueSheet === '기타' && (
+        <BottomSheet title={t('기타 문의', 'Other Inquiry')} onClose={() => setIssueSheet(null)}>
+          <input value={issueTitle} onChange={e => setIssueTitle(e.target.value)} placeholder={t('제목', 'Title')}
+            style={{ width: '100%', padding: '11px 13px', border: '1px solid #e5e8eb', borderRadius: 10, fontSize: 13, outline: 'none', boxSizing: 'border-box', marginBottom: 10 }} />
+          <textarea value={issueDesc} onChange={e => setIssueDesc(e.target.value)} placeholder={t('내용', 'Details')}
+            style={{ width: '100%', height: 80, padding: '11px 13px', border: '1px solid #e5e8eb', borderRadius: 10, fontSize: 13, resize: 'none', outline: 'none', boxSizing: 'border-box', marginBottom: 14 }} />
+          <button onClick={submitIssue}
+            style={{ width: '100%', padding: 13, borderRadius: 12, border: 'none', background: issueTitle ? BLUE : '#e5e8eb', color: '#fff', fontSize: 14, fontWeight: 700, cursor: issueTitle ? 'pointer' : 'not-allowed' }}>
+            {t('접수하기', 'Submit')}
+          </button>
+        </BottomSheet>
+      )}
+
+      {/* Header */}
+      <div style={{ background: '#fff', padding: '20px 16px 16px', borderBottom: '1px solid #f2f4f6' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <div style={{ fontSize: 19, fontWeight: 700, color: '#191f28' }}>{t(`안녕하세요, ${name}님 👋`, `Hello, ${name} 👋`)}</div>
+            <div style={{ fontSize: 12, color: GRAY, marginTop: 4 }}>{houseName} · {room}</div>
+          </div>
+          <div style={{ display: 'flex', background: '#f2f4f6', borderRadius: 20, padding: 3 }}>
+            {(['ko', 'en'] as const).map(l => (
+              <button key={l} onClick={() => setLang(l)} style={{ padding: '4px 12px', borderRadius: 16, border: 'none', background: lang === l ? '#fff' : 'transparent', color: lang === l ? '#191f28' : GRAY, fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: lang === l ? '0 1px 4px rgba(0,0,0,.08)' : 'none' }}>
+              {l === 'ko' ? '한' : 'EN'}
               </button>
             ))}
           </div>
-          <input value={issueTitle} onChange={e => setIssueTitle(e.target.value)} placeholder={t('제목 (예: 화장실 변기 막힘)', 'Title (e.g., Toilet clogged)')} style={{ ...inputStyle, marginBottom: 8 }} />
-          <textarea value={issueDesc} onChange={e => setIssueDesc(e.target.value)} placeholder={t('내용 (선택)', 'Details (optional)')} rows={3} style={{ ...inputStyle, resize: 'none', marginBottom: 10 }} />
-          <button onClick={submitIssue} disabled={!issueTitle.trim() || issueLoading}
-            style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', background: issueTitle.trim() ? BLUE : '#E8E8E8', color: issueTitle.trim() ? '#fff' : '#999', fontSize: 13, fontWeight: 600, cursor: issueTitle.trim() ? 'pointer' : 'default', fontFamily: 'inherit' }}>
-            {issueLoading ? t('접수 중...', 'Submitting...') : t('접수하기', 'Submit')}
-          </button>
         </div>
-
-        {/* Contact Manager */}
-        <button onClick={handleContact}
-          style={{ width: '100%', padding: 14, borderRadius: 12, border: 'none', background: '#191f28', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 40 }}>
-          <MessageCircle size={16} /> {t('매니저에게 문의하기', 'Contact Manager')}
-        </button>
       </div>
 
-      {toast && <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: '#191f28', color: '#fff', padding: '10px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600, zIndex: 999, whiteSpace: 'nowrap' }}>{toast}</div>}
+      <div style={{ padding: '14px 16px 40px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* D-day */}
+        <div style={{ background: 'linear-gradient(135deg,#3182f6,#1a6bd4)', borderRadius: 16, padding: '22px 22px' }}>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,.75)', marginBottom: 6, fontWeight: 500 }}>{t('계약 잔여일', 'Contract Remaining')}</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+            <div style={{ fontSize: 40, fontWeight: 700, color: '#fff', letterSpacing: -1 }}>D-{dday}</div>
+            <div style={{ textAlign: 'right', fontSize: 11, color: 'rgba(255,255,255,.8)', lineHeight: 1.8 }}>
+              <div>{tenant['입주일']}</div>
+              <div>~ {tenant['퇴실일']}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Notices */}
+        <Card>
+          <div onClick={() => setNoticeOpen(!noticeOpen)} style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: '#191f28' }}>{t('공지사항', 'Notice')}</span>
+              {notices.some(n => n.important) && (
+                <span style={{ fontSize: 10, background: RED, color: '#fff', padding: '2px 7px', borderRadius: 10, fontWeight: 700 }}>
+                  {notices.filter(n => n.important).length}
+                </span>
+              )}
+            </div>
+            <Chevron open={noticeOpen} />
+          </div>
+          {noticeOpen && (
+            <div style={{ borderTop: '1px solid #f2f4f6' }}>
+              {notices.map((n, i, arr) => (
+                <div key={n.id} style={{ padding: '12px 18px', borderBottom: i < arr.length - 1 ? '1px solid #f2f4f6' : 'none', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
+                    {n.important && <span style={{ fontSize: 10, background: '#fff0f1', color: RED, padding: '2px 7px', borderRadius: 4, fontWeight: 700 }}>{t('중요', 'Important')}</span>}
+                    {n.house && <span style={{ fontSize: 10, background: '#ebf3ff', color: BLUE, padding: '2px 7px', borderRadius: 4, fontWeight: 700 }}>{houseName}</span>}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, color: '#191f28', fontWeight: n.important ? 600 : 400, lineHeight: 1.5 }}>{n.title}</div>
+                    <div style={{ fontSize: 11, color: GRAY, marginTop: 3 }}>{n.date}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        {/* House Info */}
+        {house && (
+          <Card>
+            <CardTitle title={t('하우스 정보', 'House Info')} />
+            {[
+              { l: t('현관 비번', 'Door Code'), v: house['현관비번'], cp: true },
+              { l: t('와이파이', 'WiFi'), v: house['와이파이SSID'], cp: false },
+              { l: t('비밀번호', 'Password'), v: house['와이파이PW'], cp: true },
+              { l: t('주소', 'Address'), v: house['주소'], cp: false },
+            ].map((row, i, arr) => (
+              <div key={row.l} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 18px', borderBottom: i < arr.length - 1 ? '1px solid #f2f4f6' : 'none' }}>
+                <span style={{ fontSize: 13, color: GRAY, flexShrink: 0 }}>{row.l}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28', textAlign: 'right' }}>{row.v || '-'}</span>
+                  {row.cp && row.v && <button onClick={() => copyText(row.v)} style={{ border: 'none', background: '#f2f4f6', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><CopyIcon /></button>}
+                </div>
+              </div>
+            ))}
+          </Card>
+        )}
+
+        {/* Payment Guide */}
+        <Card>
+          <CardTitle title={t('납부 안내', 'Payment Guide')} />
+          <div style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {[
+              t('월세/관리비는 매월 1일까지 납부해 주세요.', 'Please pay by the 1st of each month.'),
+              t('공과금은 별도 청구됩니다.', 'Utility bills are charged separately.'),
+              t('납부 계좌는 계약서를 확인해 주세요.', 'Check your contract for payment account.'),
+            ].map((txt, i) => (
+              <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <div style={{ width: 4, height: 4, borderRadius: '50%', background: BLUE, marginTop: 6, flexShrink: 0 }} />
+                <span style={{ fontSize: 13, color: '#191f28', lineHeight: 1.6 }}>{txt}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        {/* Duty */}
+        <Card>
+          <div onClick={() => setDutyOpen(!dutyOpen)} style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', borderBottom: dutyOpen ? '1px solid #f2f4f6' : 'none' }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#191f28' }}>{t('청소 당번 안내', 'Cleaning Duty')}</div>
+              <div style={{ fontSize: 11, color: GRAY, marginTop: 2 }}>
+                {schedule.find(s => s.isMine && !s.isPast)
+                  ? t(`다음 내 당번: ${fmtWeek(schedule.find(s => s.isMine && !s.isPast)!.weekStart)}주`, `My next duty: ${fmtWeek(schedule.find(s => s.isMine && !s.isPast)!.weekStart)}`)
+                  : t('당번 일정 없음', 'No upcoming duty')}
+              </div>
+            </div>
+            <Chevron open={dutyOpen} />
+          </div>
+          {dutyOpen && (
+            <div style={{ padding: '12px 18px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 12 }}>
+                {[
+                  t('매주 지정된 당번이 공용구역을 청소합니다.', 'Clean common areas each week.'),
+                  t('사진 미업로드 시 벌금 30,000원이 부과됩니다.', '30,000 won fine if photo not uploaded.'),
+                ].map((txt, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ width: 4, height: 4, borderRadius: '50%', background: ORANGE, marginTop: 6, flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: GRAY, lineHeight: 1.5 }}>{txt}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ borderTop: '1px solid #f2f4f6', paddingTop: 12 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: GRAY, marginBottom: 8 }}>{t('당번 일정', 'Schedule')}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {schedule.map((s, i) => {
+                    const isThisWeek = i === 4;
+                    return (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderRadius: 8, background: s.isMine ? '#ebf3ff' : isThisWeek ? '#f8f9fa' : 'transparent', border: s.isMine ? `1.5px solid ${BLUE}` : '1.5px solid transparent' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 12, color: s.isPast ? GRAY : '#191f28', fontWeight: isThisWeek || s.isMine ? 600 : 400 }}>{fmtWeek(s.weekStart)}{t('주', '')}</span>
+                          {isThisWeek && <span style={{ fontSize: 10, color: BLUE, fontWeight: 600 }}>{t('이번주', 'This week')}</span>}
+                          {s.isPast && <span style={{ fontSize: 10, color: GRAY }}>{t('완료', 'Done')}</span>}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 12, color: s.isMine ? BLUE : s.isPast ? GRAY : '#191f28', fontWeight: s.isMine ? 700 : 400 }}>{s.room}</span>
+                          {s.isMine && <span style={{ fontSize: 10, background: BLUE, color: '#fff', padding: '1px 7px', borderRadius: 4, fontWeight: 700 }}>{t('내 당번', 'My Turn')}</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </Card>
+
+        {/* Supplies */}
+        <Card>
+          <CardTitle title={t('비품 신청', 'Supply Request')} />
+          <div style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {SUPPLIES.map(s => (
+                <button key={s} onClick={() => setSelSupplies(p => p.includes(s) ? p.filter(x => x !== s) : [...p, s])}
+                  style={{ padding: '6px 13px', borderRadius: 20, border: `1.5px solid ${selSupplies.includes(s) ? BLUE : '#e5e8eb'}`, background: selSupplies.includes(s) ? '#ebf3ff' : '#fff', color: selSupplies.includes(s) ? BLUE : '#191f28', fontSize: 12, fontWeight: selSupplies.includes(s) ? 700 : 400, cursor: 'pointer' }}>
+                  {s}
+                </button>
+              ))}
+            </div>
+            {selSupplies.includes('기타') && (
+              <input value={etcText} onChange={e => setEtcText(e.target.value)} placeholder={t('필요한 물품을 입력해 주세요', 'Enter item name')}
+                style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e8eb', borderRadius: 8, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+            )}
+            <div style={{ fontSize: 11, color: GRAY, lineHeight: 1.5 }}>{t('쓰레기봉투 구매 시 기타에 계좌정보를 입력해 주세요.', 'For trash bags, include account info in \'Other\'.')}</div>
+            <button onClick={submitSupply}
+              style={{ width: '100%', padding: 13, borderRadius: 10, border: 'none', background: selSupplies.length ? BLUE : '#e5e8eb', color: '#fff', fontSize: 14, fontWeight: 700, cursor: selSupplies.length ? 'pointer' : 'not-allowed' }}>
+              {t('신청하기', 'Request')}
+            </button>
+          </div>
+        </Card>
+
+        {/* Issues */}
+        <Card>
+          <CardTitle title={t('불편사항 신청', 'Report Issue')} />
+          <div style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div onClick={() => setIssueSheet('수리')} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', borderRadius: 10, background: '#fff8f0', border: '1px solid #ffe0cc', cursor: 'pointer' }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: RED, marginBottom: 2 }}>{t('수리', 'Repair')}</div>
+                <div style={{ fontSize: 11, color: GRAY }}>{t('시설 고장·파손 신고', 'Report facility damage')}</div>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 18L15 12L9 6" stroke={RED} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </div>
+
+            <div onClick={() => window.open('/apply/cleaning', '_blank')} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', borderRadius: 10, background: '#f0f9ff', border: '1px solid #bae6fd', cursor: 'pointer' }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#0369a1', marginBottom: 2 }}>{t('방청소 신청', 'Room Cleaning')}</div>
+                <div style={{ fontSize: 11, color: GRAY }}>{t('신청서 작성 후 배정됩니다', 'Fill out form to request')}</div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ fontSize: 11, color: BLUE, fontWeight: 600 }}>{t('신청서', 'Form')}</span>
+                <LinkIcon />
+              </div>
+            </div>
+
+            <div onClick={() => setIssueSheet('기타')} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', borderRadius: 10, background: '#f8f9fa', border: '1px solid #e5e8eb', cursor: 'pointer' }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#191f28', marginBottom: 2 }}>{t('기타', 'Other')}</div>
+                <div style={{ fontSize: 11, color: GRAY }}>{t('그 외 문의사항', 'Other inquiries')}</div>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 18L15 12L9 6" stroke={GRAY} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </div>
+          </div>
+        </Card>
+
+        {/* Contact */}
+        <button onClick={handleContact} style={{ width: '100%', padding: 16, borderRadius: 14, border: 'none', background: '#191f28', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+          {t('매니저에게 문의하기', 'Contact Manager')}
+        </button>
+
+        {/* Bottom Quick Links */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+          <div onClick={() => window.open('/apply/aircon', '_blank')} style={{ padding: '11px 0', borderRadius: 10, border: '1px solid #e5e8eb', background: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#191f28', textAlign: 'center' }}>
+            {t('에어컨 신청', 'A/C Request')}
+          </div>
+          <div onClick={() => window.open('/apply/checkout', '_blank')} style={{ padding: '11px 0', borderRadius: 10, border: `1px solid ${RED}30`, background: '#fff0f1', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: RED, textAlign: 'center' }}>
+            {t('퇴실 신청', 'Move-out')}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
