@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getSheetData, appendRow, updateRow } from '@/lib/sheets'
 
-// 입주자 시트 컬럼 인덱스 (19열)
+// 입주자 시트 컬럼 인덱스 (20열)
 // [0]입주자ID [1]구 [2]지점명 [3]방코드 [4]방타입 [5]이름
 // [6]입주일 [7]퇴실일 [8]상태 [9]보증금 [10]월세 [11]관리비
 // [12]메모 [13]연락처 [14]생년월일 [15]주소
-// [16]투자자 [17]투자자계좌 [18]투자자연락처
+// [16]투자자 [17]투자자계좌 [18]투자자연락처 [19]링크토큰
 
 function rowToTenant(r: string[], rowIndex: number) {
   return {
@@ -29,6 +29,7 @@ function rowToTenant(r: string[], rowIndex: number) {
     투자자: r[16] || '',
     투자자계좌: r[17] || '',
     투자자연락처: r[18] || '',
+    링크토큰: r[19] || '',
   }
 }
 
@@ -50,8 +51,7 @@ export async function GET(req: Request) {
     }
 
     if (token) {
-      // 링크토큰은 인덱스 [13] — 연락처 필드에 저장되어 있거나 별도 토큰 필드
-      const tenant = tenants.find(t => t.연락처 === token || (t as any).링크토큰 === token)
+      const tenant = tenants.find(t => t.링크토큰 === token)
       if (!tenant) return NextResponse.json({ error: '없음' }, { status: 404 })
       return NextResponse.json(tenant)
     }
