@@ -317,7 +317,10 @@ export default function PaymentsPage() {
           {filtered.length > 0 ? filtered.map((t, i) => (
             <div key={t.입주자ID}>
               {i > 0 && <div style={{ height: 1, background: '#f2f4f6', margin: '0 16px' }} />}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px' }}>
+              <div onClick={() => router.push(`/tenants/${t.입주자ID}`)}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', cursor: 'pointer', transition: 'background .15s' }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#f2f3f5')}
+                onMouseLeave={e => (e.currentTarget.style.background = '')}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ fontSize: 14, fontWeight: 700, color: '#191f28' }}>{t.이름}</span>
@@ -330,7 +333,7 @@ export default function PaymentsPage() {
                   </div>
                   {t.투자자 && <div style={{ fontSize: 10, color: GRAY, marginTop: 2 }}>{t.투자자}</div>}
                 </div>
-                <div style={{ flexShrink: 0 }}>
+                <div style={{ flexShrink: 0 }} onClick={e => e.stopPropagation()}>
                   {t.paid ? (
                     <span style={{ padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, background: '#e6f9f0', color: GREEN }}>완료</span>
                   ) : (
