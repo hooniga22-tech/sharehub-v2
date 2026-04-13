@@ -5,7 +5,7 @@ import useSWR from 'swr';
 import { fetcher } from '@/lib/fetcher';
 import { useParams, useRouter } from 'next/navigation';
 import { Phone, MessageSquare, FileText, Plus, X, Check } from 'lucide-react';
-import { getMonthlyCharge } from '@/lib/prorata';
+import { getMonthlyCharge, getDaysInMonth } from '@/lib/prorata';
 
 const BLUE = '#3182f6', GRAY = '#8b95a1', GREEN = '#00c471', RED = '#f04452', ORANGE = '#d97706';
 const fmt = (n: number) => n.toLocaleString() + '원';
@@ -53,6 +53,7 @@ export default function TenantDetailPage() {
   const [payMethod, setPayMethod] = useState('계좌이체');
   const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
   const [toast, setToast] = useState('');
+  const [oldPayOpen, setOldPayOpen] = useState(false);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2200); };
 
@@ -193,121 +194,104 @@ export default function TenantDetailPage() {
         </div>
       </div>
 
-      {/* Section 3: 이달 수납 */}
+      {/* Section 3: 납부 내역 (B안) */}
       {(() => {
+        const recent2 = sortedPayments.slice(0, 2);
+        const older = sortedPayments.slice(2);
+
+        // First month pro-rata
+        const moveInDate = tenant.입주일 || '';
+        const moveD = moveInDate ? new Date(moveInDate) : null;
+        const moveYear = moveD ? moveD.getFullYear() : 0;
+        const moveMonth = moveD ? moveD.getMonth() + 1 : 0;
+        const moveDay = moveD ? moveD.getDate() : 1;
+        const daysInMoveMonth = moveYear ? getDaysInMonth(moveYear, moveMonth) : 30;
+        const moveDays = daysInMoveMonth - moveDay + 1;
+        const isProrata = moveDay > 1;
+        const firstRent = isProrata ? Math.round(rent / daysInMoveMonth * moveDays) : rent;
+        const firstMgmt = isProrata ? Math.round(mgmt / daysInMoveMonth * moveDays) : mgmt;
+
         const currentYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-        const curPay = payments.find(p => p.연월 === currentYM);
-        const isPaid = curPay?.상태 === '납부완료';
-        const chargeAmt = Number(curPay?.청구액 || 0);
-        const paidAmt = Number(curPay?.납부액 || 0);
-        const totalAmt = isPaid ? paidAmt : (chargeAmt || (rent + mgmt));
-        const pastPayments = sortedPayments.filter(p => p.연월 !== currentYM).slice(0, 6);
 
-        return (
-          <>
-            <div style={{ background: '#fff', padding: 16, marginBottom: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                <h3 style={{ fontSize: 13, fontWeight: 700 }}>이달 수납</h3>
-                {charge.isProrata && (
-                  <span style={{ padding: '2px 7px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#fff8e6', color: ORANGE }}>일할계산</span>
-                )}
-              </div>
-
-              {curPay ? (
-                <div style={{ background: isPaid ? '#f0fff8' : '#fff0f0', borderRadius: 12, padding: 12 }}>
-                  {/* 상태 뱃지 + 납부일 */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {isPaid ? (
-                        <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#e8faf2', color: '#0e6245' }}>납부완료</span>
-                      ) : (
-                        <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#ffeaea', color: RED }}>미납</span>
-                      )}
-                      {isPaid && curPay.납부일 && (
-                        <span style={{ fontSize: 11, color: GRAY }}>{curPay.납부일} 납부</span>
-                      )}
-                    </div>
-                    <span style={{ fontSize: 15, fontWeight: 700, color: isPaid ? '#191f28' : RED }}>{fmt(totalAmt)}</span>
-                  </div>
-
-                  {/* 월세/관리비 상세 */}
-                  {charge.isProrata && charge.detail ? (
-                    <>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555', marginBottom: 3 }}>
-                        <span>월세 ({charge.detail.days}일/{charge.detail.daysInMonth}일)</span>
-                        <span>{fmt(charge.detail.rentPart)}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555' }}>
-                        <span>관리비 ({charge.detail.days}일/{charge.detail.daysInMonth}일)</span>
-                        <span>{fmt(charge.detail.mgmtPart)}</span>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555', marginBottom: 3 }}>
-                        <span>월세</span>
-                        <span>{fmt(rent)}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555' }}>
-                        <span>관리비</span>
-                        <span>{fmt(mgmt)}</span>
-                      </div>
-                    </>
-                  )}
-
-                  {/* 미납일 때 납부 등록 버튼 */}
-                  {!isPaid && (
-                    <button onClick={() => { setPaySheet(curPay); setPayMethod('계좌이체'); setPayDate(new Date().toISOString().split('T')[0]); }}
-                      style={{ width: '100%', padding: '10px 16px', borderRadius: 10, border: 'none', background: BLUE, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', marginTop: 12 }}>
-                      납부 등록
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div style={{ textAlign: 'center', padding: '20px 0', color: GRAY }}>
-                  <p style={{ fontSize: 13 }}>이달 수납 내역이 없어요</p>
-                </div>
+        const PayRow = ({ p }: { p: Payment }) => {
+          const paid = p.상태 === '납부완료';
+          const [pY, pM] = p.연월.split('-');
+          const isCurrent = p.연월 === currentYM;
+          const statusLabel = paid ? '완료' : (isCurrent ? '예정' : '미납');
+          const statusColor = paid ? GREEN : (isCurrent ? BLUE : RED);
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', padding: '11px 0', borderBottom: '1px solid #f2f3f5', gap: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28', minWidth: 80, flexShrink: 0 }}>{pY}년 {Number(pM)}월</span>
+              <span style={{ fontSize: 12, color: '#4e5968', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                월세 {fmt(rent)} · <span style={{ color: '#00b493' }}>관리비 {fmt(mgmt)}</span>
+              </span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: statusColor, flexShrink: 0 }}>{statusLabel}</span>
+              {!paid && (
+                <button onClick={() => { setPaySheet(p); setPayMethod('계좌이체'); setPayDate(new Date().toISOString().split('T')[0]); }}
+                  style={{ fontSize: 11, fontWeight: 600, color: BLUE, background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0, fontFamily: 'inherit' }}>
+                  등록
+                </button>
               )}
             </div>
+          );
+        };
 
-            {/* 납부 이력 */}
-            {pastPayments.length > 0 && (
-              <div style={{ background: '#fff', padding: 16, marginBottom: 8 }}>
-                <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>납부 이력</h3>
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  {pastPayments.map((p, i) => {
-                    const paid = p.상태 === '납부완료';
-                    const amount = Number(paid ? p.납부액 : p.청구액) || 0;
-                    const [pYear, pMonth] = p.연월.split('-');
-                    return (
-                      <div key={p.수납ID}>
-                        {i > 0 && <div style={{ height: 1, background: '#f2f4f6' }} />}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <span style={{ fontSize: 13, fontWeight: 500, minWidth: 72 }}>{pYear}년 {Number(pMonth)}월</span>
-                            {paid && p.납부일 && (
-                              <span style={{ fontSize: 11, color: GRAY }}>{p.납부일.slice(5)}</span>
-                            )}
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ fontSize: 13, fontWeight: 500, color: '#191f28' }}>{amount > 0 ? fmt(amount) : '-'}</span>
-                            {paid ? (
-                              <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#e8faf2', color: '#0e6245' }}>납부완료</span>
-                            ) : (
-                              <button onClick={() => { setPaySheet(p); setPayMethod('계좌이체'); setPayDate(new Date().toISOString().split('T')[0]); }}
-                                style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#ffeaea', color: RED, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
-                                미납
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+        return (
+          <div style={{ background: '#fff', padding: 16, marginBottom: 8 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>납부 내역</h3>
+
+            {sortedPayments.length > 0 ? (
+              <>
+                {/* 최신 2개월 */}
+                {recent2.map(p => <PayRow key={p.수납ID} p={p} />)}
+
+                {/* 이전 N개월 아코디언 */}
+                {older.length > 0 && (
+                  <>
+                    <div onClick={() => setOldPayOpen(!oldPayOpen)}
+                      style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '10px 0', cursor: 'pointer', gap: 4 }}>
+                      <span style={{ fontSize: 12, color: GRAY, fontWeight: 500 }}>이전 {older.length}개월 {oldPayOpen ? '▲' : '▼'}</span>
+                    </div>
+                    {oldPayOpen && older.map(p => <PayRow key={p.수납ID} p={p} />)}
+                  </>
+                )}
+              </>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '20px 0', color: GRAY }}>
+                <p style={{ fontSize: 13 }}>납부 내역이 없어요</p>
+              </div>
+            )}
+
+            {/* 하단 고정 행: 보증금잔액+월세일할 / 관리비일할 / 계약금 */}
+            {moveInDate && (
+              <div style={{ borderTop: '1px solid #e5e8eb', marginTop: 4 }}>
+                {/* 잔금1: 보증금잔액 + 월세일할 */}
+                <div style={{ display: 'flex', alignItems: 'center', padding: '11px 0', borderBottom: '1px solid #f2f3f5', gap: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28', minWidth: 80, flexShrink: 0 }}>잔금①</span>
+                  <span style={{ fontSize: 12, color: '#4e5968', flex: 1 }}>
+                    보증금 {fmt(deposit)} + 월세{isProrata ? ' 일할' : ''} {fmt(firstRent)}
+                  </span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: GREEN, flexShrink: 0 }}>완료</span>
+                </div>
+                {/* 잔금2: 관리비일할 */}
+                <div style={{ display: 'flex', alignItems: 'center', padding: '11px 0', borderBottom: '1px solid #f2f3f5', gap: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28', minWidth: 80, flexShrink: 0 }}>잔금②</span>
+                  <span style={{ fontSize: 12, color: '#00b493', flex: 1 }}>
+                    관리비{isProrata ? ' 일할' : ''} {fmt(firstMgmt)}
+                  </span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: GREEN, flexShrink: 0 }}>완료</span>
+                </div>
+                {/* 계약금 */}
+                <div style={{ display: 'flex', alignItems: 'center', padding: '11px 0', gap: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28', minWidth: 80, flexShrink: 0 }}>계약금</span>
+                  <span style={{ fontSize: 12, color: '#4e5968', flex: 1 }}>
+                    보증금 {fmt(deposit)}
+                  </span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: GREEN, flexShrink: 0 }}>완료</span>
                 </div>
               </div>
             )}
-          </>
+          </div>
         );
       })()}
 
