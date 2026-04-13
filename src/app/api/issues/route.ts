@@ -43,7 +43,14 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const id = `I${Date.now().toString(36).toUpperCase()}`
+    const rows = await getSheetData('이슈')
+    // issue_XXXX 형식 자동 생성
+    let maxNum = 0
+    for (const r of rows) {
+      const m = r[0]?.match(/issue_(\d+)/)
+      if (m) maxNum = Math.max(maxNum, Number(m[1]))
+    }
+    const id = `issue_${String(maxNum + 1).padStart(4, '0')}`
     const today = new Date().toISOString().slice(0, 10)
     const row = [
       id,
