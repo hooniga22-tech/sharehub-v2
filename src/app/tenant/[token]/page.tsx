@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import useSWR from 'swr';
 import { fetcher } from '@/lib/fetcher';
 import { useParams } from 'next/navigation';
@@ -70,6 +70,14 @@ export default function TenantPortalPage() {
     { refreshInterval: 0, revalidateOnFocus: true, revalidateOnReconnect: true }
   );
   const house = Array.isArray(housesData) ? housesData.find((h: any) => h['지점명'] === tenant?.['지점명']) : null;
+  const { data: rawPayments } = useSWR(
+    tenant?.['입주자ID'] ? `/api/payments?tenantId=${tenant['입주자ID']}` : null, fetcher,
+    { refreshInterval: 0, revalidateOnFocus: true }
+  );
+  const paymentHistory = useMemo(() => {
+    const list = Array.isArray(rawPayments) ? rawPayments : [];
+    return [...list].sort((a: any, b: any) => (b.연월 || '').localeCompare(a.연월 || '')).slice(0, 6);
+  }, [rawPayments]);
   const loading = tenantLoading;
 
   const [lang, setLang] = useState<'ko' | 'en'>('ko');
@@ -277,21 +285,33 @@ export default function TenantPortalPage() {
           </Card>
         )}
 
-        {/* Payment Guide */}
+        {/* Payment History */}
         <Card>
-          <CardTitle title={t('납부 안내', 'Payment Guide')} />
-          <div style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {[
-              t('월세/관리비는 매월 1일까지 납부해 주세요.', 'Please pay by the 1st of each month.'),
-              t('공과금은 별도 청구됩니다.', 'Utility bills are charged separately.'),
-              t('납부 계좌는 계약서를 확인해 주세요.', 'Check your contract for payment account.'),
-            ].map((txt, i) => (
-              <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                <div style={{ width: 4, height: 4, borderRadius: '50%', background: BLUE, marginTop: 6, flexShrink: 0 }} />
-                <span style={{ fontSize: 13, color: '#191f28', lineHeight: 1.6 }}>{txt}</span>
-              </div>
-            ))}
-          </div>
+          <CardTitle title={t('납부 내역', 'Payment History')} sub={t('최근 6개월', 'Last 6 months')} />
+          {paymentHistory.length > 0 ? (
+            <div>
+              {paymentHistory.map((p: any, i: number) => {
+                const isPaid = p.상태 === '납부완료';
+                const [pY, pM] = (p.연월 || '').split('-');
+                const amount = Number(p.청구액) || 0;
+                return (
+                  <div key={p.수납ID || i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 18px', borderTop: '1px solid #f2f4f6' }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: '#191f28' }}>{pY}{t('년 ', '.')}{Number(pM)}{t('월', '')}</div>
+                      <div style={{ fontSize: 11, color: GRAY }}>{amount > 0 ? fmt(amount) : '-'}</div>
+                    </div>
+                    <span style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: isPaid ? '#e8faf2' : '#fff0f1', color: isPaid ? '#0e6245' : RED }}>
+                      {isPaid ? t('납부완료', 'Paid') : t('미납', 'Unpaid')}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div style={{ padding: '20px 18px', textAlign: 'center', color: GRAY, fontSize: 13 }}>
+              {t('납부 내역이 없어요', 'No payment history')}
+            </div>
+          )}
         </Card>
 
         {/* Duty */}

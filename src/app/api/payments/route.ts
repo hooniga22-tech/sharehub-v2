@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server'
 import { getSheetData, appendRow, updateRow } from '@/lib/sheets'
 
-// 수납 시트 컬럼 (13열)
-// [0]수납ID [1]입주자ID [2]지점명 [3]방코드 [4]입주자명
-// [5]연도 [6]월 [7]월세금액 [8]관리비금액 [9]납부여부
-// [10]납부일 [11]납부방법 [12]메모
+// 수납 시트 컬럼 (12열)
+// [0]수납ID [1]입주자ID [2]지점명 [3]방코드 [4]이름
+// [5]연월 [6]청구액 [7]납부액 [8]납부일 [9]상태 [10]납부방법 [11]메모
 
 function rowToPayment(r: string[], rowIndex: number) {
   return {
@@ -13,15 +12,14 @@ function rowToPayment(r: string[], rowIndex: number) {
     입주자ID: r[1] || '',
     지점명: r[2] || '',
     방코드: r[3] || '',
-    입주자명: r[4] || '',
-    연도: r[5] || '',
-    월: r[6] || '',
-    월세금액: r[7] || '',
-    관리비금액: r[8] || '',
-    납부여부: r[9] || '미납',
-    납부일: r[10] || '',
-    납부방법: r[11] || '',
-    메모: r[12] || '',
+    이름: r[4] || '',
+    연월: r[5] || '',
+    청구액: r[6] || '',
+    납부액: r[7] || '',
+    납부일: r[8] || '',
+    상태: r[9] || '미납',
+    납부방법: r[10] || '',
+    메모: r[11] || '',
   }
 }
 
@@ -37,8 +35,12 @@ export async function GET(req: Request) {
     let payments = rows.map((r, i) => rowToPayment(r, i))
 
     if (tenantId) payments = payments.filter(p => p.입주자ID === tenantId)
-    if (year) payments = payments.filter(p => p.연도 === year)
-    if (month) payments = payments.filter(p => p.월 === month)
+    if (year && month) {
+      const ym = `${year}-${month.padStart(2, '0')}`
+      payments = payments.filter(p => p.연월 === ym)
+    } else if (year) {
+      payments = payments.filter(p => p.연월.startsWith(year))
+    }
 
     return NextResponse.json(payments)
   } catch (e) {
@@ -51,20 +53,27 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const id = `pay_${Date.now()}`
+
+    // 수납ID 자동 생성: 기존 마지막 번호 +1
+    const rows = await getSheetData('수납')
+    let maxNum = 0
+    for (const r of rows) {
+      const m = r[0]?.match(/pay_(\d+)/)
+      if (m) maxNum = Math.max(maxNum, Number(m[1]))
+    }
+    const id = `pay_${String(maxNum + 1).padStart(4, '0')}`
 
     const row = [
       id,
       body.입주자ID || '',
       body.지점명 || '',
       body.방코드 || '',
-      body.입주자명 || '',
-      body.연도 || String(new Date().getFullYear()),
-      body.월 || String(new Date().getMonth() + 1),
-      body.월세금액 || '',
-      body.관리비금액 || '',
-      body.납부여부 || '미납',
+      body.이름 || '',
+      body.연월 || '',
+      body.청구액 || '',
+      body.납부액 || '',
       body.납부일 || '',
+      body.상태 || '미납',
       body.납부방법 || '',
       body.메모 || '',
     ]
@@ -89,13 +98,13 @@ export async function PUT(req: Request) {
 
     const e = rows[rowIndex]
     const updated = [
-      e[0], e[1], e[2], e[3], e[4], e[5], e[6],
-      data.월세금액 ?? e[7],
-      data.관리비금액 ?? e[8],
-      data.납부여부 ?? e[9],
-      data.납부일 ?? e[10],
-      data.납부방법 ?? e[11],
-      data.메모 ?? (e[12] || ''),
+      e[0], e[1], e[2], e[3], e[4], e[5],
+      data.청구액 ?? e[6],
+      data.납부액 ?? e[7],
+      data.납부일 ?? e[8],
+      data.상태 ?? e[9],
+      data.납부방법 ?? e[10],
+      data.메모 ?? (e[11] || ''),
     ]
 
     await updateRow('수납', rowIndex, updated)

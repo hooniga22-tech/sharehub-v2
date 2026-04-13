@@ -11,7 +11,7 @@ const BLUE = '#3182f6', GRAY = '#8b95a1', GREEN = '#00c471', RED = '#f04452', OR
 const fmt = (n: number) => n.toLocaleString() + '원';
 
 type Tenant = Record<string, string>;
-type Payment = { 수납ID: string; 연도: string; 월: string; 월세금액: string; 관리비금액: string; 납부여부: string; 납부일: string; 납부방법: string };
+type Payment = { 수납ID: string; 입주자ID: string; 지점명: string; 방코드: string; 이름: string; 연월: string; 청구액: string; 납부액: string; 납부일: string; 상태: string; 납부방법: string; 메모: string };
 type Issue = { id: string; title: string; category: string; status: string; createdAt: string };
 
 const calcDday = (dateStr: string): number => {
@@ -81,10 +81,10 @@ export default function TenantDetailPage() {
     if (!paySheet) return;
     await fetch('/api/payments', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: paySheet.수납ID, 납부여부: '납부', 납부일: payDate, 납부방법: payMethod }),
+      body: JSON.stringify({ id: paySheet.수납ID, 상태: '납부완료', 납부액: paySheet.청구액, 납부일: payDate, 납부방법: payMethod }),
     });
     mutatePayments(payments.map(p =>
-      p.수납ID === paySheet.수납ID ? { ...p, 납부여부: '납부', 납부일: payDate, 납부방법: payMethod } : p
+      p.수납ID === paySheet.수납ID ? { ...p, 상태: '납부완료', 납부액: p.청구액, 납부일: payDate, 납부방법: payMethod } : p
     ), false);
     setPaySheet(null);
     showToast('납부 등록 완료!');
@@ -126,11 +126,7 @@ export default function TenantDetailPage() {
   const now = new Date();
   const charge = getMonthlyCharge(rent, mgmt, tenant.입주일 || '', now.getFullYear(), now.getMonth() + 1);
 
-  const sortedPayments = [...payments].sort((a, b) => {
-    const aKey = `${a.연도}.${a.월.padStart(2, '0')}`;
-    const bKey = `${b.연도}.${b.월.padStart(2, '0')}`;
-    return bKey.localeCompare(aKey);
-  });
+  const sortedPayments = [...payments].sort((a, b) => b.연월.localeCompare(a.연월));
 
   return (
     <div style={{ minHeight: '100vh', background: '#F7F8FA', paddingBottom: 16 }}>
@@ -226,15 +222,16 @@ export default function TenantDetailPage() {
         {sortedPayments.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {sortedPayments.map((p, i) => {
-              const isPaid = p.납부여부 === '납부';
-              const total = (Number(p.월세금액) || 0) + (Number(p.관리비금액) || 0);
+              const isPaid = p.상태 === '납부완료';
+              const amount = Number(p.청구액) || 0;
+              const [pYear, pMonth] = p.연월.split('-');
               return (
                 <div key={p.수납ID}>
                   {i > 0 && <div style={{ height: 1, background: '#F5F5F5' }} />}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0' }}>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 500 }}>{p.연도}년 {p.월}월</div>
-                      <div style={{ fontSize: 11, color: GRAY }}>월세+관리비 {total > 0 ? fmt(total) : '-'}</div>
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>{pYear}년 {Number(pMonth)}월</div>
+                      <div style={{ fontSize: 11, color: GRAY }}>청구 {amount > 0 ? fmt(amount) : '-'}</div>
                     </div>
                     {isPaid ? (
                       <span style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#e8faf2', color: '#0e6245' }}>납부 {p.납부일?.slice(5)}</span>
@@ -327,7 +324,7 @@ export default function TenantDetailPage() {
               <span style={{ fontSize: 16, fontWeight: 700 }}>납부 등록</span>
               <button onClick={() => setPaySheet(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="#999" /></button>
             </div>
-            <div style={{ fontSize: 13, color: GRAY, marginBottom: charge.isProrata ? 12 : 20 }}>{tenant.이름} · {paySheet.연도}년 {paySheet.월}월분</div>
+            <div style={{ fontSize: 13, color: GRAY, marginBottom: charge.isProrata ? 12 : 20 }}>{tenant.이름} · {paySheet.연월?.replace('-', '년 ').replace(/^(\d+년 )0?/, '$1')}월분</div>
 
             {charge.isProrata && charge.detail && (
               <div style={{ background: '#fff8ed', borderRadius: 10, padding: 12, marginBottom: 16 }}>

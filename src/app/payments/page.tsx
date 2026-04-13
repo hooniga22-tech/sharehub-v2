@@ -9,7 +9,7 @@ const BLUE = '#3182f6', RED = '#f04452', GREEN = '#00c471', GRAY = '#8b95a1';
 const fmt = (n: number) => n.toLocaleString() + '원';
 
 type Tab = 'all' | 'unpaid' | 'paid';
-type Payment = { 수납ID: string; 입주자ID: string; 지점명: string; 방코드: string; 입주자명: string; 연도: string; 월: string; 월세금액: string; 관리비금액: string; 납부여부: string; 납부일: string; 납부방법: string; 메모: string };
+type Payment = { 수납ID: string; 입주자ID: string; 지점명: string; 방코드: string; 이름: string; 연월: string; 청구액: string; 납부액: string; 납부일: string; 상태: string; 납부방법: string; 메모: string };
 type Tenant = { 입주자ID: string; 구: string; 지점명: string; 방코드: string; 이름: string; 상태: string; 월세: string; 관리비: string; 입주일: string };
 
 export default function PaymentsPage() {
@@ -34,7 +34,7 @@ export default function PaymentsPage() {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      fetch(`/api/payments?year=${year}&month=${month}`).then(r => r.json()),
+      fetch(`/api/payments?year=${year}&month=${String(month).padStart(2, '0')}`).then(r => r.json()),
       fetch('/api/tenants').then(r => r.json()),
     ]).then(([payData, tenantData]) => {
       setPayments(Array.isArray(payData) ? payData : []);
@@ -48,14 +48,15 @@ export default function PaymentsPage() {
     const activeTenants = tenants.filter(t => t.상태 === '입주중' || t.상태 === '계약중');
     return activeTenants.map(t => {
       const pay = payments.find(p => p.입주자ID === t.입주자ID);
-      const isPaid = pay?.납부여부 === '납부';
+      const isPaid = pay?.상태 === '납부완료';
       const r = Number(t.월세 || 0), m = Number(t.관리비 || 0);
       const charge = getMonthlyCharge(r, m, t.입주일 || '', year, month);
+      const chargeAmount = Number(pay?.청구액 || 0) || charge.amount;
       return {
         ...t,
         paymentId: pay?.수납ID || '',
         paid: isPaid,
-        rentAmount: Number(pay?.월세금액 || 0) || charge.amount,
+        rentAmount: chargeAmount,
         fullAmount: r + m,
         paidDate: pay?.납부일 || '',
         isProrata: charge.isProrata,
@@ -102,11 +103,11 @@ export default function PaymentsPage() {
       await fetch('/api/payments', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: paymentId, 납부여부: '납부', 납부일: today, 납부방법: '수동' }),
+        body: JSON.stringify({ id: paymentId, 상태: '납부완료', 납부일: today, 납부방법: '수동' }),
       });
     }
     setPayments(prev => prev.map(p =>
-      p.수납ID === paymentId ? { ...p, 납부여부: '납부', 납부일: today } : p
+      p.수납ID === paymentId ? { ...p, 상태: '납부완료', 납부일: today } : p
     ));
     showToast('납부 처리됐어요!');
   };
@@ -116,17 +117,18 @@ export default function PaymentsPage() {
     const t = tenants.find(x => x.입주자ID === manualTenantId);
     if (!t) return;
     const today = manualDate || new Date().toISOString().split('T')[0];
+    const ym = `${year}-${String(month).padStart(2, '0')}`;
     await fetch('/api/payments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        입주자ID: t.입주자ID, 지점명: t.지점명, 방코드: t.방코드, 입주자명: t.이름,
-        연도: String(year), 월: String(month),
-        월세금액: manualAmount, 관리비금액: '', 납부여부: '납부', 납부일: today, 납부방법: '수동',
+        입주자ID: t.입주자ID, 지점명: t.지점명, 방코드: t.방코드, 이름: t.이름,
+        연월: ym, 청구액: manualAmount, 납부액: manualAmount,
+        납부일: today, 상태: '납부완료', 납부방법: '수동',
       }),
     });
     // Refresh
-    const payData = await fetch(`/api/payments?year=${year}&month=${month}`).then(r => r.json());
+    const payData = await fetch(`/api/payments?year=${year}&month=${String(month).padStart(2, '0')}`).then(r => r.json());
     setPayments(Array.isArray(payData) ? payData : []);
     setShowManual(false);
     showToast('입금 등록 완료!');
