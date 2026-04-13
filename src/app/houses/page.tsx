@@ -48,7 +48,10 @@ export default function HousesPage() {
   return (
     <div style={{ background: '#f5f5f5', minHeight: '100vh' }}>
       <div style={{ background: '#fff', padding: '14px 16px 10px', borderBottom: '1px solid #f2f4f6', position: 'sticky', top: 0, zIndex: 10 }}>
-        <div style={{ fontSize: 17, fontWeight: 700, color: '#191f28', marginBottom: 10 }}>지점 관리</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+          <button onClick={() => router.push('/manage')} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', padding: 4, color: '#191919' }}>←</button>
+          <span style={{ fontSize: 17, fontWeight: 700, color: '#191f28' }}>지점 관리</span>
+        </div>
         <div style={{ display: 'flex', gap: 6, overflowX: 'auto', padding: '0 0 12px', scrollbarWidth: 'none' }}>
           {['전체', ...guList].map(g => (
             <button key={g} onClick={() => setGu(g)} style={{ padding: '6px 14px', borderRadius: 100, border: gu === g ? '1px solid #191f28' : '1px solid #e5e8eb', background: gu === g ? '#191f28' : '#fff', color: gu === g ? '#fff' : '#4e5968', fontSize: 13, fontWeight: gu === g ? 600 : 400, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, fontFamily: 'inherit' }}>{g}</button>
