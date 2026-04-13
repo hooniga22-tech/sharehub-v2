@@ -7,13 +7,14 @@ export async function POST(req: Request) {
     const { token, items, memo } = body
 
     const tenantRows = await getSheetData('입주자')
-    const tenant = tenantRows.find(r => r[14] === token)
+    // 입주자: [0]ID [5]이름 [2]지점명 [3]방코드 [19]링크토큰
+    const tenant = tenantRows.find(r => r[19] === token)
     if (!tenant) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
     const today = new Date().toISOString().split('T')[0]
     const id = `supply_${Date.now()}`
     await appendRow('비품신청', [
-      id, tenant[0], tenant[4], tenant[2], tenant[3],
+      id, tenant[0], tenant[5], tenant[2], tenant[3],
       items, 1, memo || '', '접수', today,
     ])
     return NextResponse.json({ ok: true, id })

@@ -15,8 +15,9 @@ export async function GET(_: Request, { params }: { params: Promise<{ slug: stri
 
     const houseName = houseRow[1]?.trim()
 
+    // 입주자: [2]지점명 [8]상태
     const activeCount = tenantRows.filter(r =>
-      r[2]?.trim() === houseName && r[11] === '입주중'
+      r[2]?.trim() === houseName && r[8] === '입주중'
     ).length
 
     return NextResponse.json({

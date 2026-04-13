@@ -7,9 +7,10 @@ export async function POST(req: Request) {
     const tenants = await getSheetData('입주자')
 
     // Build tenant summary for context
+    // 입주자: [0]ID [2]지점명 [3]방코드 [5]이름 [6]입주일 [7]퇴실일 [8]상태 [9]보증금 [10]월세 [11]관리비
     const tenantSummary = tenants.slice(0, 50).map(r => ({
-      id: r[0], houseName: r[2], roomCode: r[3], name: r[4],
-      rent: r[6], mgmt: r[7], deposit: r[8], startDate: r[9], endDate: r[10], status: r[11],
+      id: r[0], houseName: r[2], roomCode: r[3], name: r[5],
+      rent: r[10], mgmt: r[11], deposit: r[9], startDate: r[6], endDate: r[7], status: r[8],
     }))
 
     const systemPrompt = `당신은 쉐어하우스 운영 관리 AI입니다.

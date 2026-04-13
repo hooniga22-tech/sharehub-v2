@@ -10,25 +10,27 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (idx === -1) return NextResponse.json({ error: 'not found' }, { status: 404 })
     const ex = rows[idx]
 
-    // row: [0]ID [1]담당자명 [2]지점명 [3]작업종류 [4]예정일 [5]완료여부 [6]정산금액 [7]이슈ID [8]메모 [9]링크토큰 [10]등록일
-    const isDone = body.isDone !== undefined ? body.isDone : ex[5] === 'Y'
-    const amount = body.amount !== undefined ? body.amount : Number(ex[6]) || 0
+    // row: [0]용역ID [1]예정일 [2]지점명 [3]담당자명 [4]작업종류 [5]정산금액 [6]메모 [7]완료여부 [8]링크토큰 [9]링크토큰 [10]등록일
+    const isDone = body.isDone !== undefined ? body.isDone : ex[7] === 'Y'
+    const amount = body.amount !== undefined ? body.amount : Number(ex[5]) || 0
 
     await updateRow('용역', idx, [
       ex[0], ex[1], ex[2], ex[3], ex[4],
-      isDone ? 'Y' : 'N',
       amount,
-      ex[7] || '', ex[8] || '', ex[9] || '', ex[10] || '',
+      ex[6] || '',
+      isDone ? 'Y' : 'N',
+      ex[8] || '', ex[9] || '', ex[10] || '',
     ])
 
     // 완료 처리 → 운영지출 자동 추가
     if (isDone && body.isDone === true) {
       const opexId = `opex_wk_${id}_${Date.now()}`
-      const date = ex[4] || new Date().toISOString().split('T')[0]
+      const date = ex[1] || new Date().toISOString().split('T')[0]
       const d = new Date(date)
+      // 운영지출: [0]ID [1]지점명 [2]날짜 [3]카테고리 [4]금액 [5]내용 [6]담당자 [7]메모 [8]월
       await appendRow('운영지출', [
-        opexId, ex[2], '청소', `${ex[3]} (${ex[1]})`, amount,
-        ex[1], date, d.getFullYear(), d.getMonth() + 1,
+        opexId, ex[2], date, '청소', amount,
+        `${ex[4]} (${ex[3]})`, ex[3], '', d.getMonth() + 1,
         `용역 자동연동: ${id}`,
       ])
     }

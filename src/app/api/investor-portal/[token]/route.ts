@@ -33,13 +33,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
     }
 
     const monthlyData = months.map(({ year: y, month: m }) => {
+      // 입주자: [8]상태 [10]월세 [11]관리비
       const activeRent = tenantRows
-        .filter(r => r[2]?.trim() === houseName && r[11] !== '퇴실')
-        .reduce((sum, r) => sum + (Number(r[6]) || 0) + (Number(r[7]) || 0), 0)
+        .filter(r => r[2]?.trim() === houseName && r[8] !== '퇴실')
+        .reduce((sum, r) => sum + (Number(r[10]) || 0) + (Number(r[11]) || 0), 0)
 
+      // 공과금: [1]지점명 [2]연도 [3]월 [4]전기 [5]가스 [6]수도 [7]인터넷 [8]정수기 [10]청소 [11]기타
       const utility = utilityRows
-        .filter(r => Number(r[3]) === y && Number(r[4]) === m && r[2]?.trim() === houseName)
-        .reduce((sum, r) => sum + [5, 6, 7, 8, 9, 10, 11].reduce((s, i) => s + (Number(r[i]) || 0), 0), 0)
+        .filter(r => Number(r[2]) === y && Number(r[3]) === m && r[1]?.trim() === houseName)
+        .reduce((sum, r) => sum + [4, 5, 6, 7, 8, 10, 11].reduce((s, i) => s + (Number(r[i]) || 0), 0), 0)
 
       const totalExpense = buildingRent + utility
       const profit = activeRent - totalExpense
@@ -60,11 +62,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
     const currentMonth = monthlyData[monthlyData.length - 1]
 
     const activeTenants = tenantRows.filter(r =>
-      r[2]?.trim() === houseName && r[11] === '입주중'
+      r[2]?.trim() === houseName && r[8] === '입주중'
     ).length
     const exitSoon = tenantRows.filter(r => {
-      if (r[2]?.trim() !== houseName || r[11] !== '입주중') return false
-      const end = r[10]
+      if (r[2]?.trim() !== houseName || r[8] !== '입주중') return false
+      const end = r[7]
       if (!end) return false
       const diff = Math.ceil((new Date(end).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
       return diff >= 0 && diff <= 30

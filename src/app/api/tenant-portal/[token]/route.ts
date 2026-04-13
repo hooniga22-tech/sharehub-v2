@@ -10,7 +10,10 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
       getSheetData('이슈'),
     ])
 
-    const tenantRow = tenantRows.find(r => r[14] === token)
+    // 입주자: [0]ID [1]구 [2]지점명 [3]방코드 [4]방타입 [5]이름 [6]입주일 [7]퇴실일
+    //         [8]상태 [9]보증금 [10]월세 [11]관리비 [12]메모 [13]연락처 [14]생년월일
+    //         [15]주소 [16]투자자 [17]투자자계좌 [18]투자자연락처 [19]링크토큰
+    const tenantRow = tenantRows.find(r => r[19] === token)
     if (!tenantRow) return NextResponse.json({ error: 'not found' }, { status: 404 })
 
     const houseName = tenantRow[2]?.trim()
@@ -23,7 +26,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
         status: r[6], createdAt: r[8],
       }))
 
-    const endDate = tenantRow[10]
+    const endDate = tenantRow[7]
     const dDay = endDate
       ? Math.ceil((new Date(endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
       : null
@@ -33,16 +36,16 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
         id: tenantRow[0],
         houseName,
         roomCode: tenantRow[3],
-        name: tenantRow[4],
-        phone: tenantRow[5],
-        rent: Number(tenantRow[6]) || 0,
-        managementFee: Number(tenantRow[7]) || 0,
-        deposit: Number(tenantRow[8]) || 0,
-        startDate: tenantRow[9],
-        endDate: tenantRow[10],
-        status: tenantRow[11],
-        nationality: tenantRow[12],
-        memo: tenantRow[13],
+        name: tenantRow[5],
+        phone: tenantRow[13],
+        rent: Number(tenantRow[10]) || 0,
+        managementFee: Number(tenantRow[11]) || 0,
+        deposit: Number(tenantRow[9]) || 0,
+        startDate: tenantRow[6],
+        endDate: tenantRow[7],
+        status: tenantRow[8],
+        nationality: tenantRow[14] || '',
+        memo: tenantRow[12],
         dDay,
       },
       house: houseRow ? {
