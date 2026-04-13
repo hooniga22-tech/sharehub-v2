@@ -140,8 +140,8 @@ export default function TenantDetailPage() {
         <div style={{ display: 'flex', gap: 6 }}>
           {tenant?.['링크토큰'] && (
             <button onClick={() => window.open(`${window.location.origin}/tenant/${tenant['링크토큰']}`, '_blank')}
-              style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e8eb', background: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#191f28' }}>
-              🔗 링크
+              style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #e5e8eb', background: '#fff', color: '#191f28', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+              링크
             </button>
           )}
           <button onClick={() => window.open(`/contract/${id}`, '_blank')}
