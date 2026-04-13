@@ -44,6 +44,32 @@ export async function updateRow(sheetName: string, rowIndex: number, row: (strin
   })
 }
 
+export async function deleteRow(sheetName: string, rowIndex: number): Promise<void> {
+  const auth = await getAuth()
+  const sheets = google.sheets({ version: 'v4', auth })
+  // Get sheetId from sheetName
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID })
+  const sheet = meta.data.sheets?.find(s => s.properties?.title === sheetName)
+  if (!sheet?.properties?.sheetId && sheet?.properties?.sheetId !== 0) {
+    throw new Error(`Sheet "${sheetName}" not found`)
+  }
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: SHEET_ID,
+    requestBody: {
+      requests: [{
+        deleteDimension: {
+          range: {
+            sheetId: sheet.properties.sheetId,
+            dimension: 'ROWS',
+            startIndex: rowIndex + 1, // +1 for header row
+            endIndex: rowIndex + 2,
+          },
+        },
+      }],
+    },
+  })
+}
+
 export function rowsToObjects(rows: string[][]): Record<string, string>[] {
   if (!rows || rows.length < 2) return []
   const headers = rows[0]

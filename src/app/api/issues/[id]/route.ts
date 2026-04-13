@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getSheetData, updateRow } from '@/lib/sheets'
+import { getSheetData, updateRow, deleteRow } from '@/lib/sheets'
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -44,6 +44,20 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       body.memo ?? prev[11],
     ]
     await updateRow('이슈', idx, updated)
+    return NextResponse.json({ success: true })
+  } catch (e) {
+    return NextResponse.json({ error: String(e) }, { status: 500 })
+  }
+}
+
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params
+    const rows = await getSheetData('이슈')
+    const idx = rows.findIndex(r => r[0] === id)
+    if (idx === -1) return NextResponse.json({ error: 'not found' }, { status: 404 })
+
+    await deleteRow('이슈', idx)
     return NextResponse.json({ success: true })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
