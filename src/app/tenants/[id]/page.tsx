@@ -138,8 +138,8 @@ export default function TenantDetailPage() {
           <span style={{ fontSize: 16, fontWeight: 700 }}>입주자 상세</span>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
-          {tenant?.연락처 && (
-            <button onClick={() => { navigator.clipboard?.writeText(`${window.location.origin}/tenant/${tenant.연락처}`); showToast('개인 링크가 복사됐어요!'); }}
+          {tenant?.['링크토큰'] && (
+            <button onClick={() => window.open(`${window.location.origin}/tenant/${tenant['링크토큰']}`, '_blank')}
               style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e8eb', background: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#191f28' }}>
               🔗 링크
             </button>

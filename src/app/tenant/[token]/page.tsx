@@ -77,35 +77,20 @@ export default function TenantPortalPage() {
   const copyText = (text: string) => { navigator.clipboard?.writeText(text); showToast(t('복사됐어요!', 'Copied!')); };
 
   useEffect(() => {
-    import('@/lib/channeltalk').then(({ loadChannelTalk, bootChannelTalk }) => {
-      loadChannelTalk();
-      fetch(`/api/tenants?token=${token}`)
-        .then(r => r.json())
-        .then(async (data) => {
-          if (data.error) { setLoading(false); return; }
-          setTenant(data);
-          try {
-            const houses = await fetch('/api/houses').then(r => r.json());
-            const found = Array.isArray(houses) ? houses.find((h: any) => h['지점명'] === data['지점명']) : null;
-            if (found) setHouse(found);
-          } catch { /* */ }
-          bootChannelTalk({
-            memberId: token,
-            name: data['이름'],
-            mobileNumber: data['연락처'],
-            tags: ['입주자', data['지점명'], data['구'] || ''].filter(Boolean),
-            customAttributes: { house: data['지점명'] || '', room: data['방코드'] || '', contractEnd: data['퇴실일'] || '', status: data['상태'] || '' },
-          });
-          setLoading(false);
-        })
-        .catch(() => setLoading(false));
-    });
+    fetch(`/api/tenants?token=${token}`)
+      .then(r => r.json())
+      .then(async (data) => {
+        if (data.error) { setLoading(false); return; }
+        setTenant(data);
+        try {
+          const houses = await fetch('/api/houses').then(r => r.json());
+          const found = Array.isArray(houses) ? houses.find((h: any) => h['지점명'] === data['지점명']) : null;
+          if (found) setHouse(found);
+        } catch { /* */ }
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, [token]);
-
-  const handleContact = async () => {
-    const { openChannelTalk } = await import('@/lib/channeltalk');
-    openChannelTalk();
-  };
 
   const submitSupply = async () => {
     if (!selSupplies.length || !tenant) return;
@@ -191,10 +176,10 @@ export default function TenantPortalPage() {
             ))}
           </div>
           <div style={{ background: '#f8f9fa', borderRadius: 12, padding: '14px 16px', marginBottom: 16, fontSize: 13, color: GRAY, lineHeight: 1.7, textAlign: 'center' }}>
-            <div style={{ fontSize: 13, color: '#191f28', fontWeight: 600, marginBottom: 4 }}>{t('채널톡 상담으로 신청해 주세요', 'Please contact us via chat')}</div>
+            <div style={{ fontSize: 13, color: '#191f28', fontWeight: 600, marginBottom: 4 }}>{t('카카오톡으로 문의해 주세요', 'Please contact us via KakaoTalk')}</div>
             <div style={{ fontSize: 12, color: GRAY }}>{t('사진 첨부 후 매니저가 빠르게 처리해 드려요', 'Attach photos and we\'ll handle it quickly')}</div>
           </div>
-          <button onClick={() => { setIssueSheet(null); handleContact(); }}
+          <button onClick={() => { setIssueSheet(null); window.open('http://pf.kakao.com/_xnxnNxj', '_blank'); }}
             style={{ width: '100%', padding: 14, borderRadius: 12, border: 'none', background: '#3182f6', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
             {t('매니저에게 문의하기', 'Contact Manager')}
           </button>
@@ -423,10 +408,6 @@ export default function TenantPortalPage() {
         </Card>
 
         {/* Bottom Buttons */}
-        <button onClick={handleContact} style={{ width: '100%', padding: 15, borderRadius: 14, border: 'none', background: '#3182f6', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
-          {t('매니저에게 문의하기', 'Contact Manager')}
-        </button>
-
         <div style={{ display: 'flex', gap: 6 }}>
           <button onClick={() => window.open('/apply/cleaning', '_blank')} style={{ flex: 1, padding: '12px 0', borderRadius: 10, border: '1px solid #e5e8eb', background: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#191f28', textAlign: 'center', fontFamily: 'inherit' }}>
             {t('방청소 신청', 'Room Cleaning')}
@@ -435,6 +416,10 @@ export default function TenantPortalPage() {
             {t('에어컨 신청', 'A/C Request')}
           </button>
         </div>
+
+        <button onClick={() => window.open('http://pf.kakao.com/_xnxnNxj', '_blank')} style={{ width: '100%', padding: 15, borderRadius: 14, border: 'none', background: '#3182f6', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+          {t('매니저에게 문의하기', 'Contact Manager')}
+        </button>
 
         <button onClick={() => window.open('/apply/checkout', '_blank')} style={{ width: '100%', padding: '12px 0', borderRadius: 10, border: '1px solid rgba(240,68,82,0.3)', background: '#fff0f1', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#f04452', textAlign: 'center', fontFamily: 'inherit' }}>
           {t('퇴실 신청', 'Move-out Request')}
