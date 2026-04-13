@@ -422,20 +422,23 @@ export default function TenantPortalPage() {
           </div>
         </Card>
 
-        {/* Contact */}
-        <button onClick={handleContact} style={{ width: '100%', padding: 16, borderRadius: 14, border: 'none', background: '#3182f6', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+        {/* Bottom Buttons */}
+        <button onClick={handleContact} style={{ width: '100%', padding: 15, borderRadius: 14, border: 'none', background: '#3182f6', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
           {t('매니저에게 문의하기', 'Contact Manager')}
         </button>
 
-        {/* Bottom Quick Links */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-          <div onClick={() => window.open('/apply/aircon', '_blank')} style={{ padding: '11px 0', borderRadius: 10, border: '1px solid #e5e8eb', background: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#191f28', textAlign: 'center' }}>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button onClick={() => window.open('/apply/cleaning', '_blank')} style={{ flex: 1, padding: '12px 0', borderRadius: 10, border: '1px solid #e5e8eb', background: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#191f28', textAlign: 'center', fontFamily: 'inherit' }}>
+            {t('방청소 신청', 'Room Cleaning')}
+          </button>
+          <button onClick={() => window.open('/apply/aircon', '_blank')} style={{ flex: 1, padding: '12px 0', borderRadius: 10, border: '1px solid #e5e8eb', background: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#191f28', textAlign: 'center', fontFamily: 'inherit' }}>
             {t('에어컨 신청', 'A/C Request')}
-          </div>
-          <div onClick={() => window.open('/apply/checkout', '_blank')} style={{ padding: '11px 0', borderRadius: 10, border: `1px solid ${RED}30`, background: '#fff0f1', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: RED, textAlign: 'center' }}>
-            {t('퇴실 신청', 'Move-out')}
-          </div>
+          </button>
         </div>
+
+        <button onClick={() => window.open('/apply/checkout', '_blank')} style={{ width: '100%', padding: '12px 0', borderRadius: 10, border: '1px solid rgba(240,68,82,0.3)', background: '#fff0f1', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#f04452', textAlign: 'center', fontFamily: 'inherit' }}>
+          {t('퇴실 신청', 'Move-out Request')}
+        </button>
       </div>
     </div>
   );
