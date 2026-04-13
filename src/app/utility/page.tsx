@@ -9,7 +9,7 @@ const fmt = (n: number) => n.toLocaleString() + '원';
 const BASE_AMOUNT = 100000;
 
 type UtilData = { ID: string; 지점명: string; 연도: string; 월: string; 전기: string; 가스: string; 수도: string; 인터넷: string; 정수기: string; 메모: string };
-type HouseInfo = { name: string; tenants: number };
+type HouseInfo = { name: string; tenants: number; district?: string; investor?: string };
 
 function totalBill(d: UtilData) { return ['전기', '가스', '수도', '인터넷', '정수기'].reduce((s, k) => s + (Number((d as Record<string, string>)[k]) || 0), 0); }
 function perPerson(d: UtilData, tenants: number) { return tenants > 0 ? Math.round(totalBill(d) / tenants) : 0; }
@@ -33,6 +33,11 @@ export default function UtilityPage() {
   const [inputInternet, setInputInternet] = useState('');
   const [inputPurifier, setInputPurifier] = useState('');
   const [toast, setToast] = useState('');
+  const [filterGu, setFilterGu] = useState('전체');
+  const [filterInvestor, setFilterInvestor] = useState('전체');
+  const [openDrop, setOpenDrop] = useState<'gu' | 'inv' | null>(null);
+  const [guList, setGuList] = useState<string[]>(['전체']);
+  const [investorList, setInvestorList] = useState<string[]>(['전체']);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2200); };
 
@@ -42,28 +47,64 @@ export default function UtilityPage() {
       fetch(`/api/utility?year=${year}&month=${month}`).then(r => r.json()),
       fetch(`/api/utility?year=${year}`).then(r => r.json()),
       fetch('/api/tenants').then(r => r.json()),
-    ]).then(([monthData, yearData, tenantData]) => {
+      fetch('/api/houses').then(r => r.json()),
+      fetch('/api/investors').then(r => r.json()),
+    ]).then(([monthData, yearData, tenantData, houseData, investorData]) => {
       setData(Array.isArray(monthData) ? monthData : []);
       setAllData(Array.isArray(yearData) ? yearData : []);
-      // Build house list with tenant counts
+
+      const hArr = Array.isArray(houseData) ? houseData : [];
+      const invArr = Array.isArray(investorData) ? investorData : [];
+
+      // Build district map & investor map from houses + investors
+      const districtMap: Record<string, string> = {};
+      const tokenToInvestor: Record<string, string> = {};
+      const houseInvestorMap: Record<string, string> = {};
+
+      for (const inv of invArr) { if (inv['링크토큰']) tokenToInvestor[inv['링크토큰']] = inv['투자자명']; }
+      for (const h of hArr) {
+        const name = h['지점명']?.trim();
+        if (!name) continue;
+        districtMap[name] = h['구'] || '';
+        if (h['투자자토큰'] && tokenToInvestor[h['투자자토큰']]) houseInvestorMap[name] = tokenToInvestor[h['투자자토큰']];
+      }
+
+      // Build gu list & investor list
+      const gus = [...new Set(Object.values(districtMap).filter(Boolean))].sort();
+      setGuList(['전체', ...gus]);
+      const invNames = [...new Set(Object.values(houseInvestorMap).filter(Boolean))].sort();
+      setInvestorList(['전체', ...invNames]);
+
+      // Build house list with tenant counts + district + investor
       const tArr = Array.isArray(tenantData) ? tenantData : [];
       const active = tArr.filter((t: Record<string, string>) => t['상태'] === '입주중' || t['상태'] === '계약중');
-      const houseMap: Record<string, number> = {};
-      for (const t of active) { const h = t['지점명']; if (h) houseMap[h] = (houseMap[h] || 0) + 1; }
-      setHouses(Object.entries(houseMap).map(([name, tenants]) => ({ name, tenants })).sort((a, b) => a.name.localeCompare(b.name)));
+      const houseCountMap: Record<string, number> = {};
+      for (const t of active) { const h = t['지점명']; if (h) houseCountMap[h] = (houseCountMap[h] || 0) + 1; }
+      setHouses(Object.entries(houseCountMap).map(([name, tenants]) => ({
+        name, tenants, district: districtMap[name] || '', investor: houseInvestorMap[name] || '',
+      })).sort((a, b) => a.name.localeCompare(b.name)));
       setLoading(false);
     }).catch(() => setLoading(false));
   };
 
   useEffect(() => { fetchData(); }, [month, year]);
 
+  // Filter houses by gu + investor
+  const filteredHouses = useMemo(() => {
+    return houses.filter(h => {
+      if (filterGu !== '전체' && h.district !== filterGu) return false;
+      if (filterInvestor !== '전체' && h.investor !== filterInvestor) return false;
+      return true;
+    });
+  }, [houses, filterGu, filterInvestor]);
+
   // Merge houses with bills
   const housesWithBills = useMemo(() => {
-    return houses.map(h => {
+    return filteredHouses.map(h => {
       const bill = data.find(d => d.지점명 === h.name);
       return { ...h, bill };
     });
-  }, [houses, data]);
+  }, [filteredHouses, data]);
 
   const inputted = housesWithBills.filter(h => h.bill);
   const notInputted = housesWithBills.filter(h => !h.bill);
@@ -161,6 +202,46 @@ export default function UtilityPage() {
             </button>
           ))}
         </div>
+        {/* Filter bar */}
+        <div style={{ padding: '0 16px', display: 'flex', gap: 8, marginBottom: 4, position: 'relative' }}>
+          {/* 구 드롭다운 */}
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setOpenDrop(openDrop === 'gu' ? null : 'gu')}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 10, border: `1px solid ${filterGu !== '전체' ? '#3182f6' : '#e5e8eb'}`, background: filterGu !== '전체' ? '#edf3ff' : '#fff', color: filterGu !== '전체' ? '#3182f6' : '#4e5968', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+              {filterGu === '전체' ? '구 선택' : filterGu}
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </button>
+            {openDrop === 'gu' && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 100, background: '#fff', borderRadius: 12, border: '1px solid #e5e8eb', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', padding: 8, minWidth: 140, maxHeight: 240, overflowY: 'auto' }}>
+                {guList.map(g => (
+                  <button key={g} onClick={() => { setFilterGu(g); setOpenDrop(null); }}
+                    style={{ display: 'block', width: '100%', padding: '10px 14px', borderRadius: 8, border: 'none', background: filterGu === g ? '#edf3ff' : 'transparent', color: filterGu === g ? '#3182f6' : '#4e5968', fontSize: 14, fontWeight: filterGu === g ? 600 : 400, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+                    {g}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {/* 투자자 드롭다운 */}
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setOpenDrop(openDrop === 'inv' ? null : 'inv')}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 10, border: `1px solid ${filterInvestor !== '전체' ? '#3182f6' : '#e5e8eb'}`, background: filterInvestor !== '전체' ? '#edf3ff' : '#fff', color: filterInvestor !== '전체' ? '#3182f6' : '#4e5968', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+              {filterInvestor === '전체' ? '투자자 선택' : filterInvestor}
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </button>
+            {openDrop === 'inv' && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 100, background: '#fff', borderRadius: 12, border: '1px solid #e5e8eb', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', padding: 8, minWidth: 140, maxHeight: 240, overflowY: 'auto' }}>
+                {investorList.map(inv => (
+                  <button key={inv} onClick={() => { setFilterInvestor(inv); setOpenDrop(null); }}
+                    style={{ display: 'block', width: '100%', padding: '10px 14px', borderRadius: 8, border: 'none', background: filterInvestor === inv ? '#edf3ff' : 'transparent', color: filterInvestor === inv ? '#3182f6' : '#4e5968', fontSize: 14, fontWeight: filterInvestor === inv ? 600 : 400, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+                    {inv}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
         <div style={{ display: 'flex', background: '#fff', borderTop: '1px solid #F0F0F0' }}>
           {tabLabels.map((label, i) => (
             <button key={i} onClick={() => setTab(i)}
@@ -287,7 +368,7 @@ export default function UtilityPage() {
               </div>
             </div>
 
-            {houses.map(h => {
+            {filteredHouses.map(h => {
               const hBills = trendMonths.map(t => allData.find(d => d.지점명 === h.name && d.월 === String(t.m)));
               const hTotals = hBills.map(b => b ? totalBill(b) : 0);
               const hMax = Math.max(...hTotals, 1);
