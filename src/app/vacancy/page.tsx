@@ -2,52 +2,22 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { X, FileText, Check } from 'lucide-react';
 
-const BLUE = '#3182f6', GRAY = '#8b95a1', GREEN = '#00c471', RED = '#f04452', ORANGE = '#d97706';
-
-type Vac = {
-  공실ID: string; 지점명: string; 방코드: string; 공실유형: string;
-  공실시작일: string; 퇴실예정일: string;
-  예정자명: string; 예정자연락처: string; 예정입주일: string; 보증금상태: string;
-  메모: string; 상태: string;
-};
+const BLUE = '#3182f6', GRAY = '#8b95a1', RED = '#f04452', ORANGE = '#d97706';
 
 export default function VacancyPage() {
   const router = useRouter();
   const [tab, setTab] = useState(0);
-  const [vacs, setVacs] = useState<Vac[]>([]);
+  const [tenants, setTenants] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [prospectSheet, setProspectSheet] = useState<Vac | null>(null);
-  const [memoSheet, setMemoSheet] = useState<Vac | null>(null);
-  const [detailSheet, setDetailSheet] = useState<Vac | null>(null);
-  const [toast, setToast] = useState('');
   const [gu, setGu] = useState('전체');
   const [guMap, setGuMap] = useState<Record<string, string>>({});
 
-  const [pName, setPName] = useState('');
-  const [pPhone, setPPhone] = useState('');
-  const [pMoveIn, setPMoveIn] = useState('');
-  const [pDeposit, setPDeposit] = useState<'대기' | '완료'>('대기');
-  const [memoText, setMemoText] = useState('');
-
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2200); };
-
-  const anySheet = prospectSheet || memoSheet || detailSheet;
-  useEffect(() => {
-    document.body.style.overflow = anySheet ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
-  }, [anySheet]);
-
-  const [tenants, setTenants] = useState<any[]>([]);
-
   useEffect(() => {
     Promise.all([
-      fetch('/api/vacancies').then(r => r.json()),
       fetch('/api/houses').then(r => r.json()),
       fetch('/api/tenants').then(r => r.json()),
-    ]).then(([vacData, houseData, tenantData]) => {
-      setVacs(Array.isArray(vacData) ? vacData : []);
+    ]).then(([houseData, tenantData]) => {
       setTenants(Array.isArray(tenantData) ? tenantData : []);
       const map: Record<string, string> = {};
       (Array.isArray(houseData) ? houseData : []).forEach((h: any) => { if (h['지점명'] && h['구']) map[h['지점명']] = h['구']; });
@@ -57,108 +27,27 @@ export default function VacancyPage() {
   }, []);
 
   const guList = useMemo(() => [...new Set(Object.values(guMap).filter(Boolean))].sort(), [guMap]);
-  const guFiltered = useMemo(() => gu === '전체' ? vacs : vacs.filter(v => guMap[v.지점명] === gu), [vacs, gu, guMap]);
-
   const guFilteredTenants = useMemo(() => gu === '전체' ? tenants : tenants.filter(t => guMap[t['지점명']] === gu), [tenants, gu, guMap]);
 
-  // 공실현황: 상태==='공실'
   const vacantNowTenants = useMemo(() => guFilteredTenants.filter(t => t['상태'] === '공실'), [guFilteredTenants]);
-  // 공실예정: 상태==='공실예정'
   const vacantSoonTenants = useMemo(() => guFilteredTenants.filter(t => t['상태'] === '공실예정'), [guFilteredTenants]);
-  // 전체공실: 위 둘 합산
   const allVacantTenants = useMemo(() => guFilteredTenants.filter(t => t['상태'] === '공실' || t['상태'] === '공실예정'), [guFilteredTenants]);
 
-  const openProspect = (v: Vac) => {
-    setProspectSheet(v);
-    setPName(''); setPPhone(''); setPMoveIn(''); setPDeposit('대기');
-  };
-
-  const saveProspect = async () => {
-    if (!prospectSheet || !pName || !pMoveIn) return;
-    await fetch('/api/vacancies', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: prospectSheet.공실ID, 예정자명: pName, 예정자연락처: pPhone, 예정입주일: pMoveIn, 보증금상태: pDeposit }),
-    });
-    setVacs(prev => prev.map(v =>
-      v.공실ID === prospectSheet.공실ID ? { ...v, 예정자명: pName, 예정자연락처: pPhone, 예정입주일: pMoveIn, 보증금상태: pDeposit } : v
-    ));
-    setProspectSheet(null);
-    showToast('예정자 등록 완료!');
-  };
-
-  const openMemo = (v: Vac) => { setMemoSheet(v); setMemoText(v.메모); };
-
-  const saveMemo = async () => {
-    if (!memoSheet) return;
-    await fetch('/api/vacancies', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: memoSheet.공실ID, 메모: memoText }),
-    });
-    setVacs(prev => prev.map(v => v.공실ID === memoSheet.공실ID ? { ...v, 메모: memoText } : v));
-    setMemoSheet(null);
-    showToast('메모 저장됐어요');
-  };
-
-  const confirmMoveIn = async (vacId: string) => {
-    await fetch('/api/vacancies', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: vacId, 상태: '완료' }),
-    });
-    setVacs(prev => prev.filter(v => v.공실ID !== vacId));
-    setDetailSheet(null);
-    showToast('✅ 입주 확정 완료!');
-  };
-
   const tabLabels = [`공실현황 ${vacantNowTenants.length}`, `공실예정 ${vacantSoonTenants.length}`, `전체공실 ${allVacantTenants.length}`];
-
   const fmt = (n: number) => n.toLocaleString() + '원';
 
-  const VacCard = ({ v }: { v: Vac }) => {
-    const hasProspect = !!v.예정자명;
+  const TenantCard = ({ t }: { t: any }) => {
+    const isNow = t['상태'] === '공실';
+    const rentMgmt = (Number(t['월세']) || 0) + (Number(t['관리비']) || 0);
     return (
-      <div style={{ background: '#fff', borderRadius: 14, padding: 16, marginBottom: 10, border: `1px solid ${v.공실유형 === '현재공실' ? '#fcc' : '#fde68a'}` }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+      <div style={{ background: '#fff', borderRadius: 14, padding: 16, marginBottom: 10, border: `1px solid ${isNow ? '#fcc' : '#fde68a'}` }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#191f28' }}>{v.지점명} {v.방코드}</div>
-            <div style={{ fontSize: 12, color: GRAY }}>
-              {v.공실유형 === '현재공실' ? `공실 ${v.공실시작일}~` : `퇴실 ${v.퇴실예정일}`}
-            </div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#191f28' }}>{t['지점명']} · {t['방코드']}</div>
+            <div style={{ fontSize: 12, color: GRAY, marginTop: 2 }}>{t['방타입'] || '-'}{!isNow && t['퇴실일'] ? ` · 퇴실 ${t['퇴실일']}` : ''}</div>
+            <div style={{ fontSize: 13, color: '#4e5968', marginTop: 4 }}>{fmt(rentMgmt)}</div>
           </div>
-          {hasProspect && (
-            <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: v.보증금상태 === '완료' ? '#e8faf2' : '#fff8e1', color: v.보증금상태 === '완료' ? '#0e6245' : '#b7791f' }}>
-              예정자 {v.보증금상태 === '완료' ? '✓' : '대기'}
-            </span>
-          )}
-        </div>
-        {hasProspect && (
-          <button onClick={() => setDetailSheet(v)}
-            style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8f9fa', borderRadius: 10, padding: '10px 14px', border: 'none', cursor: 'pointer', fontFamily: 'inherit', marginBottom: 10, textAlign: 'left' }}>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>{v.예정자명}</div>
-              <div style={{ fontSize: 11, color: GRAY }}>입주 {v.예정입주일?.slice(5)}</div>
-            </div>
-            <span style={{ fontSize: 12, color: BLUE, fontWeight: 600 }}>상세 ›</span>
-          </button>
-        )}
-        {v.메모 && (
-          <div style={{ background: '#fffbeb', borderRadius: 8, padding: '8px 12px', marginBottom: 10 }}>
-            <span style={{ fontSize: 12, color: '#92400e' }}>📝 {v.메모}</span>
-          </div>
-        )}
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => openMemo(v)}
-            style={{ flex: 1, padding: '8px 0', borderRadius: 8, border: '1px solid #e5e8eb', background: '#fff', fontSize: 12, fontWeight: 600, color: '#555', cursor: 'pointer', fontFamily: 'inherit' }}>
-            📝 {v.메모 ? '메모 수정' : '메모'}
-          </button>
-          {!hasProspect && (
-            <button onClick={() => openProspect(v)}
-              style={{ flex: 1, padding: '8px 0', borderRadius: 8, border: 'none', background: BLUE, fontSize: 12, fontWeight: 600, color: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
-              + 예정자 등록
-            </button>
-          )}
+          <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: isNow ? '#fee2e2' : '#fff8e1', color: isNow ? RED : '#b7791f' }}>{isNow ? '공실' : '공실예정'}</span>
         </div>
       </div>
     );
@@ -205,18 +94,7 @@ export default function VacancyPage() {
           vacantNowTenants.length > 0 ? (
             <>
               <div style={{ fontSize: 13, fontWeight: 700, color: RED, marginBottom: 10 }}>현재 공실 {vacantNowTenants.length}실</div>
-              {vacantNowTenants.map(t => (
-                <div key={t['입주자ID']} style={{ background: '#fff', borderRadius: 14, padding: 16, marginBottom: 10, border: '1px solid #fcc' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: '#191f28' }}>{t['지점명']} {t['방코드']}</div>
-                      <div style={{ fontSize: 12, color: GRAY, marginTop: 2 }}>{t['방타입'] || '-'}</div>
-                      <div style={{ fontSize: 12, color: '#4e5968', marginTop: 4 }}>월세 {fmt(Number(t['월세']) || 0)} · 관리비 {fmt(Number(t['관리비']) || 0)}</div>
-                    </div>
-                    <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#fee2e2', color: RED }}>공실</span>
-                  </div>
-                </div>
-              ))}
+              {vacantNowTenants.map(t => <TenantCard key={t['입주자ID']} t={t} />)}
             </>
           ) : (
             <div style={{ textAlign: 'center', padding: '60px 0' }}>
@@ -230,18 +108,7 @@ export default function VacancyPage() {
           vacantSoonTenants.length > 0 ? (
             <>
               <div style={{ fontSize: 13, fontWeight: 700, color: ORANGE, marginBottom: 10 }}>공실 예정 {vacantSoonTenants.length}실</div>
-              {vacantSoonTenants.map(t => (
-                <div key={t['입주자ID']} style={{ background: '#fff', borderRadius: 14, padding: 16, marginBottom: 10, border: '1px solid #fde68a' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: '#191f28' }}>{t['지점명']} {t['방코드']}</div>
-                      <div style={{ fontSize: 12, color: GRAY, marginTop: 2 }}>{t['방타입'] || '-'} · 퇴실 {t['퇴실일'] || '-'}</div>
-                      <div style={{ fontSize: 12, color: '#4e5968', marginTop: 4 }}>월세 {fmt(Number(t['월세']) || 0)} · 관리비 {fmt(Number(t['관리비']) || 0)}</div>
-                    </div>
-                    <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#fff8e1', color: '#b7791f' }}>공실예정</span>
-                  </div>
-                </div>
-              ))}
+              {vacantSoonTenants.map(t => <TenantCard key={t['입주자ID']} t={t} />)}
             </>
           ) : (
             <div style={{ textAlign: 'center', padding: '60px 0' }}>
@@ -254,21 +121,7 @@ export default function VacancyPage() {
           allVacantTenants.length > 0 ? (
             <>
               <div style={{ fontSize: 13, fontWeight: 700, color: BLUE, marginBottom: 10 }}>전체 공실 {allVacantTenants.length}실</div>
-              {allVacantTenants.map(t => {
-                const isNow = t['상태'] === '공실';
-                return (
-                  <div key={t['입주자ID']} style={{ background: '#fff', borderRadius: 14, padding: 16, marginBottom: 10, border: `1px solid ${isNow ? '#fcc' : '#fde68a'}` }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div>
-                        <div style={{ fontSize: 15, fontWeight: 700, color: '#191f28' }}>{t['지점명']} {t['방코드']}</div>
-                        <div style={{ fontSize: 12, color: GRAY, marginTop: 2 }}>{t['방타입'] || '-'}{!isNow && t['퇴실일'] ? ` · 퇴실 ${t['퇴실일']}` : ''}</div>
-                        <div style={{ fontSize: 12, color: '#4e5968', marginTop: 4 }}>월세 {fmt(Number(t['월세']) || 0)} · 관리비 {fmt(Number(t['관리비']) || 0)}</div>
-                      </div>
-                      <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: isNow ? '#fee2e2' : '#fff8e1', color: isNow ? RED : '#b7791f' }}>{isNow ? '공실' : '공실예정'}</span>
-                    </div>
-                  </div>
-                );
-              })}
+              {allVacantTenants.map(t => <TenantCard key={t['입주자ID']} t={t} />)}
             </>
           ) : (
             <div style={{ textAlign: 'center', padding: '60px 0' }}>
@@ -278,110 +131,6 @@ export default function VacancyPage() {
           )
         )}
       </div>
-
-      {/* Prospect Sheet */}
-      {prospectSheet && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-          <div onClick={() => setProspectSheet(null)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.45)' }} />
-          <div style={{ position: 'relative', width: '100%', maxWidth: 430, background: '#fff', borderRadius: '20px 20px 0 0', padding: 24 }}>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}><div style={{ width: 36, height: 4, borderRadius: 2, background: '#e5e8eb' }} /></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-              <span style={{ fontSize: 16, fontWeight: 700 }}>예정자 등록</span>
-              <button onClick={() => setProspectSheet(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="#999" /></button>
-            </div>
-            <div style={{ fontSize: 13, color: GRAY, marginBottom: 20 }}>{prospectSheet.지점명} {prospectSheet.방코드}</div>
-            {[
-              { label: '이름', val: pName, set: setPName, ph: '이름 입력', type: 'text' },
-              { label: '연락처', val: pPhone, set: setPPhone, ph: '010-0000-0000', type: 'tel' },
-              { label: '입주 예정일', val: pMoveIn, set: setPMoveIn, ph: '', type: 'date' },
-            ].map(f => (
-              <div key={f.label} style={{ marginBottom: 14 }}>
-                <label style={{ fontSize: 13, fontWeight: 600, color: '#333', display: 'block', marginBottom: 6 }}>{f.label}</label>
-                <input value={f.val} onChange={e => f.set(e.target.value)} type={f.type} placeholder={f.ph}
-                  style={{ width: '100%', padding: '12px 14px', border: '1px solid #E8E8E8', borderRadius: 10, fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box', outline: 'none' }} />
-              </div>
-            ))}
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: '#333', display: 'block', marginBottom: 6 }}>보증금</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {(['대기', '완료'] as const).map(d => (
-                  <button key={d} onClick={() => setPDeposit(d)}
-                    style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: `1px solid ${pDeposit === d ? BLUE : '#E8E8E8'}`, background: pDeposit === d ? '#EBF4FF' : '#fff', color: pDeposit === d ? BLUE : '#666', fontSize: 13, fontWeight: pDeposit === d ? 600 : 400, cursor: 'pointer', fontFamily: 'inherit' }}>
-                    {d}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <button onClick={saveProspect} disabled={!pName || !pMoveIn}
-              style={{ width: '100%', padding: 14, borderRadius: 12, border: 'none', background: pName && pMoveIn ? BLUE : '#e5e8eb', color: pName && pMoveIn ? '#fff' : '#999', fontSize: 14, fontWeight: 700, cursor: pName && pMoveIn ? 'pointer' : 'default', fontFamily: 'inherit' }}>
-              등록 완료
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Memo Sheet */}
-      {memoSheet && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-          <div onClick={() => setMemoSheet(null)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.45)' }} />
-          <div style={{ position: 'relative', width: '100%', maxWidth: 430, background: '#fff', borderRadius: '20px 20px 0 0', padding: 24 }}>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}><div style={{ width: 36, height: 4, borderRadius: 2, background: '#e5e8eb' }} /></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-              <span style={{ fontSize: 16, fontWeight: 700 }}>메모</span>
-              <button onClick={() => setMemoSheet(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="#999" /></button>
-            </div>
-            <div style={{ fontSize: 13, color: GRAY, marginBottom: 16 }}>{memoSheet.지점명} {memoSheet.방코드}</div>
-            <textarea value={memoText} onChange={e => setMemoText(e.target.value)}
-              placeholder={"공실 관련 메모를 입력하세요\n예: 도배 필요, 사진 촬영 완료..."}
-              style={{ width: '100%', height: 140, padding: '12px 14px', border: '1px solid #E8E8E8', borderRadius: 10, fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box', outline: 'none', resize: 'none' }} />
-            <button onClick={saveMemo}
-              style={{ width: '100%', padding: 14, borderRadius: 12, border: 'none', background: BLUE, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: 12 }}>
-              저장
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Detail Sheet */}
-      {detailSheet && detailSheet.예정자명 && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-          <div onClick={() => setDetailSheet(null)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.45)' }} />
-          <div style={{ position: 'relative', width: '100%', maxWidth: 430, background: '#fff', borderRadius: '20px 20px 0 0', padding: 24 }}>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}><div style={{ width: 36, height: 4, borderRadius: 2, background: '#e5e8eb' }} /></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-              <span style={{ fontSize: 16, fontWeight: 700 }}>입주 예정자</span>
-              <button onClick={() => setDetailSheet(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="#999" /></button>
-            </div>
-            <div style={{ fontSize: 13, color: GRAY, marginBottom: 16 }}>{detailSheet.지점명} {detailSheet.방코드}</div>
-            <div style={{ background: '#f8f9fa', borderRadius: 12, padding: '14px 18px', marginBottom: 20 }}>
-              {[
-                { l: '이름', v: detailSheet.예정자명 },
-                { l: '연락처', v: detailSheet.예정자연락처 },
-                { l: '입주 예정일', v: detailSheet.예정입주일 },
-                { l: '보증금', v: detailSheet.보증금상태 },
-              ].map(row => (
-                <div key={row.l} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
-                  <span style={{ fontSize: 13, color: GRAY }}>{row.l}</span>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28' }}>{row.v}</span>
-                </div>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button style={{ flex: 1, padding: '12px 0', borderRadius: 10, border: '1px solid #e5e8eb', background: '#fff', fontSize: 13, fontWeight: 600, color: '#555', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                <FileText size={14} /> 계약 진행
-              </button>
-              <button onClick={() => confirmMoveIn(detailSheet.공실ID)}
-                style={{ flex: 1, padding: '12px 0', borderRadius: 10, border: 'none', background: BLUE, fontSize: 13, fontWeight: 600, color: '#fff', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                <Check size={14} /> 입주 확정
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {toast && (
-        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: '#191f28', color: '#fff', padding: '10px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600, zIndex: 999, whiteSpace: 'nowrap' }}>{toast}</div>
-      )}
     </div>
   );
 }
