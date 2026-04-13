@@ -21,6 +21,7 @@ export default function PaymentsPage() {
   const [toast, setToast] = useState('');
   const [guFilter, setGuFilter] = useState('전체');
   const [investorFilter, setInvestorFilter] = useState('전체');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'done' | 'unpaid'>('all');
   const [guDropOpen, setGuDropOpen] = useState(false);
   const [invDropOpen, setInvDropOpen] = useState(false);
 
@@ -55,7 +56,7 @@ export default function PaymentsPage() {
   }, [month, year]);
 
   const tenantPayments = useMemo(() => {
-    const active = tenants.filter((t: Tenant) => t.상태 === '입주중' || t.상태 === '계약중');
+    const active = tenants.filter((t: Tenant) => (t.상태 === '입주중' || t.상태 === '계약중') && t.이름 !== '전체임대');
     return active.map(t => {
       const pay = payments.find(p => p.입주자ID === t.입주자ID);
       const isPaid = pay?.상태 === '납부완료';
@@ -80,8 +81,10 @@ export default function PaymentsPage() {
     let list = tenantPayments;
     if (guFilter !== '전체') list = list.filter(t => t.구 === guFilter);
     if (investorFilter !== '전체') list = list.filter(t => t.투자자 === investorFilter);
+    if (statusFilter === 'done') list = list.filter(t => t.paid);
+    if (statusFilter === 'unpaid') list = list.filter(t => !t.paid);
     return list;
-  }, [tenantPayments, guFilter, investorFilter]);
+  }, [tenantPayments, guFilter, investorFilter, statusFilter]);
 
   const paidList = filtered.filter(t => t.paid);
   const unpaidList = filtered.filter(t => !t.paid);
@@ -177,8 +180,8 @@ export default function PaymentsPage() {
     showToast('납부 등록 완료!');
   };
 
-  const hasActiveFilter = guFilter !== '전체' || investorFilter !== '전체';
-  const resetFilters = () => { setGuFilter('전체'); setInvestorFilter('전체'); };
+  const hasActiveFilter = guFilter !== '전체' || investorFilter !== '전체' || statusFilter !== 'all';
+  const resetFilters = () => { setGuFilter('전체'); setInvestorFilter('전체'); setStatusFilter('all'); };
 
   if (loading) {
     return (
@@ -234,18 +237,22 @@ export default function PaymentsPage() {
 
         {/* KPI Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
-          <div style={{ background: '#fff', borderRadius: 12, padding: '14px 16px', textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: GRAY, marginBottom: 4 }}>납부완료</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: GREEN }}>{paidList.length}<span style={{ fontSize: 13, fontWeight: 500 }}>명</span></div>
-          </div>
-          <div style={{ background: '#fff', borderRadius: 12, padding: '14px 16px', textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: GRAY, marginBottom: 4 }}>미납</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: RED }}>{unpaidList.length}<span style={{ fontSize: 13, fontWeight: 500 }}>명</span></div>
-          </div>
-          <div style={{ background: '#fff', borderRadius: 12, padding: '14px 16px', textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: GRAY, marginBottom: 4 }}>수납률</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: BLUE }}>{rate}<span style={{ fontSize: 13, fontWeight: 500 }}>%</span></div>
-          </div>
+          {([
+            { key: 'done' as const, label: '납부완료', value: paidList.length, unit: '명', color: GREEN, activeBg: '#e6f9f0' },
+            { key: 'unpaid' as const, label: '미납', value: unpaidList.length, unit: '명', color: RED, activeBg: '#fff0f1' },
+            { key: 'all' as const, label: '수납률', value: rate, unit: '%', color: BLUE, activeBg: '#edf3ff' },
+          ]).map(kpi => {
+            const active = statusFilter === kpi.key && kpi.key !== 'all' || (statusFilter === 'all' && kpi.key === 'all');
+            const isToggle = kpi.key !== 'all';
+            return (
+              <button key={kpi.key}
+                onClick={() => isToggle ? setStatusFilter(prev => prev === kpi.key ? 'all' : kpi.key) : setStatusFilter('all')}
+                style={{ background: statusFilter === kpi.key && isToggle ? kpi.activeBg : '#fff', borderRadius: 12, padding: '14px 16px', textAlign: 'center', border: statusFilter === kpi.key && isToggle ? `2px solid ${kpi.color}` : '2px solid transparent', cursor: 'pointer', fontFamily: 'inherit' }}>
+                <div style={{ fontSize: 11, color: GRAY, marginBottom: 4 }}>{kpi.label}</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: kpi.color }}>{kpi.value}<span style={{ fontSize: 13, fontWeight: 500 }}>{kpi.unit}</span></div>
+              </button>
+            );
+          })}
         </div>
 
         {/* Progress Bar */}
