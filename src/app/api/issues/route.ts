@@ -10,31 +10,31 @@ export async function GET(req: Request) {
     const room = searchParams.get('room')
 
     const rows = await getSheetData('이슈')
-    const houses = await getSheetData('지점')
-    const houseNames = houses.map(r => r[1]?.trim()).filter(Boolean)
 
-    let issues = rows.map((r, i) => ({
-      rowIndex: i,
-      id: r[0] || '',
-      houseName: r[1] || '',
-      roomCode: r[2] || '',
-      title: r[3] || '',
-      content: r[4] || '',
-      category: r[5] || '기타',
-      status: r[6] || '접수',
-      assignee: r[7] || '',
-      createdAt: r[8] || '',
-      completedAt: r[9] || '',
-      cost: Number(r[10]) || 0,
-      memo: r[11] || '',
-    }))
+    let issues = rows
+      .map((r, i) => ({
+        rowIndex: i,
+        id: r[0] || '',
+        houseName: r[1] || '',
+        roomCode: r[2] || '',
+        title: r[3] || '',
+        content: r[4] || '',
+        category: r[5] || '기타',
+        status: r[6] || '접수',
+        assignee: r[7] || '',
+        createdAt: r[8] || '',
+        completedAt: r[9] || '',
+        cost: Number(r[10]) || 0,
+        memo: r[11] || '',
+      }))
+      .filter(i => i.id) // 이슈ID가 없는 빈 행 제외
 
     if (house) issues = issues.filter(i => i.houseName === house)
     if (room) issues = issues.filter(i => i.roomCode === room)
 
     issues.sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1))
 
-    return NextResponse.json({ issues, houseNames })
+    return NextResponse.json({ issues })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }

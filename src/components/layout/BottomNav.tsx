@@ -7,7 +7,7 @@ import { Home, Users, AlertTriangle, Settings } from 'lucide-react';
 const tabs = [
   { href: '/', label: '홈', icon: Home },
   { href: '/tenants', label: '입주자', icon: Users },
-  { href: '/issues', label: '이슈', icon: AlertTriangle, badge: 5 },
+  { href: '/issues', label: '이슈', icon: AlertTriangle },
   { href: '/manage', label: '관리', icon: Settings },
 ];
 
@@ -61,31 +61,7 @@ export default function BottomNav() {
               position: 'relative',
             }}
           >
-            <div style={{ position: 'relative' }}>
-              <Icon size={22} strokeWidth={active ? 2.2 : 1.8} />
-              {tab.badge && (
-                <span
-                  style={{
-                    position: 'absolute',
-                    top: -6,
-                    right: -10,
-                    background: '#F04452',
-                    color: '#fff',
-                    fontSize: 10,
-                    fontWeight: 700,
-                    borderRadius: '50%',
-                    minWidth: 16,
-                    height: 16,
-                    padding: '0 4px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {tab.badge}
-                </span>
-              )}
-            </div>
+            <Icon size={22} strokeWidth={active ? 2.2 : 1.8} />
             <span style={{ fontSize: 10 }}>{tab.label}</span>
           </Link>
         );
