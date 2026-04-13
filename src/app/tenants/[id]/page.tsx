@@ -200,6 +200,7 @@ export default function TenantDetailPage() {
         const isPaid = curPay?.상태 === '납부완료';
         const chargeAmt = Number(curPay?.청구액 || 0);
         const paidAmt = Number(curPay?.납부액 || 0);
+        const totalAmt = isPaid ? paidAmt : (chargeAmt || (rent + mgmt));
         const pastPayments = sortedPayments.filter(p => p.연월 !== currentYM).slice(0, 6);
 
         return (
@@ -213,59 +214,51 @@ export default function TenantDetailPage() {
               </div>
 
               {curPay ? (
-                <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #f2f4f6', padding: 16 }}>
+                <div style={{ background: isPaid ? '#f0fff8' : '#fff0f0', borderRadius: 12, padding: 12 }}>
                   {/* 상태 뱃지 + 납부일 */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                    {isPaid ? (
-                      <span style={{ padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, background: '#e8faf2', color: '#0e6245' }}>납부완료</span>
-                    ) : (
-                      <span style={{ padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, background: '#ffeaea', color: RED }}>미납</span>
-                    )}
-                    {isPaid && curPay.납부일 && (
-                      <span style={{ fontSize: 12, color: GRAY }}>{curPay.납부일} 납부</span>
-                    )}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {isPaid ? (
+                        <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#e8faf2', color: '#0e6245' }}>납부완료</span>
+                      ) : (
+                        <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#ffeaea', color: RED }}>미납</span>
+                      )}
+                      {isPaid && curPay.납부일 && (
+                        <span style={{ fontSize: 11, color: GRAY }}>{curPay.납부일} 납부</span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: isPaid ? '#191f28' : RED }}>{fmt(totalAmt)}</span>
                   </div>
 
-                  {/* 일할계산 상세 */}
+                  {/* 월세/관리비 상세 */}
                   {charge.isProrata && charge.detail ? (
-                    <div style={{ background: '#fff8ed', borderRadius: 10, padding: 12, marginBottom: 14 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: ORANGE, marginBottom: 8 }}>일할계산 내역</div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555', marginBottom: 4 }}>
-                        <span>월세: {fmt(rent)} ({charge.detail.days}일/{charge.detail.daysInMonth}일)</span>
-                        <span style={{ fontWeight: 600 }}>{fmt(charge.detail.rentPart)}</span>
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555', marginBottom: 3 }}>
+                        <span>월세 ({charge.detail.days}일/{charge.detail.daysInMonth}일)</span>
+                        <span>{fmt(charge.detail.rentPart)}</span>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555', marginBottom: 8 }}>
-                        <span>관리비: {fmt(mgmt)} ({charge.detail.days}일/{charge.detail.daysInMonth}일)</span>
-                        <span style={{ fontWeight: 600 }}>{fmt(charge.detail.mgmtPart)}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555' }}>
+                        <span>관리비 ({charge.detail.days}일/{charge.detail.daysInMonth}일)</span>
+                        <span>{fmt(charge.detail.mgmtPart)}</span>
                       </div>
-                      <div style={{ height: 1, background: '#f0e4cc', marginBottom: 8 }} />
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, color: ORANGE }}>
-                        <span>합계</span>
-                        <span>{fmt(charge.detail.total)}</span>
-                      </div>
-                    </div>
+                    </>
                   ) : (
-                    <div style={{ marginBottom: 14 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#555', marginBottom: 4 }}>
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555', marginBottom: 3 }}>
                         <span>월세</span>
                         <span>{fmt(rent)}</span>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#555', marginBottom: 8 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555' }}>
                         <span>관리비</span>
                         <span>{fmt(mgmt)}</span>
                       </div>
-                      <div style={{ height: 1, background: '#f2f4f6', marginBottom: 8 }} />
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 700, color: '#191f28' }}>
-                        <span>합계</span>
-                        <span>{isPaid ? fmt(paidAmt) : fmt(chargeAmt || (rent + mgmt))}</span>
-                      </div>
-                    </div>
+                    </>
                   )}
 
                   {/* 미납일 때 납부 등록 버튼 */}
                   {!isPaid && (
                     <button onClick={() => { setPaySheet(curPay); setPayMethod('계좌이체'); setPayDate(new Date().toISOString().split('T')[0]); }}
-                      style={{ width: '100%', padding: '8px 16px', borderRadius: 8, border: 'none', background: BLUE, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      style={{ width: '100%', padding: '10px 16px', borderRadius: 10, border: 'none', background: BLUE, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', marginTop: 12 }}>
                       납부 등록
                     </button>
                   )}
@@ -288,16 +281,16 @@ export default function TenantDetailPage() {
                     const [pYear, pMonth] = p.연월.split('-');
                     return (
                       <div key={p.수납ID}>
-                        {i > 0 && <div style={{ height: 1, background: '#F5F5F5' }} />}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0' }}>
+                        {i > 0 && <div style={{ height: 1, background: '#f2f4f6' }} />}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                             <span style={{ fontSize: 13, fontWeight: 500, minWidth: 72 }}>{pYear}년 {Number(pMonth)}월</span>
-                            <span style={{ fontSize: 13, color: '#191f28' }}>{amount > 0 ? fmt(amount) : '-'}</span>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             {paid && p.납부일 && (
                               <span style={{ fontSize: 11, color: GRAY }}>{p.납부일.slice(5)}</span>
                             )}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 13, fontWeight: 500, color: '#191f28' }}>{amount > 0 ? fmt(amount) : '-'}</span>
                             {paid ? (
                               <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#e8faf2', color: '#0e6245' }}>납부완료</span>
                             ) : (
