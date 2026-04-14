@@ -41,6 +41,13 @@ export default function PaymentsPage() {
   const [saving, setSaving] = useState(false);
   const [uploadBanner, setUploadBanner] = useState(false);
 
+  // 구/지점 필터
+  const [guList, setGuList] = useState<string[]>([]);
+  const [guBranchMap, setGuBranchMap] = useState<Record<string, string[]>>({});
+  const [branchGuMap, setBranchGuMap] = useState<Record<string, string>>({});
+  const [selectedGu, setSelectedGu] = useState('');
+  const [selectedBranch, setSelectedBranch] = useState('');
+
   const prevMonth = () => {
     if (month === 1) { setYear(y => y - 1); setMonth(12); }
     else setMonth(m => m - 1);
@@ -64,6 +71,32 @@ export default function PaymentsPage() {
   }, [year, month]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // 구→지점 맵 로드 (입주자 탭에서)
+  useEffect(() => {
+    fetch('/api/tenants')
+      .then(r => r.json())
+      .then((d: { 구: string; 지점명: string }[]) => {
+        const arr = Array.isArray(d) ? d : [];
+        const map: Record<string, Set<string>> = {};
+        const bMap: Record<string, string> = {};
+        for (const t of arr) {
+          const gu = t.구 || '';
+          const branch = t.지점명 || '';
+          if (!gu || !branch) continue;
+          if (!map[gu]) map[gu] = new Set();
+          map[gu].add(branch);
+          bMap[branch] = gu;
+        }
+        const sorted = Object.keys(map).sort();
+        setGuList(sorted);
+        const mapObj: Record<string, string[]> = {};
+        for (const g of sorted) mapObj[g] = [...map[g]].sort();
+        setGuBranchMap(mapObj);
+        setBranchGuMap(bMap);
+      })
+      .catch(() => {});
+  }, []);
 
   // Check if upload just completed
   useEffect(() => {
@@ -119,13 +152,34 @@ export default function PaymentsPage() {
     return diff > 0 ? diff : 0;
   };
 
-  const filtered = items.filter(p => {
+  // 구/지점 필터 적용된 아이템
+  const guFiltered = items.filter(p => {
+    if (selectedBranch) return p.지점명 === selectedBranch;
+    if (selectedGu) {
+      const gu = branchGuMap[p.지점명];
+      return gu === selectedGu;
+    }
+    return true;
+  });
+
+  // 구/지점 필터 기준 KPI
+  const localSummary = (() => {
+    const total = guFiltered.length;
+    const paid = guFiltered.filter(p => p.상태 === '납부완료').length;
+    const partial = guFiltered.filter(p => p.상태 === '부분납부').length;
+    const unpaid = total - paid - partial;
+    const paidAmount = guFiltered.filter(p => p.상태 === '납부완료').reduce((s, p) => s + (Number(p.청구액) || 0), 0);
+    const unpaidAmount = guFiltered.filter(p => p.상태 !== '납부완료').reduce((s, p) => s + (Number(p.청구액) || 0) - (Number(p.납부액) || 0), 0);
+    const paidRate = total > 0 ? Math.round((paid / total) * 1000) / 10 : 0;
+    return { total, paid, unpaid, partial, paidRate, paidAmount, unpaidAmount };
+  })();
+
+  const filtered = guFiltered.filter(p => {
     if (filter === '완납') return p.상태 === '납부완료';
     if (filter === '미납') return p.상태 === '미납';
     if (filter === '부분납부') return p.상태 === '부분납부';
     return true;
   }).sort((a, b) => {
-    // 미납 우선, D+ 큰 순
     const sa = a.상태 === '납부완료' ? 1 : 0;
     const sb = b.상태 === '납부완료' ? 1 : 0;
     if (sa !== sb) return sa - sb;
@@ -133,11 +187,13 @@ export default function PaymentsPage() {
   });
 
   const filterCounts: Record<string, number> = {
-    '전체': items.length,
-    '미납': items.filter(p => p.상태 === '미납').length,
-    '완납': items.filter(p => p.상태 === '납부완료').length,
-    '부분납부': items.filter(p => p.상태 === '부분납부').length,
+    '전체': guFiltered.length,
+    '미납': guFiltered.filter(p => p.상태 === '미납').length,
+    '완납': guFiltered.filter(p => p.상태 === '납부완료').length,
+    '부분납부': guFiltered.filter(p => p.상태 === '부분납부').length,
   };
+
+  const branchOptions = selectedGu ? (guBranchMap[selectedGu] || []) : [];
 
   return (
     <div style={{ minHeight: '100vh', background: '#f5f5f5', maxWidth: 430, margin: '0 auto' }}>
@@ -170,18 +226,32 @@ export default function PaymentsPage() {
         <div style={{ textAlign: 'center', padding: '80px 0', color: '#b0b8c1', fontSize: 13 }}>불러오는 중...</div>
       ) : (
         <>
+          {/* 구/지점 드롭다운 */}
+          <div style={{ background: '#fff', padding: '10px 14px', display: 'flex', gap: 8, borderBottom: '1px solid #f2f2f2' }}>
+            <select value={selectedGu} onChange={e => { setSelectedGu(e.target.value); setSelectedBranch(''); }}
+              style={{ flex: 1, padding: '7px 10px', border: '1.5px solid #e8e8e8', borderRadius: 8, fontSize: 12, background: '#fff', color: '#191919', fontFamily: 'inherit', outline: 'none', appearance: 'auto' }}>
+              <option value="">전체 구</option>
+              {guList.map(g => <option key={g} value={g}>{g}</option>)}
+            </select>
+            <select value={selectedBranch} onChange={e => setSelectedBranch(e.target.value)}
+              style={{ flex: 1, padding: '7px 10px', border: '1.5px solid #e8e8e8', borderRadius: 8, fontSize: 12, background: '#fff', color: '#191919', fontFamily: 'inherit', outline: 'none', appearance: 'auto' }}>
+              <option value="">전체 지점</option>
+              {branchOptions.map(b => <option key={b} value={b}>{b}</option>)}
+            </select>
+          </div>
+
           {/* KPI */}
           <div style={{ background: '#fff', padding: '20px 20px 18px', display: 'flex', borderBottom: '1px solid #f0f0f0' }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 12, color: '#b0b8c1', marginBottom: 4 }}>미납</div>
-              <div style={{ fontSize: 28, fontWeight: 700, color: '#191919' }}>{summary.unpaid + (summary.partial || 0)}<span style={{ fontSize: 14, fontWeight: 400, color: '#b0b8c1', marginLeft: 2 }}>건</span></div>
-              <div style={{ fontSize: 12, color: '#b0b8c1', marginTop: 2 }}>{fmt(summary.unpaidAmount)}</div>
+              <div style={{ fontSize: 28, fontWeight: 700, color: '#191919' }}>{localSummary.unpaid + localSummary.partial}<span style={{ fontSize: 14, fontWeight: 400, color: '#b0b8c1', marginLeft: 2 }}>건</span></div>
+              <div style={{ fontSize: 12, color: '#b0b8c1', marginTop: 2 }}>{fmt(localSummary.unpaidAmount)}</div>
             </div>
             <div style={{ width: 1, background: '#f0f0f0', margin: '0 16px' }} />
             <div style={{ flex: 1, textAlign: 'right' }}>
               <div style={{ fontSize: 12, color: '#b0b8c1', marginBottom: 4 }}>납부율</div>
-              <div style={{ fontSize: 28, fontWeight: 700, color: BLUE }}>{summary.paidRate}<span style={{ fontSize: 14, fontWeight: 400, marginLeft: 1 }}>%</span></div>
-              <div style={{ fontSize: 12, color: '#b0b8c1', marginTop: 2 }}>{summary.paid} / {summary.total}명</div>
+              <div style={{ fontSize: 28, fontWeight: 700, color: BLUE }}>{localSummary.paidRate}<span style={{ fontSize: 14, fontWeight: 400, marginLeft: 1 }}>%</span></div>
+              <div style={{ fontSize: 12, color: '#b0b8c1', marginTop: 2 }}>{localSummary.paid} / {localSummary.total}명</div>
             </div>
           </div>
 
