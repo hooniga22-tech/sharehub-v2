@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
 import { getSheetData } from '@/lib/sheets'
 
+// 투자자 탭: [0]투자자ID [1]투자자명 [2]연락처 [3]계좌정보 [4]생년월일 [5]링크토큰 [6]메모
+// 투자지점 탭: [0]투자ID [1]투자자ID [2]투자자명 [3]지점명 [4]투자자비율 [5]유재훈비율 [6]공동여부 [7]메모
+// 입주자 탭: [0]입주자ID [1]구 [2]지점명 ... [8]상태 [10]월세 [11]관리비
+
 export async function GET(req: Request, { params }: { params: Promise<{ token: string }> }) {
   try {
     const { token } = await params
@@ -8,77 +12,61 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
     const year = Number(searchParams.get('year')) || new Date().getFullYear()
     const month = Number(searchParams.get('month')) || new Date().getMonth() + 1
 
-    const [investorRows, houseRows, tenantRows, utilityRows] = await Promise.all([
+    const [investorRows, houseRows, tenantRows] = await Promise.all([
       getSheetData('투자자'),
-      getSheetData('지점'),
+      getSheetData('투자지점'),
       getSheetData('입주자'),
-      getSheetData('공과금'),
     ])
 
+    // 토큰으로 투자자 찾기
     const investorRow = investorRows.find(r => r[5] === token)
-    if (!investorRow) return NextResponse.json({ error: 'not found' }, { status: 404 })
-
-    const investorName = investorRow[1]?.trim()
-    const houseName = investorRow[3]?.trim()
-    const ratio = Number(investorRow[4]) || 0
-
-    const houseRow = houseRows.find(r => r[1]?.trim() === houseName)
-    const buildingRent = Number(houseRow?.[7]) || 0
-    const isConsignment = houseRow?.[12]?.trim() === '위탁운영'
-
-    const months = []
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(year, month - 1 - i, 1)
-      months.push({ year: d.getFullYear(), month: d.getMonth() + 1 })
+    if (!investorRow) {
+      return NextResponse.json({ error: 'not found' }, { status: 404 })
     }
 
-    const monthlyData = months.map(({ year: y, month: m }) => {
-      // 입주자: [8]상태 [10]월세 [11]관리비
-      const activeRent = tenantRows
-        .filter(r => r[2]?.trim() === houseName && r[8] !== '퇴실')
-        .reduce((sum, r) => sum + (Number(r[10]) || 0) + (Number(r[11]) || 0), 0)
+    const investorId = investorRow[0]
+    const investorName = investorRow[1] || ''
+    const phone = investorRow[2] || ''
+    const account = investorRow[3] || ''
 
-      // 공과금: [1]지점명 [2]연도 [3]월 [4]전기 [5]가스 [6]수도 [7]인터넷 [8]정수기 [10]청소 [11]기타
-      const utility = utilityRows
-        .filter(r => Number(r[2]) === y && Number(r[3]) === m && r[1]?.trim() === houseName)
-        .reduce((sum, r) => sum + [4, 5, 6, 7, 8, 10, 11].reduce((s, i) => s + (Number(r[i]) || 0), 0), 0)
+    // 해당 투자자의 투자지점 목록
+    const myHouses = houseRows
+      .filter(r => r[1] === investorId)
+      .map(r => ({
+        investId: r[0] || '',
+        houseName: r[3] || '',
+        investorRatio: Number(r[4]) || 0,
+        jaehoonRatio: Number(r[5]) || 0,
+        isJoint: r[6] === 'Y',
+      }))
 
-      const totalExpense = buildingRent + utility
-      const profit = activeRent - totalExpense
-      const investorProfit = Math.round(profit * ratio / 100)
+    // 활성 입주자 (입주중/계약중)의 월세+관리비 by 지점
+    const activeTenants = tenantRows.filter(r => r[8] === '입주중' || r[8] === '계약중')
+    const revenueByHouse = new Map<string, number>()
+    for (const t of activeTenants) {
+      const house = t[2] || ''
+      const rent = (Number(t[10]) || 0) + (Number(t[11]) || 0)
+      revenueByHouse.set(house, (revenueByHouse.get(house) || 0) + rent)
+    }
 
-      return {
-        year: y, month: m,
-        income: activeRent,
-        buildingRent,
-        utility,
-        totalExpense,
-        profit,
-        investorProfit,
-        hasUtility: utility > 0,
-      }
+    // 지점별 정산 계산
+    const houses = myHouses.map(h => {
+      const revenue = revenueByHouse.get(h.houseName) || 0
+      const share = Math.round(revenue * (h.investorRatio / 100))
+      return { ...h, revenue, share }
     })
 
-    const currentMonth = monthlyData[monthlyData.length - 1]
-
-    const activeTenants = tenantRows.filter(r =>
-      r[2]?.trim() === houseName && r[8] === '입주중'
-    ).length
-    const exitSoon = tenantRows.filter(r => {
-      if (r[2]?.trim() !== houseName || r[8] !== '입주중') return false
-      const end = r[7]
-      if (!end) return false
-      const diff = Math.ceil((new Date(end).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-      return diff >= 0 && diff <= 30
-    }).length
+    const totalShare = houses.reduce((s, h) => s + h.share, 0)
+    const totalRevenue = houses.reduce((s, h) => s + h.revenue, 0)
 
     return NextResponse.json({
-      investor: { name: investorName, houseName, ratio, phone: investorRow[6] || '' },
-      house: { name: houseName, district: houseRow?.[2] || '', address: houseRow?.[3] || '', buildingRent, isConsignment },
-      currentMonth,
-      monthlyData,
-      tenantSummary: { activeTenants, exitSoon },
-      year, month,
+      investor: { id: investorId, name: investorName, phone, account },
+      houses,
+      totalShare,
+      totalRevenue,
+      houseCount: houses.length,
+      year,
+      month,
     })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
