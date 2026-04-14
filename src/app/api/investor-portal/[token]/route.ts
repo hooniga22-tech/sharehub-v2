@@ -61,9 +61,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
     const houses = myHouses.map(h => {
       const key = normalize(h.houseName)
       const houseTenants = tenantsByHouse.get(key) || []
-      const revenue = houseTenants.reduce((s, t) => s + (Number(t[10]) || 0) + (Number(t[11]) || 0), 0)
+      const rentRevenue = houseTenants.reduce((s, t) => s + (Number(t[10]) || 0), 0)
       const houseRent = houseRentMap.get(key) || 0
-      const profit = revenue - houseRent
+      const profit = rentRevenue - houseRent
       const investorShare = Math.round(profit * (h.investorRatio / 100))
       const jaehoonShare = Math.round(profit * (h.jaehoonRatio / 100))
 
@@ -74,14 +74,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
           name: t[5] || '',
           roomCode: t[3] || '',
           roomType: t[4] || '',
-          rent: (Number(t[10]) || 0) + (Number(t[11]) || 0),
+          rent: Number(t[10]) || 0,
           endDate,
         }
       })
 
       return {
         ...h,
-        revenue,
+        rentRevenue,
         houseRent,
         profit,
         investorShare,
@@ -91,13 +91,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
     })
 
     const totalShare = houses.reduce((s, h) => s + (h.investorShare || 0), 0)
-    const totalRevenue = houses.reduce((s, h) => s + (h.revenue || 0), 0)
+    const totalRentRevenue = houses.reduce((s, h) => s + (h.rentRevenue || 0), 0)
+    const totalProfit = houses.reduce((s, h) => s + (h.profit || 0), 0)
 
     return NextResponse.json({
       investor: { id: investorId, name: investorName, phone, account },
       houses,
       totalShare,
-      totalRevenue,
+      totalRentRevenue,
+      totalProfit,
       houseCount: houses.length,
       year,
       month,
