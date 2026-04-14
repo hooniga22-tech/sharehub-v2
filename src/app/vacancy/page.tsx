@@ -2,161 +2,244 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { ChevronLeft, ChevronDown, ChevronRight } from 'lucide-react';
 
-const BLUE = '#3182f6', GRAY = '#8b95a1', RED = '#f04452', ORANGE = '#d97706';
+const BLUE = '#3182F6', RED = '#E24B4A', AMBER = '#F59E0B', GRAY = '#8b95a1';
+
+type Tenant = Record<string, string>;
+
+function sortByRoomCode(a: Tenant, b: Tenant) {
+  return (a['방코드'] || '').localeCompare(b['방코드'] || '', 'ko');
+}
+
+function groupByHouse(list: Tenant[]) {
+  const map = new Map<string, Tenant[]>();
+  for (const t of list) {
+    const name = t['지점명'] || '-';
+    if (!map.has(name)) map.set(name, []);
+    map.get(name)!.push(t);
+  }
+  const entries = [...map.entries()].sort((a, b) => a[0].localeCompare(b[0], 'ko'));
+  for (const [, rooms] of entries) rooms.sort(sortByRoomCode);
+  return entries;
+}
 
 export default function VacancyPage() {
   const router = useRouter();
   const [tab, setTab] = useState(0);
-  const [tenants, setTenants] = useState<any[]>([]);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [gu, setGu] = useState('전체');
-  const [guMap, setGuMap] = useState<Record<string, string>>({});
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    Promise.all([
-      fetch('/api/houses').then(r => r.json()),
-      fetch('/api/tenants').then(r => r.json()),
-    ]).then(([houseData, tenantData]) => {
-      setTenants(Array.isArray(tenantData) ? tenantData : []);
-      const map: Record<string, string> = {};
-      (Array.isArray(houseData) ? houseData : []).forEach((h: any) => { if (h['지점명'] && h['구']) map[h['지점명']] = h['구']; });
-      setGuMap(map);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+    fetch('/api/tenants').then(r => r.json()).then(d => {
+      setTenants(Array.isArray(d) ? d : []);
+    }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
-  const guList = useMemo(() => [...new Set(Object.values(guMap).filter(Boolean))].sort(), [guMap]);
-  const guFilteredTenants = useMemo(() => gu === '전체' ? tenants : tenants.filter(t => guMap[t['지점명']] === gu), [tenants, gu, guMap]);
+  const guList = useMemo(() =>
+    [...new Set(tenants.map(t => t['구']).filter(Boolean))].sort()
+  , [tenants]);
 
-  const vacantNowTenants = useMemo(() => guFilteredTenants.filter(t => t['상태'] === '공실'), [guFilteredTenants]);
-  const vacantSoonTenants = useMemo(() => guFilteredTenants.filter(t => t['상태'] === '공실예정'), [guFilteredTenants]);
-  const allVacantTenants = useMemo(() => guFilteredTenants.filter(t => t['상태'] === '공실' || t['상태'] === '공실예정'), [guFilteredTenants]);
+  const filtered = useMemo(() =>
+    gu === '전체' ? tenants : tenants.filter(t => t['구'] === gu)
+  , [tenants, gu]);
 
-  const tabLabels = [`공실현황 ${vacantNowTenants.length}`, `공실예정 ${vacantSoonTenants.length}`, `전체공실 ${allVacantTenants.length}`];
-  const fmt = (n: number) => n.toLocaleString() + '원';
+  const vacantCount = useMemo(() => filtered.filter(t => t['상태'] === '공실').length, [filtered]);
+  const soonCount = useMemo(() => filtered.filter(t => t['상태'] === '공실예정').length, [filtered]);
 
-  const groupByHouse = (list: any[]) => {
-    const map = new Map<string, any[]>();
-    for (const t of list) {
-      const name = t['지점명'] || '-';
-      if (!map.has(name)) map.set(name, []);
-      map.get(name)!.push(t);
-    }
-    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0], 'ko'));
-  };
+  const toggle = (name: string) => setCollapsed(p => ({ ...p, [name]: !p[name] }));
 
-  const HouseGroup = ({ list }: { list: any[] }) => {
-    const groups = groupByHouse(list);
-    return (
-      <>
-        {groups.map(([houseName, rooms]) => (
-          <div key={houseName} style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', marginBottom: 12, border: '1px solid #f2f3f5' }}>
-            {/* Group header */}
-            <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 16, fontWeight: 700, color: '#191f28' }}>{houseName}</span>
-              <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#fff0f0', color: RED }}>공실 {rooms.length}개</span>
-              <span style={{ fontSize: 12, color: GRAY, marginLeft: 'auto' }}>{guMap[houseName] || ''}</span>
-            </div>
-            {/* Room rows */}
-            {rooms.map((t: any, i: number) => {
-              const isNow = t['상태'] === '공실';
-              const rentMgmt = (Number(t['월세']) || 0) + (Number(t['관리비']) || 0);
-              return (
-                <div key={t['입주자ID']} style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderTop: '1px solid #f2f3f5' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28' }}>{t['방코드']}</span>
-                    <span style={{ fontSize: 12, color: GRAY, marginLeft: 6 }}>{t['방타입'] || '-'}</span>
-                    <div style={{ fontSize: 12, color: '#4e5968', marginTop: 2 }}>{fmt(rentMgmt)}{!isNow && t['퇴실일'] ? ` · 퇴실 ${t['퇴실일']}` : ''}</div>
-                  </div>
-                  <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: isNow ? '#fee2e2' : '#fff8e1', color: isNow ? RED : '#b7791f', flexShrink: 0 }}>{isNow ? '공실' : '공실예정'}</span>
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </>
-    );
-  };
+  const tabLabels = ['전체현황', '입주가능', '즉시공실'];
+
+  // Header
+  const Header = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', background: '#fff', borderBottom: '1px solid #F0F0F0', position: 'sticky', top: 0, zIndex: 10 }}>
+      <button onClick={() => router.push('/manage')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}>
+        <ChevronLeft size={22} color="#191919" />
+      </button>
+      <span style={{ fontSize: 16, fontWeight: 700 }}>공실 관리</span>
+    </div>
+  );
+
+  // Tabs
+  const Tabs = (
+    <div style={{ display: 'flex', background: '#fff', borderBottom: '1px solid #F0F0F0' }}>
+      {tabLabels.map((label, i) => (
+        <button key={i} onClick={() => setTab(i)}
+          style={{ flex: 1, padding: '12px 0', border: 'none', borderBottom: tab === i ? `2px solid ${BLUE}` : '2px solid transparent', background: 'none', fontSize: 13, fontWeight: tab === i ? 700 : 400, color: tab === i ? BLUE : GRAY, cursor: 'pointer', fontFamily: 'inherit' }}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+
+  // Gu filter chips
+  const GuFilter = guList.length > 0 ? (
+    <div style={{ display: 'flex', overflowX: 'auto', gap: 6, padding: '12px 16px', scrollbarWidth: 'none', background: '#F7F8FA' }}>
+      {['전체', ...guList].map(g => (
+        <button key={g} onClick={() => setGu(g)}
+          style={{ padding: '6px 14px', borderRadius: 100, border: gu === g ? '1px solid #191f28' : '1px solid #e5e8eb', background: gu === g ? '#191f28' : '#fff', color: gu === g ? '#fff' : '#4e5968', fontSize: 13, fontWeight: gu === g ? 600 : 400, whiteSpace: 'nowrap', flexShrink: 0, cursor: 'pointer', fontFamily: 'inherit' }}>
+          {g}
+        </button>
+      ))}
+    </div>
+  ) : null;
 
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', background: '#F7F8FA' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', background: '#fff', borderBottom: '1px solid #F0F0F0' }}>
-          <button onClick={() => router.push('/manage')} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', padding: 4, color: '#191919' }}>←</button>
-          <span style={{ fontSize: 16, fontWeight: 700 }}>공실 관리</span>
-        </div>
-        <div style={{ textAlign: 'center', padding: '80px 0', color: GRAY }}><div style={{ fontSize: 13 }}>불러오는 중...</div></div>
+        {Header}
+        <div style={{ textAlign: 'center', padding: '80px 0', color: GRAY, fontSize: 13 }}>불러오는 중...</div>
       </div>
     );
   }
 
-  return (
-    <div style={{ minHeight: '100vh', background: '#F7F8FA' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', background: '#fff', borderBottom: '1px solid #F0F0F0', position: 'sticky', top: 0, zIndex: 10 }}>
-        <button onClick={() => router.push('/manage')} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', padding: 4, color: '#191919' }}>←</button>
-        <span style={{ fontSize: 16, fontWeight: 700 }}>공실 관리</span>
+  // === TAB 1: 전체현황 ===
+  const renderTab1 = () => {
+    const groups = groupByHouse(filtered);
+    return (
+      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {groups.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '60px 0', color: GRAY, fontSize: 13 }}>데이터가 없어요</div>
+        ) : groups.map(([houseName, rooms]) => {
+          const houseVacant = rooms.filter(r => r['상태'] === '공실').length;
+          const houseSoon = rooms.filter(r => r['상태'] === '공실예정').length;
+          const isCollapsed = collapsed[houseName];
+          return (
+            <div key={houseName} style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', border: '1px solid #f2f3f5' }}>
+              <button onClick={() => toggle(houseName)}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', padding: '14px 16px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+                <span style={{ fontSize: 15, fontWeight: 700, color: '#191f28', flex: 1 }}>{houseName}</span>
+                <div style={{ display: 'flex', gap: 4, marginRight: 8 }}>
+                  {houseVacant > 0 && (
+                    <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#fee2e2', color: RED }}>공실 {houseVacant}</span>
+                  )}
+                  {houseSoon > 0 && (
+                    <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#fff8e1', color: '#b7791f' }}>퇴실예정 {houseSoon}</span>
+                  )}
+                </div>
+                {isCollapsed ? <ChevronRight size={16} color={GRAY} /> : <ChevronDown size={16} color={GRAY} />}
+              </button>
+              {!isCollapsed && rooms.map(t => {
+                const st = t['상태'];
+                const isVacant = st === '공실';
+                const isSoon = st === '공실예정';
+                const bg = isVacant ? '#fafafa' : isSoon ? '#fffbf0' : '#fff';
+                return (
+                  <div key={t['입주자ID'] || t['방코드']} style={{ display: 'flex', alignItems: 'center', padding: '10px 16px', borderTop: '1px solid #f2f3f5', background: bg }}>
+                    <span style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 600, color: '#191f28', width: 120, flexShrink: 0 }}>{t['방코드']}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {isVacant ? (
+                        <span style={{ fontSize: 13, fontWeight: 600, color: RED }}>공실</span>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 13, color: '#191f28' }}>{t['이름'] || '-'}</span>
+                          {isSoon && (
+                            <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: '#fff8e1', color: AMBER }}>퇴실예정</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {(isSoon || isVacant) && t['퇴실일'] && (
+                      <span style={{ fontSize: 12, color: isSoon ? AMBER : GRAY, flexShrink: 0 }}>{t['퇴실일']}</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
       </div>
+    );
+  };
 
-      <div style={{ display: 'flex', background: '#fff', borderBottom: '1px solid #F0F0F0' }}>
-        {tabLabels.map((label, i) => (
-          <button key={i} onClick={() => setTab(i)}
-            style={{ flex: 1, padding: '12px 0', border: 'none', borderBottom: tab === i ? `2px solid ${BLUE}` : '2px solid transparent', background: 'none', fontSize: 13, fontWeight: tab === i ? 700 : 400, color: tab === i ? BLUE : GRAY, cursor: 'pointer', fontFamily: 'inherit' }}>
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {guList.length > 0 && (
-        <div style={{ display: 'flex', overflowX: 'auto', gap: 6, padding: '12px 16px', scrollbarWidth: 'none', background: '#F7F8FA' }}>
-          {['전체', ...guList].map(g => (
-            <button key={g} onClick={() => setGu(g)} style={{ padding: '6px 14px', borderRadius: 100, border: gu === g ? '1px solid #191f28' : '1px solid #e5e8eb', background: gu === g ? '#191f28' : '#fff', color: gu === g ? '#fff' : '#4e5968', fontSize: 13, fontWeight: gu === g ? 600 : 400, whiteSpace: 'nowrap', flexShrink: 0, cursor: 'pointer', fontFamily: 'inherit' }}>{g}</button>
+  // === TAB 2: 입주가능 ===
+  const renderTab2 = () => {
+    const available = filtered.filter(t => t['상태'] === '공실' || t['상태'] === '공실예정');
+    const groups = groupByHouse(available);
+    const totalAvail = vacantCount + soonCount;
+    return (
+      <div>
+        {/* Banner */}
+        <div style={{ margin: '16px 16px 0', padding: '14px 16px', borderRadius: 12, background: '#EEF3FF', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          <span style={{ fontSize: 13, color: BLUE, fontWeight: 600 }}>
+            즉시 공실 {vacantCount}실 + 퇴실예정 {soonCount}실 = 총 {totalAvail}실 입주 가능
+          </span>
+        </div>
+        <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {groups.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '60px 0', color: GRAY, fontSize: 13 }}>입주 가능한 방이 없어요</div>
+          ) : groups.map(([houseName, rooms]) => (
+            <div key={houseName} style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', border: '1px solid #f2f3f5' }}>
+              <div style={{ display: 'flex', alignItems: 'center', padding: '14px 16px' }}>
+                <span style={{ fontSize: 15, fontWeight: 700, color: '#191f28', flex: 1 }}>{houseName}</span>
+                <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#EEF3FF', color: BLUE }}>{rooms.length}자리 가능</span>
+              </div>
+              {rooms.map(t => {
+                const isVacant = t['상태'] === '공실';
+                return (
+                  <div key={t['입주자ID'] || t['방코드']} style={{ display: 'flex', alignItems: 'center', padding: '10px 16px', borderTop: '1px solid #f2f3f5' }}>
+                    <span style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 600, color: '#191f28', width: 120, flexShrink: 0 }}>{t['방코드']}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {isVacant ? (
+                        <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#fee2e2', color: RED }}>즉시공실</span>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#fff8e1', color: AMBER }}>퇴실예정</span>
+                          <span style={{ fontSize: 12, color: '#4e5968' }}>{t['이름']}</span>
+                        </div>
+                      )}
+                    </div>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: isVacant ? RED : AMBER, flexShrink: 0 }}>
+                      {isVacant ? '즉시' : t['퇴실일'] || '-'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           ))}
         </div>
-      )}
-
-      <div style={{ padding: 16 }}>
-        {tab === 0 && (
-          vacantNowTenants.length > 0 ? (
-            <>
-              <div style={{ fontSize: 13, fontWeight: 700, color: RED, marginBottom: 10 }}>현재 공실 {vacantNowTenants.length}실</div>
-              <HouseGroup list={vacantNowTenants} />
-            </>
-          ) : (
-            <div style={{ textAlign: 'center', padding: '60px 0' }}>
-              <div style={{ fontSize: 16, fontWeight: 600, color: '#333', marginBottom: 4 }}>현재 공실이 없어요</div>
-              <div style={{ fontSize: 13, color: GRAY }}>모든 방이 입주 중이에요</div>
-            </div>
-          )
-        )}
-
-        {tab === 1 && (
-          vacantSoonTenants.length > 0 ? (
-            <>
-              <div style={{ fontSize: 13, fontWeight: 700, color: ORANGE, marginBottom: 10 }}>공실 예정 {vacantSoonTenants.length}실</div>
-              <HouseGroup list={vacantSoonTenants} />
-            </>
-          ) : (
-            <div style={{ textAlign: 'center', padding: '60px 0' }}>
-              <div style={{ fontSize: 16, fontWeight: 600, color: '#333' }}>공실 예정이 없어요</div>
-            </div>
-          )
-        )}
-
-        {tab === 2 && (
-          allVacantTenants.length > 0 ? (
-            <>
-              <div style={{ fontSize: 13, fontWeight: 700, color: BLUE, marginBottom: 10 }}>전체 공실 {allVacantTenants.length}실</div>
-              <HouseGroup list={allVacantTenants} />
-            </>
-          ) : (
-            <div style={{ textAlign: 'center', padding: '60px 0' }}>
-              <div style={{ fontSize: 16, fontWeight: 600, color: '#333', marginBottom: 4 }}>공실이 없어요</div>
-              <div style={{ fontSize: 13, color: GRAY }}>모든 방이 입주 중이에요</div>
-            </div>
-          )
-        )}
       </div>
+    );
+  };
+
+  // === TAB 3: 즉시공실 ===
+  const renderTab3 = () => {
+    const vacant = filtered.filter(t => t['상태'] === '공실');
+    const groups = groupByHouse(vacant);
+    return (
+      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {groups.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '60px 0', color: GRAY, fontSize: 13 }}>즉시 공실이 없어요</div>
+        ) : groups.map(([houseName, rooms]) => (
+          <div key={houseName} style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', border: '1px solid #f2f3f5' }}>
+            <div style={{ display: 'flex', alignItems: 'center', padding: '14px 16px' }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: '#191f28', flex: 1 }}>{houseName}</span>
+              <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#fee2e2', color: RED }}>{rooms.length}실</span>
+            </div>
+            {rooms.map(t => (
+              <div key={t['입주자ID'] || t['방코드']} style={{ display: 'flex', alignItems: 'center', padding: '10px 16px', borderTop: '1px solid #f2f3f5' }}>
+                <span style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 600, color: '#191f28', width: 120, flexShrink: 0 }}>{t['방코드']}</span>
+                <span style={{ flex: 1, fontSize: 13, color: RED, fontWeight: 500 }}>즉시 입주 가능</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: RED, flexShrink: 0 }}>즉시</span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#F7F8FA' }}>
+      {Header}
+      {Tabs}
+      {GuFilter}
+      {tab === 0 && renderTab1()}
+      {tab === 1 && renderTab2()}
+      {tab === 2 && renderTab3()}
     </div>
   );
 }
