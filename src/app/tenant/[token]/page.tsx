@@ -94,9 +94,8 @@ export default function TenantPortalPage() {
   const [issueDesc, setIssueDesc] = useState('');
   const [selSupplies, setSelSupplies] = useState<string[]>([]);
   const [etcText, setEtcText] = useState('');
-  const [expandedYM, setExpandedYM] = useState<Set<string>>(new Set());
   const [oldPayOpen, setOldPayOpen] = useState(false);
-  const [balanceOpen, setBalanceOpen] = useState(false);
+  const [expandedPay, setExpandedPay] = useState<string | null>(null);
 
   const ko = lang === 'ko';
   const t = (k: string, e: string) => ko ? k : e;
@@ -292,10 +291,10 @@ export default function TenantPortalPage() {
           <Card>
             <CardTitle title={t('하우스 정보', 'House Info')} />
             {[
-              { l: t('현관 비번', 'Door Code'), v: house['현관비번'], cp: true },
+              { l: t('주소', 'Address'), v: house['주소'], cp: false },
+              { l: t('공용현관 비번', 'Door Code'), v: house['현관비번'], cp: true },
               { l: t('와이파이', 'WiFi'), v: house['와이파이SSID'], cp: false },
               { l: t('비밀번호', 'Password'), v: house['와이파이PW'], cp: true },
-              { l: t('주소', 'Address'), v: house['주소'], cp: false },
             ].map((row, i, arr) => (
               <div key={row.l} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 18px', borderBottom: i < arr.length - 1 ? '1px solid #f2f4f6' : 'none' }}>
                 <span style={{ fontSize: 13, color: GRAY, flexShrink: 0 }}>{row.l}</span>
@@ -308,12 +307,11 @@ export default function TenantPortalPage() {
           </Card>
         )}
 
-        {/* Payment History (A안 + 계좌) */}
+        {/* Payment History */}
         {(() => {
           const allPayments = Array.isArray(rawPayments) ? rawPayments : [];
-          const sorted = [...allPayments].sort((a: any, b: any) => (b.연월 || '').localeCompare(a.연월 || ''));
-          const recent2 = sorted.slice(0, 2);
-          const older = sorted.slice(2);
+          const monthlyPays = allPayments.filter((p: any) => /^\d{4}-\d{2}$/.test(p.연월));
+          const sorted = [...monthlyPays].sort((a: any, b: any) => (b.연월 || '').localeCompare(a.연월 || ''));
 
           // First month pro-rata
           const moveInDate = tenant['입주일'] || '';
@@ -327,51 +325,55 @@ export default function TenantPortalPage() {
           const firstRent = isProrata ? Math.round(rent / daysInMoveMonth * moveDays) : rent;
           const firstMgmt = isProrata ? Math.round(mgmt / daysInMoveMonth * moveDays) : mgmt;
           const depositAmt = Number(tenant['보증금']) || 0;
+          const contractDeposit = 500000;
+          const depositBalance = depositAmt - contractDeposit;
 
-          const rentAccount = house?.['월세계좌'] || t('계약서 참조', 'See contract');
-          const mgmtAccount = house?.['관리비계좌'] || t('계약서 참조', 'See contract');
+          const rentAccount = house?.['월세계좌'] || '';
+          const mgmtAccount = house?.['관리비계좌'] || '';
+          const rentBankLabel = rentAccount || t('월세 통장', 'Rent Account');
+          const mgmtBankLabel = mgmtAccount || t('관리비 통장', 'Mgmt Account');
 
-          const toggleYM = (ym: string) => {
-            setExpandedYM(prev => {
-              const next = new Set(prev);
-              next.has(ym) ? next.delete(ym) : next.add(ym);
-              return next;
-            });
-          };
+          const toggle = (key: string) => setExpandedPay(expandedPay === key ? null : key);
 
-          // Auto-expand recent 2
-          const isExpanded = (ym: string, idx: number) => idx < 2 ? !expandedYM.has(ym) : expandedYM.has(ym);
+          // 계약금 row from 수납 탭
+          const depositPay = allPayments.find((p: any) => p.연월 === '계약금');
+          const dpAmt = depositPay ? (Number(depositPay.납부액) || Number(depositPay.청구액) || 0) : contractDeposit;
+          const dpPaid = depositPay ? depositPay.상태 === '납부완료' : true;
 
-          const PayRowWithDetail = ({ p, idx }: { p: any; idx: number }) => {
+          const CopyBtn = ({ text }: { text: string }) => text ? (
+            <button onClick={e => { e.stopPropagation(); copyText(text); }}
+              style={{ border: 'none', background: '#e8edf2', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#555', marginLeft: 4 }}>
+              <CopyIcon /> {t('복사', 'Copy')}
+            </button>
+          ) : null;
+
+          // Pay row for monthly items
+          const PayRow = ({ p }: { p: any }) => {
             const paid = p.상태 === '납부완료';
-            const [pY, pM] = (p.연월 || '').split('-');
-            const expanded = isExpanded(p.연월, idx);
-            const nowDate = new Date();
-            const currentYM = `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, '0')}`;
-            const isCurrent = p.연월 === currentYM;
-            const statusLabel = paid ? t('완료', 'Paid') : (isCurrent ? t('예정', 'Due') : t('미납', 'Unpaid'));
-            const statusColor = paid ? GREEN : (isCurrent ? BLUE : RED);
+            const m = Number((p.연월 || '').split('-')[1]);
+            const isOpen = expandedPay === p.수납ID;
+            const statusLabel = paid ? t('완료', 'Paid') : t('미납', 'Unpaid');
+            const statusColor = paid ? GREEN : RED;
+            const amt = paid ? (Number(p.납부액) || Number(p.청구액) || 0) : (Number(p.청구액) || 0);
 
             return (
               <div style={{ borderTop: '1px solid #f2f4f6' }}>
-                <div onClick={() => toggleYM(p.연월)} style={{ display: 'flex', alignItems: 'center', padding: '12px 18px', cursor: 'pointer', gap: 8 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28', minWidth: 76, flexShrink: 0 }}>{pY}{t('년 ', '.')}{Number(pM)}{t('월', '')}</span>
-                  <span style={{ fontSize: 12, color: '#4e5968', flex: 1 }}>
-                    {t('월세', 'Rent')} {fmt(rent)} · <span style={{ color: '#00b493' }}>{t('관리비', 'Mgmt')} {fmt(mgmt)}</span>
+                <div onClick={() => toggle(p.수납ID)} style={{ display: 'flex', alignItems: 'center', padding: '12px 18px', cursor: 'pointer', gap: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28', flex: 1 }}>
+                    {m}{t('월 월세 + 관리비', ' Rent + Mgmt')}
                   </span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28', flexShrink: 0, marginRight: 8 }}>{fmt(amt)}</span>
                   <span style={{ fontSize: 12, fontWeight: 600, color: statusColor, flexShrink: 0 }}>{statusLabel}</span>
                 </div>
-                {expanded && (
-                  <div style={{ padding: '0 18px 14px', display: 'flex', gap: 8 }}>
-                    <div style={{ flex: 1, background: '#f2f3f5', borderRadius: 8, padding: '10px 12px' }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: '#191f28', marginBottom: 4 }}>{t('월세', 'Rent')}</div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#191f28' }}>{fmt(rent)}</div>
-                      <div style={{ fontSize: 11, color: GRAY, marginTop: 4, wordBreak: 'break-all' }}>{rentAccount}</div>
+                {isOpen && (
+                  <div style={{ background: '#f8fbff', padding: '12px 14px', borderTop: '1px solid #f0f0f0', margin: '0 18px 14px', borderRadius: 8 }}>
+                    <div style={{ fontSize: 12, color: '#555', lineHeight: 1.8 }}>
+                      {t('월세', 'Rent')}: {fmt(rent)} → {rentBankLabel}
+                      {rentAccount && <CopyBtn text={rentAccount} />}
                     </div>
-                    <div style={{ flex: 1, background: '#f2f3f5', borderRadius: 8, padding: '10px 12px' }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: '#00b493', marginBottom: 4 }}>{t('관리비', 'Mgmt')}</div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#191f28' }}>{fmt(mgmt)}</div>
-                      <div style={{ fontSize: 11, color: GRAY, marginTop: 4, wordBreak: 'break-all' }}>{mgmtAccount}</div>
+                    <div style={{ fontSize: 12, color: '#555', lineHeight: 1.8 }}>
+                      {t('관리비', 'Mgmt')}: {fmt(mgmt)} → {mgmtBankLabel}
+                      {mgmtAccount && <CopyBtn text={mgmtAccount} />}
                     </div>
                   </div>
                 )}
@@ -379,23 +381,26 @@ export default function TenantPortalPage() {
             );
           };
 
+          const recent3 = sorted.slice(0, 3);
+          const older = sorted.slice(3);
+
           return (
             <Card>
               <CardTitle title={t('납부 내역', 'Payment History')} />
 
-              {allPayments.length > 0 ? (
+              {/* 정상 월세 (최신순, 위에서 아래로) */}
+              {monthlyPays.length > 0 ? (
                 <>
-                  {/* 최신 2개월 (기본 펼침) */}
-                  {recent2.map((p: any, i: number) => <PayRowWithDetail key={p.수납ID || i} p={p} idx={i} />)}
-
-                  {/* 이전 N개월 아코디언 */}
+                  {recent3.map((p: any) => <PayRow key={p.수납ID} p={p} />)}
                   {older.length > 0 && (
                     <>
                       <div onClick={() => setOldPayOpen(!oldPayOpen)}
                         style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '10px 18px', cursor: 'pointer', borderTop: '1px solid #f2f4f6' }}>
-                        <span style={{ fontSize: 12, color: GRAY, fontWeight: 500 }}>{t(`이전 ${older.length}개월`, `${older.length} more months`)} {oldPayOpen ? '▲' : '▼'}</span>
+                        <span style={{ fontSize: 12, color: GRAY, fontWeight: 500 }}>
+                          {t(`이전 ${older.length}개월`, `${older.length} more months`)} {oldPayOpen ? '▲' : '▼'}
+                        </span>
                       </div>
-                      {oldPayOpen && older.map((p: any, i: number) => <PayRowWithDetail key={p.수납ID || i} p={p} idx={i + 2} />)}
+                      {oldPayOpen && older.map((p: any) => <PayRow key={p.수납ID} p={p} />)}
                     </>
                   )}
                 </>
@@ -405,65 +410,84 @@ export default function TenantPortalPage() {
                 </div>
               ) : null}
 
-              {/* 하단: 잔금 + 계약금 */}
+              {/* 초기 납부 (아래에서 위로: 2차잔금 → 1차잔금 → 계약금) */}
               {moveInDate && (
                 <div style={{ borderTop: '1px solid #e5e8eb' }}>
-                  {/* 잔금① 보증금잔액 + 월세일할 */}
+                  {/* 2차 잔금 — 관리비 일할 */}
                   <div style={{ borderTop: '1px solid #f2f4f6' }}>
-                    <div onClick={() => setBalanceOpen(!balanceOpen)} style={{ display: 'flex', alignItems: 'center', padding: '12px 18px', cursor: 'pointer', gap: 8 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28', minWidth: 76, flexShrink: 0 }}>{t('잔금①', 'Balance①')}</span>
-                      <span style={{ fontSize: 12, color: '#4e5968', flex: 1 }}>
-                        {t('보증금', 'Deposit')} {fmt(depositAmt)} + {t('월세', 'Rent')}{isProrata ? t(' 일할', ' pro-rata') : ''} {fmt(firstRent)}
-                      </span>
+                    <div onClick={() => toggle('bal2')} style={{ display: 'flex', alignItems: 'center', padding: '12px 18px', cursor: 'pointer', gap: 8 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28', flex: 1 }}>{t('2차 잔금', '2nd Balance')}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28', flexShrink: 0, marginRight: 8 }}>{fmt(firstMgmt)}</span>
                       <span style={{ fontSize: 12, fontWeight: 600, color: GREEN, flexShrink: 0 }}>{t('완료', 'Paid')}</span>
                     </div>
-                    {balanceOpen && isProrata && (
-                      <div style={{ margin: '0 18px 14px', background: '#f2f3f5', borderRadius: 10, padding: '10px 12px' }}>
-                        <div style={{ fontSize: 11, color: GRAY, marginBottom: 6 }}>
-                          {t(`일할계산 (${moveMonth}/${moveDay} ~ ${moveMonth}/${daysInMoveMonth}, ${moveDays}일/${daysInMoveMonth}일)`,
-                            `Pro-rata (${moveMonth}/${moveDay} ~ ${moveMonth}/${daysInMoveMonth}, ${moveDays}d/${daysInMoveMonth}d)`)}
+                    {expandedPay === 'bal2' && (
+                      <div style={{ background: '#f8fbff', padding: '12px 14px', borderTop: '1px solid #f0f0f0', margin: '0 18px 14px', borderRadius: 8 }}>
+                        <div style={{ fontSize: 12, color: '#555', lineHeight: 1.8 }}>
+                          {t('관리비 일할', 'Mgmt pro-rata')}: {fmt(firstMgmt)}
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555', marginBottom: 4 }}>
-                          <span>{t('보증금 잔액', 'Deposit')}</span>
-                          <span style={{ fontWeight: 600 }}>{fmt(depositAmt)}</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555' }}>
-                          <span>{t('월세 일할', 'Rent pro-rata')}</span>
-                          <span style={{ fontWeight: 600 }}>{fmt(firstRent)}</span>
-                        </div>
-                        <div style={{ height: 1, background: '#e5e8eb', margin: '6px 0' }} />
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, color: BLUE }}>
-                          <span>{t('합계', 'Total')}</span>
-                          <span>{fmt(depositAmt + firstRent)}</span>
+                        {isProrata && (
+                          <div style={{ fontSize: 12, color: GRAY, lineHeight: 1.8 }}>
+                            {t(`입주일 ${moveMonth}/${moveDay}, ${moveMonth}월 ${daysInMoveMonth}일까지 ${moveDays}일 일할계산`,
+                              `Move-in ${moveMonth}/${moveDay}, ${moveDays}d/${daysInMoveMonth}d pro-rata`)}
+                          </div>
+                        )}
+                        <div style={{ fontSize: 12, color: '#555', lineHeight: 1.8, marginTop: 2 }}>
+                          {t('납입계좌', 'Account')}: {mgmtBankLabel}
+                          {mgmtAccount && <CopyBtn text={mgmtAccount} />}
                         </div>
                       </div>
                     )}
                   </div>
 
-                  {/* 잔금② 관리비일할 */}
-                  <div style={{ display: 'flex', alignItems: 'center', padding: '12px 18px', borderTop: '1px solid #f2f4f6', gap: 8 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28', minWidth: 76, flexShrink: 0 }}>{t('잔금②', 'Balance②')}</span>
-                    <span style={{ fontSize: 12, color: '#00b493', flex: 1 }}>
-                      {t('관리비', 'Mgmt')}{isProrata ? t(' 일할', ' pro-rata') : ''} {fmt(firstMgmt)}
-                    </span>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: GREEN, flexShrink: 0 }}>{t('완료', 'Paid')}</span>
+                  {/* 1차 잔금 — 보증금잔액 + 월세일할 */}
+                  <div style={{ borderTop: '1px solid #f2f4f6' }}>
+                    <div onClick={() => toggle('bal1')} style={{ display: 'flex', alignItems: 'center', padding: '12px 18px', cursor: 'pointer', gap: 8 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28', flex: 1 }}>{t('1차 잔금', '1st Balance')}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28', flexShrink: 0, marginRight: 8 }}>{fmt(depositBalance + firstRent)}</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: GREEN, flexShrink: 0 }}>{t('완료', 'Paid')}</span>
+                    </div>
+                    {expandedPay === 'bal1' && (
+                      <div style={{ background: '#f8fbff', padding: '12px 14px', borderTop: '1px solid #f0f0f0', margin: '0 18px 14px', borderRadius: 8 }}>
+                        <div style={{ fontSize: 12, color: '#555', lineHeight: 1.8 }}>
+                          {t('보증금 잔액', 'Deposit balance')}: {fmt(depositBalance)}
+                        </div>
+                        <div style={{ fontSize: 12, color: '#555', lineHeight: 1.8 }}>
+                          {t('월세 일할', 'Rent pro-rata')}: {fmt(firstRent)}
+                        </div>
+                        {isProrata && (
+                          <div style={{ fontSize: 12, color: GRAY, lineHeight: 1.8 }}>
+                            {t(`입주일 ${moveMonth}/${moveDay}, ${moveMonth}월 ${daysInMoveMonth}일까지 ${moveDays}일 일할계산`,
+                              `Move-in ${moveMonth}/${moveDay}, ${moveDays}d/${daysInMoveMonth}d pro-rata`)}
+                          </div>
+                        )}
+                        <div style={{ height: 1, background: '#e5e8eb', margin: '6px 0' }} />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, color: BLUE }}>
+                          <span>{t('합계', 'Total')}</span>
+                          <span>{fmt(depositBalance + firstRent)}</span>
+                        </div>
+                        <div style={{ fontSize: 12, color: '#555', lineHeight: 1.8, marginTop: 4 }}>
+                          {t('납입계좌', 'Account')}: {rentBankLabel}
+                          {rentAccount && <CopyBtn text={rentAccount} />}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  {/* 계약금 — 수납 탭에 연월='계약금' 행이 있을 때만 표시 */}
-                  {(() => {
-                    const allPay = Array.isArray(rawPayments) ? rawPayments : [];
-                    const depositPay = allPay.find((p: any) => p.연월 === '계약금');
-                    if (!depositPay) return null;
-                    const dpAmt = Number(depositPay.납부액) || Number(depositPay.청구액) || 0;
-                    const dpPaid = depositPay.상태 === '납부완료';
-                    return (
-                      <div style={{ display: 'flex', alignItems: 'center', padding: '12px 18px', borderTop: '1px solid #f2f4f6', gap: 8 }}>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28', minWidth: 76, flexShrink: 0 }}>{t('계약금', 'Deposit')}</span>
-                        <span style={{ fontSize: 12, color: '#4e5968', flex: 1 }}>{fmt(dpAmt)}</span>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: dpPaid ? GREEN : RED, flexShrink: 0 }}>{dpPaid ? t('완료', 'Paid') : t('미납', 'Unpaid')}</span>
+                  {/* 계약금 */}
+                  <div style={{ borderTop: '1px solid #f2f4f6' }}>
+                    <div onClick={() => toggle('deposit')} style={{ display: 'flex', alignItems: 'center', padding: '12px 18px', cursor: 'pointer', gap: 8 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28', flex: 1 }}>{t('계약금', 'Contract Deposit')}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28', flexShrink: 0, marginRight: 8 }}>{fmt(dpAmt)}</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: dpPaid ? GREEN : RED, flexShrink: 0 }}>{dpPaid ? t('완료', 'Paid') : t('미납', 'Unpaid')}</span>
+                    </div>
+                    {expandedPay === 'deposit' && (
+                      <div style={{ background: '#f8fbff', padding: '12px 14px', borderTop: '1px solid #f0f0f0', margin: '0 18px 14px', borderRadius: 8 }}>
+                        <div style={{ fontSize: 12, color: '#555', lineHeight: 1.8 }}>
+                          {t('입주 계약 시 납부하는 금액입니다.', 'Deposit paid at the time of contract.')}
+                        </div>
                       </div>
-                    );
-                  })()}
+                    )}
+                  </div>
                 </div>
               )}
             </Card>
