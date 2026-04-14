@@ -49,8 +49,8 @@ export default function WorkerTokenPage() {
 
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-  const doneCount = useMemo(() => schedules.filter(s => s.isDone).length, [schedules]);
-  const pendingCount = useMemo(() => schedules.filter(s => !s.isDone).length, [schedules]);
+  const doneCount = useMemo(() => schedules.filter(s => s.isDone && s.date <= todayStr).length, [schedules, todayStr]);
+  const pendingCount = useMemo(() => schedules.filter(s => !s.isDone || s.date > todayStr).length, [schedules, todayStr]);
   const totalAmount = useMemo(() => schedules.reduce((s, w) => s + w.amount, 0), [schedules]);
 
   // Calendar helpers
@@ -73,9 +73,11 @@ export default function WorkerTokenPage() {
     return map;
   }, [schedules]);
 
+  const isActuallyDone = (s: Schedule) => s.isDone && s.date <= todayStr;
+  const isActuallyPending = (s: Schedule) => !s.isDone || s.date > todayStr;
   const todaySchedules = useMemo(() => schedulesByDate.get(todayStr) || [], [schedulesByDate, todayStr]);
-  const pendingSchedules = useMemo(() => schedules.filter(s => !s.isDone && s.date !== todayStr).sort((a, b) => a.date.localeCompare(b.date)), [schedules, todayStr]);
-  const doneSchedules = useMemo(() => schedules.filter(s => s.isDone).sort((a, b) => b.date.localeCompare(a.date)), [schedules]);
+  const pendingSchedules = useMemo(() => schedules.filter(s => isActuallyPending(s) && s.date !== todayStr).sort((a, b) => a.date.localeCompare(b.date)), [schedules, todayStr]);
+  const doneSchedules = useMemo(() => schedules.filter(s => isActuallyDone(s)).sort((a, b) => b.date.localeCompare(a.date)), [schedules, todayStr]);
 
   const prevMonth = () => {
     if (viewMonth === 1) { setViewYear(y => y - 1); setViewMonth(12); }
@@ -172,15 +174,15 @@ export default function WorkerTokenPage() {
               const dateStr = `${viewYear}-${String(viewMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
               const daySchedules = schedulesByDate.get(dateStr) || [];
               const isToday = dateStr === todayStr;
-              const hasDone = daySchedules.some(s => s.isDone);
-              const hasPending = daySchedules.some(s => !s.isDone);
+              const hasDone = daySchedules.some(s => s.isDone && dateStr <= todayStr);
+              const hasPending = daySchedules.some(s => !s.isDone || dateStr > todayStr);
 
               let bg = 'transparent';
-              let color = '#333';
+              let color = '#D1D5DB';
               let border = 'none';
               if (isToday) { bg = '#EFF6FF'; border = '2px solid #3182F6'; color = '#1D4ED8'; }
-              else if (hasDone && !hasPending) { bg = GREEN_BG; color = GREEN_FG; }
-              else if (hasPending) { bg = AMBER_BG; color = AMBER_FG; }
+              else if (daySchedules.length > 0 && hasDone && !hasPending) { bg = '#DCFCE7'; color = '#15803D'; }
+              else if (daySchedules.length > 0 && hasPending) { bg = '#FEF9C3'; color = '#854D0E'; }
 
               const houseLabel = daySchedules.length > 0
                 ? daySchedules.length <= 2
@@ -190,8 +192,8 @@ export default function WorkerTokenPage() {
 
               return (
                 <div key={dateStr} style={{ minHeight: 42, background: bg, borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border, padding: '2px 1px' }}>
-                  <span style={{ fontSize: 13, fontWeight: isToday ? 700 : 400, color: daySchedules.length === 0 && !isToday ? '#ccc' : color }}>{day}</span>
-                  {houseLabel && <span style={{ fontSize: 8, color, marginTop: 1, lineHeight: 1, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{houseLabel}</span>}
+                  <span style={{ fontSize: 12, fontWeight: daySchedules.length > 0 || isToday ? 700 : 400, color }}>{day}</span>
+                  {houseLabel && <span style={{ fontSize: 9, color, marginTop: 1, lineHeight: 1, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{houseLabel}</span>}
                 </div>
               );
             })}
@@ -209,7 +211,7 @@ export default function WorkerTokenPage() {
               <div style={{ fontSize: 12, color: BLUE, fontWeight: 600, marginBottom: 8 }}>오늘 · {fmtMD(todayStr)}</div>
               <div style={{ fontSize: 30, fontWeight: 700, color: '#111', marginBottom: 4 }}>{s.houseName}</div>
               <div style={{ fontSize: 15, color: '#888', marginBottom: 20 }}>{s.type} · {fmt(s.amount)}</div>
-              {!s.isDone ? (
+              {isActuallyPending(s) ? (
                 <div style={{ display: 'flex', gap: 10 }}>
                   <button onClick={() => handleEditAmount(s)} style={{ flex: 1, height: 52, borderRadius: 12, border: '1px solid #e5e8eb', background: '#fff', fontSize: 16, color: '#333', cursor: 'pointer', fontFamily: 'inherit' }}>수정</button>
                   <button onClick={() => handleDone(s.id)} style={{ flex: 2, height: 52, borderRadius: 12, border: 'none', background: BLUE, color: '#fff', fontSize: 18, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>완료 처리</button>
@@ -242,7 +244,7 @@ export default function WorkerTokenPage() {
           {doneSchedules.length > 0 && (
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: GREEN_D, marginBottom: 8, padding: '0 4px' }}>완료 {doneSchedules.length}건</div>
-              <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #f0f0f0', overflow: 'hidden', opacity: 0.45 }}>
+              <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #f0f0f0', overflow: 'hidden', opacity: 0.5 }}>
                 {doneSchedules.map((s, i, arr) => (
                   <div key={s.id} style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', borderBottom: i < arr.length - 1 ? '1px solid #f5f5f5' : 'none' }}>
                     <div style={{ flex: 1 }}>
