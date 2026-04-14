@@ -7,7 +7,7 @@ const BLUE = '#3182f6', GRAY = '#8b95a1', GREEN = '#16A34A', RED = '#E24B4A';
 const fmt = (n: number) => n.toLocaleString() + '원';
 const normalize = (name: string) => name.replace(/하우스$/, '').trim().toLowerCase();
 
-type House = { investId: string; houseName: string; investorRatio: number; jaehoonRatio: number; isJoint: boolean; memo: string };
+type House = { investId: string; houseName: string; investorRatio: number; jaehoonRatio: number; isJoint: boolean; memo: string; houseRent: number };
 type Investor = { id: string; name: string; phone: string; account: string; token: string; houses: House[] };
 type Tenant = Record<string, string>;
 
@@ -49,22 +49,21 @@ export default function InvestorsPage() {
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
-  // Revenue by house (active tenants: 입주중/계약중)
-  const revenueByHouse = useMemo(() => {
+  // 월세만 합계 by house (active tenants: 입주중/계약중)
+  const rentByHouse = useMemo(() => {
     const map = new Map<string, number>();
     const active = tenants.filter(t => t['상태'] === '입주중' || t['상태'] === '계약중');
     for (const t of active) {
       const house = normalize(t['지점명'] || '');
-      const rent = (Number(t['월세']) || 0) + (Number(t['관리비']) || 0);
+      const rent = Number(t['월세']) || 0;
       map.set(house, (map.get(house) || 0) + rent);
     }
     return map;
   }, [tenants]);
 
-  const getHouseShare = (h: House) => {
-    const revenue = revenueByHouse.get(normalize(h.houseName)) || 0;
-    return Math.round(revenue * (h.investorRatio / 100));
-  };
+  const getHouseRentRevenue = (h: House) => rentByHouse.get(normalize(h.houseName)) || 0;
+  const getHouseProfit = (h: House) => getHouseRentRevenue(h) - (h.houseRent || 0);
+  const getHouseShare = (h: House) => Math.round(getHouseProfit(h) * (h.investorRatio / 100));
 
   const getInvestorTotal = (inv: Investor) => inv.houses.reduce((s, h) => s + getHouseShare(h), 0);
 
@@ -77,29 +76,32 @@ export default function InvestorsPage() {
     setTimeout(() => setCopiedName(''), 1500);
   };
 
-  // Settlement rows: flatten investors × houses
-  const allSettlementRows = useMemo(() => {
-    const rows: { inv: Investor; house: House; share: number }[] = [];
-    for (const inv of investors) {
-      for (const h of inv.houses) {
-        rows.push({ inv, house: h, share: getHouseShare(h) });
-      }
-    }
-    return rows;
+  // Settlement: group by investor
+  const investorSettlements = useMemo(() => {
+    return investors.map(inv => {
+      const details = inv.houses.map(h => ({
+        house: h,
+        rentRevenue: getHouseRentRevenue(h),
+        profit: getHouseProfit(h),
+        share: getHouseShare(h),
+      }));
+      const totalShare = details.reduce((s, d) => s + d.share, 0);
+      return { inv, details, totalShare };
+    }).filter(x => x.details.length > 0);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [investors, revenueByHouse]);
+  }, [investors, rentByHouse]);
 
-  const totalSettlement = allSettlementRows.reduce((s, r) => s + r.share, 0);
+  const totalSettlement = investorSettlements.reduce((s, r) => s + r.totalShare, 0);
 
-  const toggleStatus = (investId: string) => {
+  const toggleStatus = (invId: string) => {
     setSettlementStatus(prev => {
-      const cur = prev[investId] || '미완료';
-      return { ...prev, [investId]: cur === '완료' ? '미완료' : '완료' };
+      const cur = prev[invId] || '미완료';
+      return { ...prev, [invId]: cur === '완료' ? '미완료' : '완료' };
     });
   };
 
-  const doneCount = allSettlementRows.filter(r => settlementStatus[r.house.investId] === '완료').length;
-  const undoneCount = allSettlementRows.length - doneCount;
+  const doneCount = investorSettlements.filter(r => settlementStatus[r.inv.id] === '완료').length;
+  const undoneCount = investorSettlements.length - doneCount;
 
   const tabLabels = ['투자자', '이달 정산'];
 
@@ -171,19 +173,21 @@ export default function InvestorsPage() {
                     {isOpen && (
                       <div style={{ borderTop: '1px solid #f2f4f6' }}>
                         {inv.houses.map((h, i) => {
-                          const revenue = revenueByHouse.get(normalize(h.houseName)) || 0;
+                          const rentRev = getHouseRentRevenue(h);
+                          const profit = getHouseProfit(h);
                           const share = getHouseShare(h);
+                          const isMinus = share < 0;
                           return (
-                            <div key={h.investId} style={{ padding: '14px 18px', borderTop: i > 0 ? '1px solid #f5f5f5' : 'none' }}>
+                            <div key={h.investId} style={{ padding: '14px 18px', borderTop: i > 0 ? '1px solid #f5f5f5' : 'none', background: isMinus ? '#FEF2F2' : '#fff' }}>
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                   <span style={{ fontSize: 14, fontWeight: 500, color: '#191f28' }}>{h.houseName}</span>
                                   <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#EFF6FF', color: '#1E40AF' }}>{h.investorRatio}%</span>
                                   {h.isJoint && <span style={{ padding: '2px 6px', borderRadius: 6, fontSize: 10, fontWeight: 600, background: '#FEF3C7', color: '#92400E' }}>공동</span>}
                                 </div>
-                                <span style={{ fontSize: 14, fontWeight: 600, color: '#191f28' }}>{fmt(share)}</span>
+                                <span style={{ fontSize: 14, fontWeight: 600, color: isMinus ? RED : BLUE }}>{fmt(share)}</span>
                               </div>
-                              <div style={{ fontSize: 12, color: GRAY, marginBottom: 8 }}>월세합계 {fmt(revenue)} x {h.investorRatio}%</div>
+                              <div style={{ fontSize: 12, color: GRAY, marginBottom: 8 }}>월세 {fmt(rentRev)} - 집월세 {fmt(h.houseRent)} = 순이익 {fmt(profit)} x {h.investorRatio}%</div>
                               <div style={{ height: 6, borderRadius: 3, background: '#f0f0f0', overflow: 'hidden' }}>
                                 <div style={{ width: `${Math.min(h.investorRatio, 100)}%`, height: '100%', background: BLUE, borderRadius: 3 }} />
                               </div>
@@ -228,58 +232,65 @@ export default function InvestorsPage() {
             </div>
           </div>
 
-          {/* Settlement Table */}
-          <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', border: '1px solid #f2f3f5' }}>
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', padding: '8px 16px', background: '#fafafa', borderBottom: '0.5px solid #f0f0f0' }}>
-              <span style={{ flex: 1, fontSize: 11, color: GRAY }}>투자자</span>
-              <span style={{ width: 60, fontSize: 11, color: GRAY }}>지점</span>
-              <span style={{ width: 40, textAlign: 'center', fontSize: 11, color: GRAY }}>비율</span>
-              <span style={{ width: 80, textAlign: 'right', fontSize: 11, color: GRAY }}>정산액</span>
-              <span style={{ width: 50, textAlign: 'center', fontSize: 11, color: GRAY }}>상태</span>
-            </div>
-
-            {allSettlementRows.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px 0', color: GRAY, fontSize: 13 }}>데이터가 없어요</div>
-            ) : (
-              <>
-                {allSettlementRows.map(({ inv, house, share }, i, arr) => {
-                  const status = settlementStatus[house.investId] || '미완료';
-                  const isDone = status === '완료';
-                  return (
-                    <div key={house.investId} style={{ display: 'flex', alignItems: 'center', padding: '11px 16px', borderBottom: i < arr.length - 1 ? '1px solid #f5f5f5' : '1px solid #f0f0f0' }}>
-                      <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: '#191f28', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.name}</span>
-                      <span style={{ width: 60, fontSize: 12, color: GRAY, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{house.houseName}</span>
-                      <span style={{ width: 40, textAlign: 'center', fontSize: 11, color: '#1E40AF', fontWeight: 600 }}>{house.investorRatio}%</span>
-                      <span style={{ width: 80, textAlign: 'right', fontSize: 13, fontWeight: 600, color: BLUE }}>{fmt(share)}</span>
-                      <div style={{ width: 50, textAlign: 'center' }}>
-                        <button onClick={() => toggleStatus(house.investId)}
+          {/* Settlement by Investor */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {investorSettlements.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 0', color: GRAY, fontSize: 13 }}>데이터가 없어요</div>
+            ) : investorSettlements.map(({ inv, details, totalShare }) => {
+              const isOpen = !!expanded['s_' + inv.id];
+              const status = settlementStatus[inv.id] || '미완료';
+              const isDone = status === '완료';
+              return (
+                <div key={inv.id} style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', border: '1px solid #f2f3f5' }}>
+                  <button onClick={() => toggle('s_' + inv.id)}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', padding: '14px 16px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 14, fontWeight: 500, color: '#191f28' }}>{inv.name}</span>
+                        <button onClick={(e) => { e.stopPropagation(); toggleStatus(inv.id); }}
                           style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600, border: 'none', cursor: 'pointer', fontFamily: 'inherit', background: isDone ? '#D1FAE5' : '#FEE2E2', color: isDone ? GREEN : RED }}>
                           {status}
                         </button>
                       </div>
+                      <div style={{ fontSize: 12, color: GRAY, marginTop: 2 }}>{details.length}개 지점</div>
                     </div>
-                  );
-                })}
-
-                {/* Total */}
-                <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', background: '#f8f9fa' }}>
-                  <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: '#191f28' }}>합계</span>
-                  <span style={{ width: 60 }} />
-                  <span style={{ width: 40 }} />
-                  <span style={{ width: 80, textAlign: 'right', fontSize: 14, fontWeight: 700, color: BLUE }}>{fmt(totalSettlement)}</span>
-                  <span style={{ width: 50, textAlign: 'center', fontSize: 10, color: GRAY }}>
-                    {doneCount}/{allSettlementRows.length}
-                  </span>
+                    <span style={{ fontSize: 16, fontWeight: 600, color: totalShare < 0 ? RED : BLUE, marginRight: 8 }}>{fmt(totalShare)}</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0 }}>
+                      <path d="M6 9L12 15L18 9" stroke="#c4c9d1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                  {isOpen && (
+                    <div style={{ borderTop: '1px solid #f2f4f6' }}>
+                      {details.map((d, di) => (
+                        <div key={d.house.investId} style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          padding: '10px 16px', borderTop: di > 0 ? '1px solid #f8f8f8' : 'none',
+                          background: d.share < 0 ? '#FEF2F2' : '#fff',
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 13, color: '#191f28' }}>{d.house.houseName}</span>
+                            <span style={{ fontSize: 10, fontWeight: 600, color: '#1E40AF' }}>{d.house.investorRatio}%</span>
+                          </div>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: d.share < 0 ? RED : BLUE }}>{fmt(d.share)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </>
-            )}
+              );
+            })}
           </div>
 
-          {/* Summary */}
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 12, fontSize: 12, color: GRAY }}>
-            <span>완료 <span style={{ fontWeight: 600, color: GREEN }}>{doneCount}건</span></span>
-            <span>미완료 <span style={{ fontWeight: 600, color: RED }}>{undoneCount}건</span></span>
+          {/* Total + Summary */}
+          <div style={{ background: '#fff', borderRadius: 16, padding: '16px', border: '1px solid #f2f3f5', marginTop: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: '#191f28' }}>합계</span>
+              <span style={{ fontSize: 16, fontWeight: 700, color: BLUE }}>{fmt(totalSettlement)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 16, fontSize: 12, color: GRAY }}>
+              <span>완료 <span style={{ fontWeight: 600, color: GREEN }}>{doneCount}건</span></span>
+              <span>미완료 <span style={{ fontWeight: 600, color: RED }}>{undoneCount}건</span></span>
+            </div>
           </div>
         </div>
       )}

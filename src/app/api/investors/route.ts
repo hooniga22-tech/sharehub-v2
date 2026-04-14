@@ -3,6 +3,9 @@ import { getSheetData, appendRow, updateRow } from '@/lib/sheets'
 
 // 투자자 탭 (7열): [0]투자자ID [1]투자자명 [2]연락처 [3]계좌정보 [4]생년월일 [5]링크토큰 [6]메모
 // 투자지점 탭 (8열): [0]투자ID [1]투자자ID [2]투자자명 [3]지점명 [4]투자자비율 [5]유재훈비율 [6]공동여부 [7]메모
+// 지점 탭: [0]지점ID [1]지점명 [7]집월세
+
+const normalize = (name: string) => name.replace(/하우스$/, '').trim().toLowerCase()
 
 type InvestorHouse = {
   investId: string
@@ -11,6 +14,7 @@ type InvestorHouse = {
   jaehoonRatio: number
   isJoint: boolean
   memo: string
+  houseRent: number
 }
 
 type InvestorResponse = {
@@ -29,10 +33,17 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const token = searchParams.get('token')
 
-    const [investorRows, houseRows] = await Promise.all([
+    const [investorRows, houseRows, houseInfoRows] = await Promise.all([
       getSheetData('투자자'),
       getSheetData('투자지점'),
+      getSheetData('지점'),
     ])
+
+    // 지점별 집월세 맵
+    const houseRentMap = new Map<string, number>()
+    for (const r of houseInfoRows) {
+      houseRentMap.set(normalize(r[1] || ''), Number(r[7]) || 0)
+    }
 
     // Build investor map
     const investorMap = new Map<string, {
@@ -63,6 +74,7 @@ export async function GET(req: Request) {
         jaehoonRatio: Number(r[5]) || 0,
         isJoint: r[6] === 'Y',
         memo: r[7] || '',
+        houseRent: houseRentMap.get(normalize(r[3] || '')) || 0,
       })
     }
 
