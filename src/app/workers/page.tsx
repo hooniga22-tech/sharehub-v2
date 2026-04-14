@@ -34,13 +34,27 @@ export default function WorkersPage() {
   const [copiedStaff, setCopiedStaff] = useState('');
 
   const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
+  const nowYear = now.getFullYear();
+  const nowMonth = now.getMonth() + 1;
+  const [year, setYear] = useState(nowYear);
+  const [month, setMonth] = useState(nowMonth);
   const prefix = `${year}-${String(month).padStart(2, '0')}`;
+  const isFuture = year > nowYear || (year === nowYear && month >= nowMonth);
+
+  const prevMonth = () => {
+    if (month === 1) { setYear(y => y - 1); setMonth(12); }
+    else setMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    if (isFuture) return;
+    if (month === 12) { setYear(y => y + 1); setMonth(1); }
+    else setMonth(m => m + 1);
+  };
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2200); };
 
   useEffect(() => {
+    setLoading(true);
     fetch(`/api/workers?year=${year}&month=${month}`)
       .then(r => r.json())
       .then(d => setSchedules(Array.isArray(d) ? d : []))
@@ -162,9 +176,13 @@ export default function WorkersPage() {
       {/* Tab 0: 이달 일정 D안 */}
       {tab === 0 && (
         <>
-          {/* Month + Summary */}
+          {/* Month Navigation + Summary */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 0', background: '#F7F8FA' }}>
-            <span style={{ fontSize: 15, fontWeight: 700, color: '#191f28' }}>{year}년 {month}월</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+              <button onClick={prevMonth} style={{ background: 'none', border: 'none', fontSize: 16, color: '#888', cursor: 'pointer', padding: '0 8px' }}>◀</button>
+              <span style={{ fontSize: 15, fontWeight: 600, color: '#111' }}>{year}년 {month}월</span>
+              <button onClick={nextMonth} disabled={isFuture} style={{ background: 'none', border: 'none', fontSize: 16, color: isFuture ? '#ddd' : '#888', cursor: isFuture ? 'default' : 'pointer', padding: '0 8px' }}>▶</button>
+            </div>
             <div style={{ display: 'flex', gap: 6 }}>
               <span style={{ padding: '4px 10px', borderRadius: 8, background: '#EEF3FF', fontSize: 12, fontWeight: 600, color: BLUE }}>{totalCount}건</span>
               <span style={{ padding: '4px 10px', borderRadius: 8, background: '#EEF3FF', fontSize: 12, fontWeight: 600, color: BLUE }}>{fmt(totalAmount)}</span>
