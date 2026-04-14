@@ -24,6 +24,9 @@ export default function InvestorPortalPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  const toggle = (id: string) => setExpanded(p => ({ ...p, [id]: !p[id] }));
 
   const now = new Date();
   const nowYear = now.getFullYear();
@@ -158,22 +161,53 @@ export default function InvestorPortalPage() {
             <div style={{ padding: '24px 18px', textAlign: 'center', color: '#ccc', fontSize: 13 }}>등록된 지점이 없어요</div>
           ) : houses.map((h, i) => {
             const isMinus = h.investorShare < 0;
+            const isOpen = !!expanded[h.investId];
             return (
-              <div key={h.investId} style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '14px 18px',
-                borderTop: i === 0 ? '1px solid #f2f4f6' : '1px solid #f8f8f8',
-                background: isMinus ? '#FEF2F2' : '#fff',
-              }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                    <span style={{ fontSize: 14, fontWeight: 500, color: '#191f28' }}>{h.houseName}</span>
-                    <span style={{ padding: '1px 6px', borderRadius: 5, fontSize: 10, fontWeight: 600, background: '#EFF6FF', color: '#1E40AF' }}>{h.investorRatio}%</span>
-                    {h.isJoint && <span style={{ padding: '1px 5px', borderRadius: 5, fontSize: 10, fontWeight: 600, background: '#FEF3C7', color: '#92400E' }}>공동</span>}
+              <div key={h.investId} style={{ borderTop: i === 0 ? '1px solid #f2f4f6' : '1px solid #f8f8f8' }}>
+                <button onClick={() => toggle(h.investId)} style={{
+                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '14px 18px', background: isMinus ? '#FEF2F2' : '#fff',
+                  border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      <span style={{ fontSize: 14, fontWeight: 500, color: '#191f28' }}>{h.houseName}</span>
+                      <span style={{ padding: '1px 6px', borderRadius: 5, fontSize: 10, fontWeight: 600, background: '#EFF6FF', color: '#1E40AF' }}>{h.investorRatio}%</span>
+                      {h.isJoint && <span style={{ padding: '1px 5px', borderRadius: 5, fontSize: 10, fontWeight: 600, background: '#FEF3C7', color: '#92400E' }}>공동</span>}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#888' }}>월세{fmtMan(h.rentRevenue)} - 집월세{fmtMan(h.houseRent)}</div>
                   </div>
-                  <div style={{ fontSize: 12, color: '#888' }}>월세{fmtMan(h.rentRevenue)} - 집월세{fmtMan(h.houseRent)}</div>
-                </div>
-                <div style={{ fontSize: 15, fontWeight: 600, color: isMinus ? RED : BLUE }}>{fmt(h.investorShare)}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 15, fontWeight: 600, color: isMinus ? RED : BLUE }}>{fmt(h.investorShare)}</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0 }}>
+                      <path d="M6 9L12 15L18 9" stroke="#c4c9d1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                </button>
+                {isOpen && (
+                  <div>
+                    <div style={{ padding: '8px 18px 6px', background: '#fafafa', borderTop: '1px solid #f2f4f6' }}>
+                      <span style={{ fontSize: 11, color: '#888' }}>입주자 현황 · {h.tenants.length}명</span>
+                    </div>
+                    {h.tenants.length === 0 ? (
+                      <div style={{ padding: '16px 18px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>입주자가 없어요</div>
+                    ) : h.tenants.map((t, ti) => (
+                      <div key={`${t.roomCode}-${ti}`} style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '10px 18px', borderTop: ti === 0 ? '1px solid #f2f4f6' : '1px solid #f8f8f8',
+                      }}>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 500, color: '#191f28' }}>{t.name}</div>
+                          <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{t.roomCode}{t.roomType ? ' · ' + t.roomType : ''}</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          {t.endDate && <div style={{ fontSize: 11, color: '#888' }}>{t.endDate}</div>}
+                          <div style={{ fontSize: 13, fontWeight: 500, color: '#111' }}>{fmt(t.rent)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
