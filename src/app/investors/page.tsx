@@ -1,220 +1,298 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Pencil, X, Link2 } from 'lucide-react';
 
-const BLUE = '#3182f6', GRAY = '#8b95a1';
+const BLUE = '#3182f6', GRAY = '#8b95a1', GREEN = '#16A34A', RED = '#E24B4A', AMBER = '#D97706';
 const fmt = (n: number) => n.toLocaleString() + '원';
 
 type Inv = { 투자자ID: string; 투자자명: string; 연락처: string; 지점명: string; 배분비율: string; 링크토큰: string; 메모: string };
+type Tenant = Record<string, string>;
 
 export default function InvestorsPage() {
   const router = useRouter();
   const [investors, setInvestors] = useState<Inv[]>([]);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selId, setSelId] = useState<string | null>(null);
-  const [addSheet, setAddSheet] = useState(false);
-  const [editInv, setEditInv] = useState<Inv | null>(null);
+  const [tab, setTab] = useState(0);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [toast, setToast] = useState('');
-  const [formName, setFormName] = useState('');
-  const [formPhone, setFormPhone] = useState('');
+  const [copiedName, setCopiedName] = useState('');
+  const [settlementStatus, setSettlementStatus] = useState<Record<string, string>>({});
+
+  const now = new Date();
+  const nowYear = now.getFullYear();
+  const nowMonth = now.getMonth() + 1;
+  const [year, setYear] = useState(nowYear);
+  const [month, setMonth] = useState(nowMonth);
+  const isFuture = year > nowYear || (year === nowYear && month >= nowMonth);
+
+  const prevMonth = () => {
+    if (month === 1) { setYear(y => y - 1); setMonth(12); }
+    else setMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    if (isFuture) return;
+    if (month === 12) { setYear(y => y + 1); setMonth(1); }
+    else setMonth(m => m + 1);
+  };
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2200); };
 
   useEffect(() => {
-    fetch('/api/investors').then(r => r.json()).then(data => {
-      setInvestors(Array.isArray(data) ? data : []);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+    Promise.all([
+      fetch('/api/investors').then(r => r.json()),
+      fetch('/api/tenants').then(r => r.json()),
+    ]).then(([invData, tenantData]) => {
+      setInvestors(Array.isArray(invData) ? invData : []);
+      setTenants(Array.isArray(tenantData) ? tenantData : []);
+    }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
-  const anySheet = addSheet || editInv;
-  useEffect(() => {
-    document.body.style.overflow = anySheet ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
-  }, [anySheet]);
+  // Group by investor name
+  const grouped = useMemo(() => {
+    const map = new Map<string, Inv[]>();
+    for (const inv of investors) {
+      const name = inv.투자자명;
+      if (!name) continue;
+      if (!map.has(name)) map.set(name, []);
+      map.get(name)!.push(inv);
+    }
+    return [...map.entries()];
+  }, [investors]);
 
-  // Group investors by name
-  const grouped = investors.reduce((map, inv) => {
-    const name = inv.투자자명;
-    if (!map[name]) map[name] = [];
-    map[name].push(inv);
+  // Revenue by house (active tenants only: 입주중/계약중)
+  const revenueByHouse = useMemo(() => {
+    const map = new Map<string, number>();
+    const active = tenants.filter(t => t['상태'] === '입주중' || t['상태'] === '계약중');
+    for (const t of active) {
+      const house = t['지점명'] || '';
+      const rent = (Number(t['월세']) || 0) + (Number(t['관리비']) || 0);
+      map.set(house, (map.get(house) || 0) + rent);
+    }
     return map;
-  }, {} as Record<string, Inv[]>);
+  }, [tenants]);
 
-  const sel = selId ? grouped[selId] : null;
-  const selFirst = sel?.[0];
-
-  const openAdd = () => { setFormName(''); setFormPhone(''); setAddSheet(true); };
-  const openEdit = (inv: Inv) => { setFormName(inv.투자자명); setFormPhone(inv.연락처); setEditInv(inv); };
-
-  const saveAdd = async () => {
-    if (!formName) return;
-    await fetch('/api/investors', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 투자자명: formName, 연락처: formPhone }),
-    });
-    const data = await fetch('/api/investors').then(r => r.json());
-    setInvestors(Array.isArray(data) ? data : []);
-    setAddSheet(false);
-    showToast('투자자가 추가됐어요!');
+  const getShare = (inv: Inv) => {
+    const revenue = revenueByHouse.get(inv.지점명) || 0;
+    const ratio = (Number(inv.배분비율) || 0) / 100;
+    return Math.round(revenue * ratio);
   };
 
-  const saveEdit = async () => {
-    if (!editInv || !formName) return;
-    await fetch('/api/investors', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: editInv.투자자ID, 투자자명: formName, 연락처: formPhone }),
-    });
-    setInvestors(prev => prev.map(i => i.투자자ID === editInv.투자자ID ? { ...i, 투자자명: formName, 연락처: formPhone } : i));
-    setEditInv(null);
-    showToast('수정됐어요!');
+  const getInvestorTotal = (invs: Inv[]) => invs.reduce((s, inv) => s + getShare(inv), 0);
+
+  const toggle = (name: string) => setExpanded(p => ({ ...p, [name]: !p[name] }));
+
+  const copyLink = (inv: Inv) => {
+    if (!inv.링크토큰) return;
+    navigator.clipboard?.writeText(`${window.location.origin}/investor/${inv.링크토큰}`);
+    setCopiedName(inv.투자자명);
+    setTimeout(() => setCopiedName(''), 1500);
   };
+
+  // Settlement tab data
+  const allInvRows = useMemo(() => {
+    const rows: { inv: Inv; share: number }[] = [];
+    for (const inv of investors) {
+      if (!inv.투자자명 || !inv.지점명) continue;
+      rows.push({ inv, share: getShare(inv) });
+    }
+    return rows;
+  }, [investors, revenueByHouse]);
+
+  const totalSettlement = allInvRows.reduce((s, r) => s + r.share, 0);
+
+  const toggleStatus = (id: string) => {
+    setSettlementStatus(prev => {
+      const cur = prev[id] || '미완료';
+      return { ...prev, [id]: cur === '완료' ? '미완료' : '완료' };
+    });
+  };
+
+  const doneSettlement = allInvRows.filter(r => settlementStatus[r.inv.투자자ID] === '완료').length;
+  const undoneSettlement = allInvRows.length - doneSettlement;
+
+  const tabLabels = ['투자자', '이달 정산'];
 
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', background: '#F7F8FA' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', background: '#fff', borderBottom: '1px solid #F0F0F0' }}>
-          <button onClick={() => router.push('/manage')} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', padding: 4, color: '#191919' }}>←</button>
+          <button onClick={() => router.push('/manage')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#191919" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
           <span style={{ fontSize: 16, fontWeight: 700 }}>투자자 관리</span>
         </div>
-        <div style={{ textAlign: 'center', padding: '80px 0', color: GRAY }}><div style={{ fontSize: 13 }}>불러오는 중...</div></div>
+        <div style={{ textAlign: 'center', padding: '80px 0', color: GRAY, fontSize: 13 }}>불러오는 중...</div>
       </div>
     );
   }
 
-  // List view
-  if (!sel) {
-    return (
-      <div style={{ minHeight: '100vh', background: '#F7F8FA' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: '#fff', borderBottom: '1px solid #F0F0F0', position: 'sticky', top: 0, zIndex: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <button onClick={() => router.push('/manage')} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', padding: 4, color: '#191919' }}>←</button>
-            <span style={{ fontSize: 16, fontWeight: 700 }}>투자자 관리</span>
-          </div>
-          <button onClick={openAdd} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 8, border: 'none', background: BLUE, fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#fff' }}>
-            <Plus size={14} /> 추가
-          </button>
-        </div>
-        <div style={{ padding: 16 }}>
-          <div style={{ fontSize: 12, color: GRAY, marginBottom: 12 }}>총 {Object.keys(grouped).length}명</div>
-          {Object.entries(grouped).map(([name, invs]) => (
-            <button key={name} onClick={() => setSelId(name)}
-              style={{ width: '100%', background: '#fff', borderRadius: 14, padding: '16px 20px', marginBottom: 10, border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#191f28', marginBottom: 2 }}>{name}</div>
-              <div style={{ fontSize: 12, color: GRAY, marginBottom: 10 }}>{invs[0].연락처} · {invs.length}개 지점</div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-                {invs.map(inv => (
-                  <span key={inv.투자자ID} style={{ padding: '3px 8px', borderRadius: 5, fontSize: 11, background: '#f2f4f6', color: GRAY }}>
-                    {inv.지점명} {inv.배분비율}%
-                  </span>
-                ))}
-              </div>
-            </button>
-          ))}
-        </div>
-        {addSheet && <Sheet title="투자자 추가" onClose={() => setAddSheet(false)}>
-          <FormFields name={formName} setName={setFormName} phone={formPhone} setPhone={setFormPhone} />
-          <button onClick={saveAdd} disabled={!formName} style={{ width: '100%', padding: 14, borderRadius: 12, border: 'none', background: formName ? BLUE : '#e5e8eb', color: formName ? '#fff' : '#999', fontSize: 14, fontWeight: 700, cursor: formName ? 'pointer' : 'default', fontFamily: 'inherit', marginTop: 8 }}>추가 완료</button>
-        </Sheet>}
-        {toast && <Toast msg={toast} />}
-      </div>
-    );
-  }
-
-  // Detail view
   return (
     <div style={{ minHeight: '100vh', background: '#F7F8FA' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: '#fff', borderBottom: '1px solid #F0F0F0', position: 'sticky', top: 0, zIndex: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={() => setSelId(null)} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', padding: 4, color: '#191919' }}>←</button>
-          <span style={{ fontSize: 16, fontWeight: 700 }}>{selId}</span>
-        </div>
-        <button onClick={() => selFirst && openEdit(selFirst)} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e8eb', background: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#555' }}>
-          <Pencil size={13} /> 수정
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', background: '#fff', borderBottom: '1px solid #F0F0F0', position: 'sticky', top: 0, zIndex: 10 }}>
+        <button onClick={() => router.push('/manage')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#191919" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
         </button>
+        <span style={{ fontSize: 16, fontWeight: 700, marginLeft: 8 }}>투자자 관리</span>
       </div>
-      <div style={{ padding: 16 }}>
-        <div style={{ background: '#fff', borderRadius: 14, overflow: 'hidden', marginBottom: 16 }}>
-          {[
-            { l: '이름', v: selFirst?.투자자명 || '' },
-            { l: '연락처', v: selFirst?.연락처 || '' },
-          ].map((row, i) => (
-            <div key={row.l} style={{ display: 'flex', justifyContent: 'space-between', padding: '13px 18px', borderBottom: i < 1 ? '1px solid #f2f4f6' : 'none' }}>
-              <span style={{ fontSize: 13, color: GRAY }}>{row.l}</span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28' }}>{row.v}</span>
-            </div>
-          ))}
-        </div>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>투자 지점</div>
-        {sel.map(inv => (
-          <div key={inv.투자자ID} style={{ background: '#fff', borderRadius: 14, border: '1px solid #f2f4f6', padding: '16px 18px', marginBottom: 10 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{inv.지점명}</div>
-            <div style={{ fontSize: 12, color: GRAY, marginBottom: 8 }}>배분 비율: {inv.배분비율}%</div>
-            <div style={{ height: 6, borderRadius: 3, display: 'flex', overflow: 'hidden' }}>
-              <div style={{ width: `${Number(inv.배분비율)}%`, background: '#c4b5fd' }} />
-              <div style={{ flex: 1, background: BLUE }} />
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-              <span style={{ fontSize: 11, color: '#7c3aed' }}>투자자 {inv.배분비율}%</span>
-              <span style={{ fontSize: 11, color: BLUE }}>운영자 {100 - Number(inv.배분비율)}%</span>
-            </div>
-          </div>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', background: '#fff', borderBottom: '1px solid #F0F0F0' }}>
+        {tabLabels.map((label, i) => (
+          <button key={i} onClick={() => setTab(i)}
+            style={{ flex: 1, padding: '12px 0', border: 'none', borderBottom: tab === i ? `2px solid ${BLUE}` : '2px solid transparent', background: 'none', fontSize: 13, fontWeight: tab === i ? 700 : 400, color: tab === i ? BLUE : GRAY, cursor: 'pointer', fontFamily: 'inherit' }}>
+            {label}
+          </button>
         ))}
-        {selFirst?.링크토큰 && (
-          <div style={{ background: '#fff', borderRadius: 14, padding: '16px 18px', marginBottom: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}><Link2 size={14} color={BLUE} /><span style={{ fontSize: 14, fontWeight: 700 }}>개인 페이지 링크</span></div>
-            <div style={{ fontSize: 12, color: GRAY, marginBottom: 10 }}>투자자가 직접 확인할 수 있는 전용 링크예요</div>
-            <div style={{ background: '#f8f9fa', borderRadius: 10, padding: '10px 14px', marginBottom: 10, wordBreak: 'break-all', fontSize: 12, color: GRAY }}>
-              {typeof window !== 'undefined' ? window.location.origin : ''}/investor/{selFirst.링크토큰}
+      </div>
+
+      {/* Tab 0: 투자자 C안 */}
+      {tab === 0 && (
+        <div style={{ padding: 16 }}>
+          <div style={{ fontSize: 12, color: GRAY, marginBottom: 12 }}>총 {grouped.length}명</div>
+
+          {grouped.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '60px 0', color: GRAY, fontSize: 13 }}>등록된 투자자가 없어요</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {grouped.map(([name, invs]) => {
+                const isOpen = !!expanded[name];
+                const total = getInvestorTotal(invs);
+                const firstToken = invs.find(i => i.링크토큰)?.링크토큰 || '';
+                return (
+                  <div key={name} style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', border: '1px solid #f2f3f5' }}>
+                    {/* Accordion Header */}
+                    <button onClick={() => toggle(name)}
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', padding: '16px 18px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 15, fontWeight: 500, color: '#191f28' }}>{name}</div>
+                        <div style={{ fontSize: 12, color: GRAY, marginTop: 2 }}>{invs.length}개 지점</div>
+                      </div>
+                      <span style={{ fontSize: 16, fontWeight: 600, color: BLUE, marginRight: 8 }}>{fmt(total)}</span>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform .2s', flexShrink: 0 }}>
+                        <path d="M9 18L15 12L9 6" stroke="#c4c9d1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+
+                    {/* Expanded */}
+                    {isOpen && (
+                      <div style={{ borderTop: '1px solid #f2f4f6' }}>
+                        {invs.map((inv, i) => {
+                          const revenue = revenueByHouse.get(inv.지점명) || 0;
+                          const ratio = Number(inv.배분비율) || 0;
+                          const share = getShare(inv);
+                          return (
+                            <div key={inv.투자자ID} style={{ padding: '14px 18px', borderTop: i > 0 ? '1px solid #f5f5f5' : 'none' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <span style={{ fontSize: 14, fontWeight: 500, color: '#191f28' }}>{inv.지점명}</span>
+                                  <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#EFF6FF', color: '#1E40AF' }}>{ratio}%</span>
+                                </div>
+                                <span style={{ fontSize: 14, fontWeight: 600, color: '#191f28' }}>{fmt(share)}</span>
+                              </div>
+                              <div style={{ fontSize: 12, color: GRAY, marginBottom: 8 }}>월세합계 {fmt(revenue)} x {ratio}%</div>
+                              <div style={{ height: 6, borderRadius: 3, background: '#f0f0f0', overflow: 'hidden' }}>
+                                <div style={{ width: `${Math.min(ratio, 100)}%`, height: '100%', background: BLUE, borderRadius: 3 }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {/* Actions */}
+                        <div style={{ padding: '12px 18px', borderTop: '1px solid #f2f4f6', display: 'flex', gap: 8 }}>
+                          {firstToken && (
+                            <>
+                              <button onClick={() => window.open(`/investor/${firstToken}`, '_blank')}
+                                style={{ flex: 1, padding: '8px 0', borderRadius: 8, border: 'none', background: BLUE, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                                개인 페이지
+                              </button>
+                              <button onClick={() => copyLink(invs.find(i => i.링크토큰)!)}
+                                style={{ flex: 1, padding: '8px 0', borderRadius: 8, border: '1px solid #e5e8eb', background: '#fff', color: '#888', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+                                {copiedName === name ? '복사됨' : '링크 복사'}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-            <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/investor/${selFirst!.링크토큰}`); showToast('링크가 복사됐어요!'); }}
-              style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', background: BLUE, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>링크 복사</button>
+          )}
+        </div>
+      )}
+
+      {/* Tab 1: 이달 정산 D안 */}
+      {tab === 1 && (
+        <div style={{ padding: 16 }}>
+          {/* Month Navigation */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <button onClick={prevMonth} style={{ background: 'none', border: 'none', fontSize: 16, color: '#888', cursor: 'pointer', padding: '0 8px' }}>◀</button>
+              <span style={{ fontSize: 15, fontWeight: 600, color: '#111' }}>{year}년 {month}월</span>
+              <button onClick={nextMonth} disabled={isFuture} style={{ background: 'none', border: 'none', fontSize: 16, color: isFuture ? '#ddd' : '#888', cursor: isFuture ? 'default' : 'pointer', padding: '0 8px' }}>▶</button>
+            </div>
           </div>
-        )}
-      </div>
-      {editInv && <Sheet title="투자자 수정" onClose={() => setEditInv(null)}>
-        <FormFields name={formName} setName={setFormName} phone={formPhone} setPhone={setFormPhone} />
-        <button onClick={saveEdit} disabled={!formName} style={{ width: '100%', padding: 14, borderRadius: 12, border: 'none', background: formName ? BLUE : '#e5e8eb', color: formName ? '#fff' : '#999', fontSize: 14, fontWeight: 700, cursor: formName ? 'pointer' : 'default', fontFamily: 'inherit', marginTop: 8 }}>수정 완료</button>
-      </Sheet>}
-      {toast && <Toast msg={toast} />}
+
+          {/* Settlement Table */}
+          <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', border: '1px solid #f2f3f5' }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', padding: '8px 16px', background: '#fafafa', borderBottom: '0.5px solid #f0f0f0' }}>
+              <span style={{ flex: 1, fontSize: 11, color: GRAY }}>투자자</span>
+              <span style={{ width: 70, fontSize: 11, color: GRAY }}>지점</span>
+              <span style={{ width: 80, textAlign: 'right', fontSize: 11, color: GRAY }}>정산액</span>
+              <span style={{ width: 50, textAlign: 'center', fontSize: 11, color: GRAY }}>상태</span>
+            </div>
+
+            {allInvRows.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: GRAY, fontSize: 13 }}>데이터가 없어요</div>
+            ) : (
+              <>
+                {allInvRows.map(({ inv, share }, i, arr) => {
+                  const status = settlementStatus[inv.투자자ID] || '미완료';
+                  const isDone = status === '완료';
+                  return (
+                    <div key={inv.투자자ID} style={{ display: 'flex', alignItems: 'center', padding: '11px 16px', borderBottom: i < arr.length - 1 ? '1px solid #f5f5f5' : '1px solid #f0f0f0' }}>
+                      <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: '#191f28' }}>{inv.투자자명}</span>
+                      <span style={{ width: 70, fontSize: 12, color: GRAY, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.지점명}</span>
+                      <span style={{ width: 80, textAlign: 'right', fontSize: 13, fontWeight: 600, color: BLUE }}>{fmt(share)}</span>
+                      <div style={{ width: 50, textAlign: 'center' }}>
+                        <button onClick={() => toggleStatus(inv.투자자ID)}
+                          style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600, border: 'none', cursor: 'pointer', fontFamily: 'inherit', background: isDone ? '#D1FAE5' : '#FEE2E2', color: isDone ? GREEN : RED }}>
+                          {status}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Total */}
+                <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', background: '#f8f9fa' }}>
+                  <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: '#191f28' }}>합계</span>
+                  <span style={{ width: 70 }} />
+                  <span style={{ width: 80, textAlign: 'right', fontSize: 14, fontWeight: 700, color: BLUE }}>{fmt(totalSettlement)}</span>
+                  <span style={{ width: 50, textAlign: 'center', fontSize: 10, color: GRAY }}>
+                    {doneSettlement}/{allInvRows.length}
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Summary */}
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 12, fontSize: 12, color: GRAY }}>
+            <span>완료 <span style={{ fontWeight: 600, color: GREEN }}>{doneSettlement}건</span></span>
+            <span>미완료 <span style={{ fontWeight: 600, color: RED }}>{undoneSettlement}건</span></span>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: '#191f28', color: '#fff', padding: '10px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600, zIndex: 999, whiteSpace: 'nowrap' }}>{toast}</div>
+      )}
     </div>
   );
-}
-
-function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.45)' }} />
-      <div style={{ position: 'relative', width: '100%', maxWidth: 430, background: '#fff', borderRadius: '20px 20px 0 0', padding: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}><div style={{ width: 36, height: 4, borderRadius: 2, background: '#e5e8eb' }} /></div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <span style={{ fontSize: 16, fontWeight: 700 }}>{title}</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="#999" /></button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function FormFields({ name, setName, phone, setPhone }: { name: string; setName: (v: string) => void; phone: string; setPhone: (v: string) => void }) {
-  return (
-    <>
-      {[{ label: '이름', val: name, set: setName, ph: '이름 입력', type: 'text' }, { label: '연락처', val: phone, set: setPhone, ph: '010-0000-0000', type: 'tel' }].map(f => (
-        <div key={f.label} style={{ marginBottom: 14 }}>
-          <label style={{ fontSize: 13, fontWeight: 600, color: '#333', display: 'block', marginBottom: 6 }}>{f.label}</label>
-          <input value={f.val} onChange={e => f.set(e.target.value)} type={f.type} placeholder={f.ph}
-            style={{ width: '100%', padding: '12px 14px', border: '1px solid #E8E8E8', borderRadius: 10, fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box', outline: 'none' }} />
-        </div>
-      ))}
-    </>
-  );
-}
-
-function Toast({ msg }: { msg: string }) {
-  return <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: '#191f28', color: '#fff', padding: '10px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600, zIndex: 999, whiteSpace: 'nowrap' }}>{msg}</div>;
 }

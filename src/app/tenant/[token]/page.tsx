@@ -79,6 +79,10 @@ export default function TenantPortalPage() {
     const list = Array.isArray(rawPayments) ? rawPayments : [];
     return [...list].sort((a: any, b: any) => (b.연월 || '').localeCompare(a.연월 || '')).slice(0, 6);
   }, [rawPayments]);
+  const { data: dutyData } = useSWR(
+    tenant?.['지점명'] ? `/api/tenant-duty?house=${encodeURIComponent(tenant['지점명'])}&roomCode=${encodeURIComponent(tenant['방코드'] || '')}` : null, fetcher,
+    { refreshInterval: 0, revalidateOnFocus: true }
+  );
   const loading = tenantLoading;
 
   const [lang, setLang] = useState<'ko' | 'en'>('ko');
@@ -120,22 +124,11 @@ export default function TenantPortalPage() {
     showToast(t('접수됐어요!', 'Submitted!'));
   };
 
-  // Schedule generation
-  const generateSchedule = () => {
-    const today = new Date();
-    const myRoom = tenant?.['방코드'] || '';
-    const rooms = ['A-1', 'A-2', 'B-1', 'B-2', 'C-1', 'C-2'];
-    const schedule: { weekStart: Date; room: string; isMine: boolean; isPast: boolean }[] = [];
-    for (let w = -4; w <= 4; w++) {
-      const monday = new Date(today);
-      monday.setDate(today.getDate() - today.getDay() + 1 + w * 7);
-      const room = rooms[((w + 8) % rooms.length)];
-      schedule.push({ weekStart: new Date(monday), room, isMine: room === myRoom, isPast: monday < today });
-    }
-    return schedule;
+  const fmtWeek = (dateStr: string) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return `${d.getMonth() + 1}/${d.getDate()}`;
   };
-
-  const fmtWeek = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
 
   if (loading) return <div style={{ minHeight: '100vh', background: '#F7F8FA', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><p style={{ color: GRAY, fontSize: 13 }}>{t('불러오는 중...', 'Loading...')}</p></div>;
 
@@ -153,7 +146,11 @@ export default function TenantPortalPage() {
   const rent = Number(tenant['월세']) || 0;
   const mgmt = Number(tenant['관리비']) || 0;
   const dday = Math.max(0, Math.ceil((new Date(tenant['퇴실일'] || '').getTime() - Date.now()) / 86400000));
-  const schedule = generateSchedule();
+  const duties = dutyData?.duties || [];
+  const myRoomCode = dutyData?.myRoomCode || room;
+  const today = new Date().toISOString().split('T')[0];
+  const todayMonday = (() => { const d = new Date(); const dow = d.getDay(); d.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1)); return d.toISOString().split('T')[0]; })();
+  const nextMyDuty = duties.find((d: any) => d.방코드 === myRoomCode && d.주차시작일 >= todayMonday && d.완료여부 !== '스킵');
 
   // Notices (static for now)
   const notices = [
@@ -448,8 +445,8 @@ export default function TenantPortalPage() {
             <div>
               <div style={{ fontSize: 14, fontWeight: 700, color: '#191f28' }}>{t('청소 당번 안내', 'Cleaning Duty')}</div>
               <div style={{ fontSize: 11, color: GRAY, marginTop: 2 }}>
-                {schedule.find(s => s.isMine && !s.isPast)
-                  ? t(`다음 내 당번: ${fmtWeek(schedule.find(s => s.isMine && !s.isPast)!.weekStart)}주`, `My next duty: ${fmtWeek(schedule.find(s => s.isMine && !s.isPast)!.weekStart)}`)
+                {nextMyDuty
+                  ? t(`다음 내 당번: ${fmtWeek(nextMyDuty.주차시작일)}주`, `My next duty: ${fmtWeek(nextMyDuty.주차시작일)}`)
                   : t('당번 일정 없음', 'No upcoming duty')}
               </div>
             </div>
@@ -470,24 +467,34 @@ export default function TenantPortalPage() {
               </div>
               <div style={{ borderTop: '1px solid #f2f4f6', paddingTop: 12 }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: GRAY, marginBottom: 8 }}>{t('당번 일정', 'Schedule')}</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  {schedule.map((s, i) => {
-                    const isThisWeek = i === 4;
-                    return (
-                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderRadius: 8, background: s.isMine ? '#ebf3ff' : isThisWeek ? '#f8f9fa' : 'transparent', border: s.isMine ? `1.5px solid ${BLUE}` : '1.5px solid transparent' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ fontSize: 12, color: s.isPast ? GRAY : '#191f28', fontWeight: isThisWeek || s.isMine ? 600 : 400 }}>{fmtWeek(s.weekStart)}{t('주', '')}</span>
-                          {isThisWeek && <span style={{ fontSize: 10, color: BLUE, fontWeight: 600 }}>{t('이번주', 'This week')}</span>}
-                          {s.isPast && <span style={{ fontSize: 10, color: GRAY }}>{t('완료', 'Done')}</span>}
+                {duties.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '16px 0', color: GRAY, fontSize: 12 }}>{t('등록된 당번 일정이 없어요', 'No duty schedule available')}</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    {duties.map((d: any) => {
+                      const isMine = d.방코드 === myRoomCode && d.당번유형 === '당번';
+                      const isThisWeek = d.주차시작일 === todayMonday;
+                      const isPast = d.주차시작일 < todayMonday;
+                      const isSkip = d.완료여부 === '스킵' || d.당번유형 === '청소주';
+                      const isDone = d.완료여부 === '완료';
+                      const displayName = isSkip ? t('정기청소', 'Cleaning Service') : (d.입주자명 || d.방코드 || '-');
+                      return (
+                        <div key={d.당번ID} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderRadius: 8, background: isMine ? '#ebf3ff' : isThisWeek ? '#f8f9fa' : 'transparent', border: isMine ? `1.5px solid ${BLUE}` : '1.5px solid transparent' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 12, color: isPast ? GRAY : '#191f28', fontWeight: isThisWeek || isMine ? 600 : 400 }}>{fmtWeek(d.주차시작일)}{t('주', '')}</span>
+                            {isThisWeek && <span style={{ fontSize: 10, color: BLUE, fontWeight: 600 }}>{t('이번주', 'This week')}</span>}
+                            {isPast && !isSkip && <span style={{ fontSize: 10, color: isDone ? GREEN : GRAY }}>{isDone ? t('완료', 'Done') : t('미완료', 'Incomplete')}</span>}
+                            {isSkip && <span style={{ fontSize: 10, color: GRAY }}>{t('스킵', 'Skip')}</span>}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 12, color: isSkip ? GRAY : isMine ? BLUE : isPast ? GRAY : '#191f28', fontWeight: isMine ? 700 : 400 }}>{displayName}</span>
+                            {isMine && <span style={{ fontSize: 10, background: BLUE, color: '#fff', padding: '1px 7px', borderRadius: 4, fontWeight: 700 }}>{t('내 당번', 'My Turn')}</span>}
+                          </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ fontSize: 12, color: s.isMine ? BLUE : s.isPast ? GRAY : '#191f28', fontWeight: s.isMine ? 700 : 400 }}>{s.room}</span>
-                          {s.isMine && <span style={{ fontSize: 10, background: BLUE, color: '#fff', padding: '1px 7px', borderRadius: 4, fontWeight: 700 }}>{t('내 당번', 'My Turn')}</span>}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           )}
