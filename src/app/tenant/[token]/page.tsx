@@ -11,6 +11,21 @@ const fmt = (n: number) => n.toLocaleString() + '원';
 
 const SUPPLIES = ['화장지', '주방세제', '세탁세제', '수세미', '고무장갑', '기타'];
 
+const parsePassword = (raw: string) => {
+  if (!raw || raw === '-') return { entry: '-', house: '-' }
+  const parts = raw.split(' / ')
+  const entryPart = parts.find(p =>
+    p.includes('키박스') || p.includes('공용') || p.includes('현관')
+  )
+  const houseParts = parts.filter(p =>
+    !p.includes('키박스') && !p.includes('공용') && !p.includes('현관')
+  )
+  return {
+    entry: entryPart || raw,
+    house: houseParts.length > 0 ? houseParts.join(' / ') : '-'
+  }
+};
+
 const Toast = ({ msg }: { msg: string }) => (
   <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: '#191f28', color: '#fff', padding: '10px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600, zIndex: 999, whiteSpace: 'nowrap' }}>{msg}</div>
 );
@@ -287,25 +302,31 @@ export default function TenantPortalPage() {
         </Card>
 
         {/* House Info */}
-        {house && (
+        {house && (() => {
+          const { entry: entryPw, house: housePw } = parsePassword(house['현관비번'] || '');
+          const wifiSsid = house['와이파이SSID'] || '';
+          const wifiPw = house['와이파이PW'] || '';
+          const wifiDisplay = wifiSsid && wifiPw ? `${wifiSsid} / PW: ${wifiPw}` : wifiSsid || wifiPw || '-';
+          return (
           <Card>
             <CardTitle title={t('하우스 정보', 'House Info')} />
             {[
-              { l: t('주소', 'Address'), v: house['주소'], cp: false },
-              { l: t('공용현관 비번', 'Door Code'), v: house['현관비번'], cp: true },
-              { l: t('와이파이', 'WiFi'), v: house['와이파이SSID'], cp: false },
-              { l: t('비밀번호', 'Password'), v: house['와이파이PW'], cp: true },
+              { l: t('주소', 'Address'), v: house['주소'], cp: false, cpVal: '' },
+              { l: t('공용현관 비번', 'Door Code'), v: entryPw, cp: true, cpVal: entryPw },
+              { l: t('집 비번', 'House Code'), v: housePw, cp: true, cpVal: housePw },
+              { l: t('와이파이', 'WiFi'), v: wifiDisplay, cp: !!wifiPw, cpVal: wifiPw },
             ].map((row, i, arr) => (
               <div key={row.l} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 18px', borderBottom: i < arr.length - 1 ? '1px solid #f2f4f6' : 'none' }}>
                 <span style={{ fontSize: 13, color: GRAY, flexShrink: 0 }}>{row.l}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28', textAlign: 'right' }}>{row.v || '-'}</span>
-                  {row.cp && row.v && <button onClick={() => copyText(row.v)} style={{ border: 'none', background: '#f2f4f6', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><CopyIcon /></button>}
+                  {row.cp && row.cpVal && row.cpVal !== '-' && <button onClick={() => copyText(row.cpVal)} style={{ border: 'none', background: '#f2f4f6', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><CopyIcon /></button>}
                 </div>
               </div>
             ))}
           </Card>
-        )}
+          );
+        })()}
 
         {/* Payment History */}
         {(() => {
