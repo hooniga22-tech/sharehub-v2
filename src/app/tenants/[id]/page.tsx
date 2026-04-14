@@ -331,13 +331,21 @@ export default function TenantDetailPage() {
                       </div>
                     )}
 
-                    {/* 계약금 */}
-                    <div style={{ display: 'flex', alignItems: 'center', padding: '13px 0', gap: 8 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28', minWidth: 80, flexShrink: 0 }}>계약금</span>
-                      <span style={{ flex: 1 }} />
-                      <span style={{ fontSize: 12, fontWeight: 600, color: '#191f28', flexShrink: 0, marginRight: 8 }}>500,000원</span>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: GREEN, flexShrink: 0 }}>완료</span>
-                    </div>
+                    {/* 계약금 — 수납 탭에 연월='계약금' 행이 있을 때만 표시 */}
+                    {(() => {
+                      const depositPay = payments.find(p => p.연월 === '계약금');
+                      if (!depositPay) return null;
+                      const dpAmt = Number(depositPay.납부액) || Number(depositPay.청구액) || 0;
+                      const dpPaid = depositPay.상태 === '납부완료';
+                      return (
+                        <div style={{ display: 'flex', alignItems: 'center', padding: '13px 0', gap: 8 }}>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28', minWidth: 80, flexShrink: 0 }}>계약금</span>
+                          <span style={{ flex: 1 }} />
+                          <span style={{ fontSize: 12, fontWeight: 600, color: '#191f28', flexShrink: 0, marginRight: 8 }}>{fmt(dpAmt)}</span>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: dpPaid ? GREEN : RED, flexShrink: 0 }}>{dpPaid ? '완료' : '미납'}</span>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </>

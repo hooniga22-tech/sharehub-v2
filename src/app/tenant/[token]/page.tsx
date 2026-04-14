@@ -146,10 +146,32 @@ export default function TenantPortalPage() {
   const rent = Number(tenant['월세']) || 0;
   const mgmt = Number(tenant['관리비']) || 0;
   const dday = Math.max(0, Math.ceil((new Date(tenant['퇴실일'] || '').getTime() - Date.now()) / 86400000));
-  const duties = dutyData?.duties || [];
+  const rawDuties = dutyData?.duties || [];
   const myRoomCode = dutyData?.myRoomCode || room;
   const today = new Date().toISOString().split('T')[0];
   const todayMonday = (() => { const d = new Date(); const dow = d.getDay(); d.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1)); return d.toISOString().split('T')[0]; })();
+
+  // 같은 주(월요일 기준) 중복 당번 제거 — 최신 주차시작일만 유지
+  const duties = (() => {
+    const getMonday = (dateStr: string) => {
+      const d = new Date(dateStr);
+      const day = d.getDay();
+      const diff = day === 0 ? -6 : 1 - day;
+      d.setDate(d.getDate() + diff);
+      return d.toISOString().split('T')[0];
+    };
+    const seen = new Map<string, any>();
+    for (const d of rawDuties) {
+      const mon = getMonday(d.주차시작일 || '');
+      const key = `${mon}_${d.방코드}_${d.당번유형}`;
+      const existing = seen.get(key);
+      if (!existing || (d.주차시작일 || '') > (existing.주차시작일 || '')) {
+        seen.set(key, d);
+      }
+    }
+    return [...seen.values()].sort((a: any, b: any) => (a.주차시작일 || '').localeCompare(b.주차시작일 || ''));
+  })();
+
   const nextMyDuty = duties.find((d: any) => d.방코드 === myRoomCode && d.주차시작일 >= todayMonday && d.완료여부 !== '스킵');
 
   // Notices (static for now)
@@ -427,12 +449,21 @@ export default function TenantPortalPage() {
                     <span style={{ fontSize: 12, fontWeight: 600, color: GREEN, flexShrink: 0 }}>{t('완료', 'Paid')}</span>
                   </div>
 
-                  {/* 계약금 */}
-                  <div style={{ display: 'flex', alignItems: 'center', padding: '12px 18px', borderTop: '1px solid #f2f4f6', gap: 8 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28', minWidth: 76, flexShrink: 0 }}>{t('계약금', 'Deposit')}</span>
-                    <span style={{ fontSize: 12, color: '#4e5968', flex: 1 }}>{fmt(depositAmt)}</span>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: GREEN, flexShrink: 0 }}>{t('완료', 'Paid')}</span>
-                  </div>
+                  {/* 계약금 — 수납 탭에 연월='계약금' 행이 있을 때만 표시 */}
+                  {(() => {
+                    const allPay = Array.isArray(rawPayments) ? rawPayments : [];
+                    const depositPay = allPay.find((p: any) => p.연월 === '계약금');
+                    if (!depositPay) return null;
+                    const dpAmt = Number(depositPay.납부액) || Number(depositPay.청구액) || 0;
+                    const dpPaid = depositPay.상태 === '납부완료';
+                    return (
+                      <div style={{ display: 'flex', alignItems: 'center', padding: '12px 18px', borderTop: '1px solid #f2f4f6', gap: 8 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28', minWidth: 76, flexShrink: 0 }}>{t('계약금', 'Deposit')}</span>
+                        <span style={{ fontSize: 12, color: '#4e5968', flex: 1 }}>{fmt(dpAmt)}</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: dpPaid ? GREEN : RED, flexShrink: 0 }}>{dpPaid ? t('완료', 'Paid') : t('미납', 'Unpaid')}</span>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </Card>
