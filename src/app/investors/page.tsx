@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 
 const BLUE = '#3182f6', GRAY = '#8b95a1', GREEN = '#16A34A', RED = '#E24B4A';
 const fmt = (n: number) => n.toLocaleString() + '원';
+const normalize = (name: string) => name.replace(/하우스$/, '').trim().toLowerCase();
 
 type House = { investId: string; houseName: string; investorRatio: number; jaehoonRatio: number; isJoint: boolean; memo: string };
 type Investor = { id: string; name: string; phone: string; account: string; token: string; houses: House[] };
@@ -53,7 +54,7 @@ export default function InvestorsPage() {
     const map = new Map<string, number>();
     const active = tenants.filter(t => t['상태'] === '입주중' || t['상태'] === '계약중');
     for (const t of active) {
-      const house = t['지점명'] || '';
+      const house = normalize(t['지점명'] || '');
       const rent = (Number(t['월세']) || 0) + (Number(t['관리비']) || 0);
       map.set(house, (map.get(house) || 0) + rent);
     }
@@ -61,7 +62,7 @@ export default function InvestorsPage() {
   }, [tenants]);
 
   const getHouseShare = (h: House) => {
-    const revenue = revenueByHouse.get(h.houseName) || 0;
+    const revenue = revenueByHouse.get(normalize(h.houseName)) || 0;
     return Math.round(revenue * (h.investorRatio / 100));
   };
 
@@ -170,7 +171,7 @@ export default function InvestorsPage() {
                     {isOpen && (
                       <div style={{ borderTop: '1px solid #f2f4f6' }}>
                         {inv.houses.map((h, i) => {
-                          const revenue = revenueByHouse.get(h.houseName) || 0;
+                          const revenue = revenueByHouse.get(normalize(h.houseName)) || 0;
                           const share = getHouseShare(h);
                           return (
                             <div key={h.investId} style={{ padding: '14px 18px', borderTop: i > 0 ? '1px solid #f5f5f5' : 'none' }}>

@@ -5,6 +5,8 @@ import { getSheetData } from '@/lib/sheets'
 // 투자지점 탭: [0]투자ID [1]투자자ID [2]투자자명 [3]지점명 [4]투자자비율 [5]유재훈비율 [6]공동여부 [7]메모
 // 입주자 탭: [0]입주자ID [1]구 [2]지점명 ... [8]상태 [10]월세 [11]관리비
 
+const normalize = (name: string) => name.replace(/하우스$/, '').trim().toLowerCase()
+
 export async function GET(req: Request, { params }: { params: Promise<{ token: string }> }) {
   try {
     const { token } = await params
@@ -40,18 +42,18 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
         isJoint: r[6] === 'Y',
       }))
 
-    // 활성 입주자 (입주중/계약중)의 월세+관리비 by 지점
+    // 활성 입주자 (입주중/계약중)의 월세+관리비 by 정규화된 지점명
     const activeTenants = tenantRows.filter(r => r[8] === '입주중' || r[8] === '계약중')
     const revenueByHouse = new Map<string, number>()
     for (const t of activeTenants) {
-      const house = t[2] || ''
+      const house = normalize(t[2] || '')
       const rent = (Number(t[10]) || 0) + (Number(t[11]) || 0)
       revenueByHouse.set(house, (revenueByHouse.get(house) || 0) + rent)
     }
 
     // 지점별 정산 계산
     const houses = myHouses.map(h => {
-      const revenue = revenueByHouse.get(h.houseName) || 0
+      const revenue = revenueByHouse.get(normalize(h.houseName)) || 0
       const share = Math.round(revenue * (h.investorRatio / 100))
       return { ...h, revenue, share }
     })
