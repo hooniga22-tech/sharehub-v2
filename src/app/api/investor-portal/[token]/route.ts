@@ -4,6 +4,7 @@ import { getSheetData } from '@/lib/sheets'
 // 투자자 탭: [0]투자자ID [1]투자자명 [2]연락처 [3]계좌정보 [4]생년월일 [5]링크토큰 [6]메모
 // 투자지점 탭: [0]투자ID [1]투자자ID [2]투자자명 [3]지점명 [4]투자자비율 [5]유재훈비율 [6]공동여부 [7]메모
 // 입주자 탭: [0]ID [1]구 [2]지점명 [3]방코드 [4]방타입 [5]이름 [6]입주일 [7]퇴실일 [8]상태 [9]보증금 [10]월세 [11]관리비
+// 지점 탭: [0]지점ID [1]지점명 [2]구 [3]주소 [4]현관비번 [5]와이파이SSID [6]와이파이PW [7]집월세 ...
 
 const normalize = (name: string) => name.replace(/하우스$/, '').trim().toLowerCase()
 
@@ -14,10 +15,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
     const year = Number(searchParams.get('year')) || new Date().getFullYear()
     const month = Number(searchParams.get('month')) || new Date().getMonth() + 1
 
-    const [investorRows, houseRows, tenantRows] = await Promise.all([
+    const [investorRows, houseRows, tenantRows, houseInfoRows] = await Promise.all([
       getSheetData('투자자'),
       getSheetData('투자지점'),
       getSheetData('입주자'),
+      getSheetData('지점'),
     ])
 
     const investorRow = investorRows.find(r => r[5] === token)
@@ -40,6 +42,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
         isJoint: r[6] === 'Y',
       }))
 
+    // 지점별 집월세 맵 (지점 탭 [1]지점명 [7]집월세)
+    const houseRentMap = new Map<string, number>()
+    for (const r of houseInfoRows) {
+      const key = normalize(r[1] || '')
+      houseRentMap.set(key, Number(r[7]) || 0)
+    }
+
     // 활성 입주자 by 정규화된 지점명
     const activeTenants = tenantRows.filter(r => r[8] === '입주중' || r[8] === '계약중')
     const tenantsByHouse = new Map<string, typeof activeTenants>()
@@ -53,7 +62,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
       const key = normalize(h.houseName)
       const houseTenants = tenantsByHouse.get(key) || []
       const revenue = houseTenants.reduce((s, t) => s + (Number(t[10]) || 0) + (Number(t[11]) || 0), 0)
-      const houseRent = 0 // 추후 입력 예정
+      const houseRent = houseRentMap.get(key) || 0
       const profit = revenue - houseRent
       const investorShare = Math.round(profit * (h.investorRatio / 100))
       const jaehoonShare = Math.round(profit * (h.jaehoonRatio / 100))
