@@ -37,6 +37,7 @@ export default function PaymentsPage() {
   const [generating, setGenerating] = useState(false);
   const [genResult, setGenResult] = useState<{ created: number; target: number } | null>(null);
   const [activeTenantCount, setActiveTenantCount] = useState(0);
+  const [genMonthCount, setGenMonthCount] = useState(0);
 
   const prevMonth = () => {
     if (month === 1) { setYear(y => y - 1); setMonth(12); }
@@ -155,6 +156,15 @@ export default function PaymentsPage() {
 
   const genMonth = isFuture ? month : (month === 12 ? 1 : month + 1);
   const genYear = month === 12 && !isFuture ? year + 1 : year;
+
+  // 청구생성 대상 월 데이터 존재 확인
+  useEffect(() => {
+    setGenMonthCount(0);
+    fetch(`/api/payments?year=${genYear}&month=${String(genMonth).padStart(2, '0')}`)
+      .then(r => r.json())
+      .then(d => { setGenMonthCount((d.items || []).length); })
+      .catch(() => {});
+  }, [genYear, genMonth]);
 
   const statusBadge = (status: string) => {
     if (status === '납부완료') return { bg: '#D1FAE5', color: GREEN, label: '완납' };
@@ -302,7 +312,7 @@ export default function PaymentsPage() {
                         <div style={{ fontSize: 11, color: '#888' }}>{p.지점명} · {p.방코드}</div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28' }}>{fmt(Number(p.청구액) || 0)}</span>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#191f28' }}>{fmt(p.상태 === '납부완료' ? (Number(p.납부액) || 0) : (Number(p.청구액) || 0))}</span>
                         <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: badge.bg, color: badge.color }}>{badge.label}</span>
                       </div>
                     </div>
@@ -331,9 +341,15 @@ export default function PaymentsPage() {
                   <span style={{ fontSize: 13, color: '#888' }}>입주자 월세 + 관리비</span>
                 </div>
 
-                <button onClick={generate} disabled={generating}
-                  style={{ width: '100%', padding: '14px 0', borderRadius: 10, border: 'none', background: BLUE, color: '#fff', fontSize: 14, fontWeight: 600, cursor: generating ? 'default' : 'pointer', fontFamily: 'inherit', opacity: generating ? 0.5 : 1 }}>
-                  {generating ? '생성 중...' : `${genMonth}월 청구 ${activeTenantCount}건 생성`}
+                {genMonthCount > 0 && (
+                  <div style={{ fontSize: 13, color: '#666', textAlign: 'center', marginBottom: 12 }}>
+                    현재 {genMonthCount}건의 청구가 생성되어 있습니다.
+                  </div>
+                )}
+
+                <button onClick={generate} disabled={generating || genMonthCount > 0}
+                  style={{ width: '100%', padding: '14px 0', borderRadius: 10, border: 'none', background: BLUE, color: '#fff', fontSize: 14, fontWeight: 600, cursor: generating || genMonthCount > 0 ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: generating || genMonthCount > 0 ? 0.4 : 1 }}>
+                  {generating ? '생성 중...' : genMonthCount > 0 ? `${genMonth}월 청구가 이미 생성되어 있습니다` : `${genMonth}월 청구 ${activeTenantCount}건 생성`}
                 </button>
 
                 {genResult && (
