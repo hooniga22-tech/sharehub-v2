@@ -5,7 +5,6 @@ import useSWR from 'swr';
 import { fetcher } from '@/lib/fetcher';
 import { Search, ChevronDown, ChevronUp, X } from 'lucide-react';
 import Link from 'next/link';
-import Avatar from '@/components/ui/Avatar';
 
 type Tenant = {
   입주자ID: string; 구: string; 지점명: string; 방코드: string; 방타입: string;
@@ -119,7 +118,7 @@ export default function TenantsPage() {
           <div style={{ display: 'flex' }}>
             {tabs.map(tab => (
               <button key={tab.key}
-                style={{ flex: 1, paddingBottom: 10, textAlign: 'center', fontSize: 13, fontWeight: filter === tab.key ? 700 : 400, color: filter === tab.key ? '#191919' : '#888888', borderBottom: filter === tab.key ? '2.5px solid #3182F6' : '2.5px solid transparent', background: 'none', border: 'none', borderBottomStyle: 'solid', cursor: 'pointer', fontFamily: 'inherit' }}
+                style={{ flex: 1, paddingBottom: 10, textAlign: 'center', fontSize: 13, fontWeight: filter === tab.key ? 700 : 400, color: filter === tab.key ? '#191919' : '#888888', background: 'none', borderWidth: 0, borderBottomWidth: 2.5, borderBottomStyle: 'solid', borderBottomColor: filter === tab.key ? '#3182F6' : 'transparent', cursor: 'pointer', fontFamily: 'inherit' }}
                 onClick={() => setFilter(tab.key)}>
                 {tab.label}
                 <span style={{ marginLeft: 4, color: filter === tab.key ? '#3182F6' : '#BBBBBB', fontSize: 12 }}>{tab.count}</span>
@@ -135,17 +134,25 @@ export default function TenantsPage() {
           {searchResults.length > 0 ? (
             <>
               <p style={{ fontSize: 13, fontWeight: 700, color: '#888888', marginBottom: 8 }}>검색 결과 {searchResults.length}건</p>
-              {searchResults.map(t => (
-                <Link key={t['입주자ID']} href={`/tenants/${t['입주자ID']}`}
-                  style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#fff', marginBottom: 8, padding: 16, borderRadius: 16, textDecoration: 'none', color: 'inherit' }}>
-                  <Avatar name={t['이름']} size={40} />
-                  <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: 14, fontWeight: 600 }}>{t['이름']}</p>
-                    <p style={{ fontSize: 12, color: '#888888' }}>{t['지점명']} {t['방코드']}</p>
-                  </div>
-                  <span style={{ fontSize: 12, color: '#888888' }}>{t['상태']}</span>
-                </Link>
-              ))}
+              {searchResults.map(t => {
+                const isSoon = t['상태'] === '공실예정';
+                return (
+                  <Link key={t['입주자ID']} href={`/tenants/${t['입주자ID']}`}
+                    style={{ display: 'flex', alignItems: 'center', background: isSoon ? '#fffbf0' : '#fff', marginBottom: 8, padding: 16, borderRadius: 16, textDecoration: 'none', color: 'inherit' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 15, fontWeight: 500, color: '#191919' }}>{t['이름']}</span>
+                        {isSoon && <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: '#FEF3C7', color: '#92400E' }}>퇴실예정</span>}
+                      </div>
+                      <p style={{ fontSize: 12, color: '#8b95a1', marginTop: 2 }}>{t['방코드']} {t['방타입']}</p>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <p style={{ fontSize: 12, color: isSoon ? '#F59E0B' : '#8b95a1', fontWeight: isSoon ? 500 : 400 }}>{t['퇴실일'] || '-'}</p>
+                      <p style={{ fontSize: 13, fontWeight: 500, color: '#191919', marginTop: 2 }}>{fmtWon(Number(t['월세']) || 0)}</p>
+                    </div>
+                  </Link>
+                );
+              })}
             </>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 0' }}>
@@ -163,9 +170,6 @@ export default function TenantsPage() {
               <div key={house} style={{ background: '#fff', marginBottom: 8, borderRadius: 16 }}>
                 <button onClick={() => setExpanded(isOpen ? null : house)}
                   style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: 16, border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
-                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#EEF3FF', color: '#3182F6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
-                    {house.charAt(0)}
-                  </div>
                   <div style={{ flex: 1, textAlign: 'left' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontSize: 15, fontWeight: 700 }}>{house}</span>
@@ -177,20 +181,28 @@ export default function TenantsPage() {
                 </button>
                 {isOpen && (
                   <div style={{ padding: '0 16px 12px' }}>
-                    {hTenants.map((t, i) => (
-                      <div key={t['입주자ID']}>
-                        {i > 0 && <div style={{ height: 1, background: '#F5F5F5' }} />}
-                        <Link href={`/tenants/${t['입주자ID']}`}
-                          style={{ display: 'flex', alignItems: 'center', padding: '12px 0', gap: 10, textDecoration: 'none', color: 'inherit' }}>
-                          <Avatar name={t['이름']} size={32} />
-                          <div style={{ flex: 1 }}>
-                            <span style={{ fontSize: 14, fontWeight: 500 }}>{t['이름']}</span>
-                            <span style={{ fontSize: 12, color: '#888888', marginLeft: 6 }}>{t['방코드']}</span>
-                          </div>
-                          <span style={{ fontSize: 13, fontWeight: 600 }}>{fmtWon(Number(t['월세']) || 0)}</span>
-                        </Link>
-                      </div>
-                    ))}
+                    {hTenants.map((t, i) => {
+                      const isSoon = t['상태'] === '공실예정';
+                      return (
+                        <div key={t['입주자ID']}>
+                          {i > 0 && <div style={{ height: 1, background: '#F5F5F5' }} />}
+                          <Link href={`/tenants/${t['입주자ID']}`}
+                            style={{ display: 'flex', alignItems: 'center', padding: '12px 0', textDecoration: 'none', color: 'inherit' }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ fontSize: 15, fontWeight: 500, color: '#191919' }}>{t['이름']}</span>
+                                {isSoon && <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: '#FEF3C7', color: '#92400E' }}>퇴실예정</span>}
+                              </div>
+                              <p style={{ fontSize: 12, color: '#8b95a1', marginTop: 2 }}>{t['방코드']} {t['방타입']}</p>
+                            </div>
+                            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                              {t['퇴실일'] && <p style={{ fontSize: 12, color: isSoon ? '#F59E0B' : '#8b95a1', fontWeight: isSoon ? 500 : 400 }}>{t['퇴실일']}</p>}
+                              <p style={{ fontSize: 13, fontWeight: 500, color: '#191919', marginTop: 2 }}>{fmtWon(Number(t['월세']) || 0)}</p>
+                            </div>
+                          </Link>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -203,15 +215,18 @@ export default function TenantsPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {checkout.map(t => (
                   <Link key={t['입주자ID']} href={`/tenants/${t['입주자ID']}`}
-                    style={{ background: '#fff', padding: 16, borderRadius: 16, display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none', color: 'inherit' }}>
-                    <Avatar name={t['이름']} size={40} />
+                    style={{ background: '#fffbf0', padding: 16, borderRadius: 16, display: 'flex', alignItems: 'center', textDecoration: 'none', color: 'inherit' }}>
                     <div style={{ flex: 1 }}>
-                      <p style={{ fontSize: 14, fontWeight: 600 }}>{t['이름']}</p>
-                      <p style={{ fontSize: 12, color: '#888888' }}>{t['지점명']} {t['방코드']}</p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 15, fontWeight: 500, color: '#191919' }}>{t['이름']}</span>
+                        <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: '#FEF3C7', color: '#92400E' }}>퇴실예정</span>
+                      </div>
+                      <p style={{ fontSize: 12, color: '#8b95a1', marginTop: 2 }}>{t['지점명']} {t['방코드']} {t['방타입']}</p>
                     </div>
-                    <span style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11, fontWeight: 600, background: '#FFF8E8', color: '#D97706' }}>
-                      {t['퇴실일']} 퇴실
-                    </span>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <p style={{ fontSize: 12, color: '#F59E0B', fontWeight: 500 }}>{t['퇴실일']}</p>
+                      <p style={{ fontSize: 13, fontWeight: 500, color: '#191919', marginTop: 2 }}>{fmtWon(Number(t['월세']) || 0)}</p>
+                    </div>
                   </Link>
                 ))}
               </div>
@@ -223,20 +238,25 @@ export default function TenantsPage() {
           {/* 전체 */}
           {filter === 'vacant' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {guFiltered.map(t => (
-                <Link key={t['입주자ID']} href={`/tenants/${t['입주자ID']}`}
-                  style={{ background: '#fff', padding: 16, borderRadius: 16, display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none', color: 'inherit' }}>
-                  <Avatar name={t['이름']} size={40} />
-                  <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: 14, fontWeight: 600 }}>{t['이름']}</p>
-                    <p style={{ fontSize: 12, color: '#888888' }}>{t['지점명']} {t['방코드']}</p>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <p style={{ fontSize: 13, fontWeight: 600 }}>{fmtWon(Number(t['월세']) || 0)}</p>
-                    <span style={{ fontSize: 11, color: t['상태'] === '입주중' ? '#00B493' : '#D97706' }}>{t['상태']}</span>
-                  </div>
-                </Link>
-              ))}
+              {guFiltered.map(t => {
+                const isSoon = t['상태'] === '공실예정';
+                return (
+                  <Link key={t['입주자ID']} href={`/tenants/${t['입주자ID']}`}
+                    style={{ background: isSoon ? '#fffbf0' : '#fff', padding: 16, borderRadius: 16, display: 'flex', alignItems: 'center', textDecoration: 'none', color: 'inherit' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 15, fontWeight: 500, color: '#191919' }}>{t['이름'] || '공실'}</span>
+                        {isSoon && <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: '#FEF3C7', color: '#92400E' }}>퇴실예정</span>}
+                      </div>
+                      <p style={{ fontSize: 12, color: '#8b95a1', marginTop: 2 }}>{t['지점명']} {t['방코드']} {t['방타입']}</p>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <p style={{ fontSize: 12, color: isSoon ? '#F59E0B' : '#8b95a1', fontWeight: isSoon ? 500 : 400 }}>{t['퇴실일'] || '-'}</p>
+                      <p style={{ fontSize: 13, fontWeight: 500, color: '#191919', marginTop: 2 }}>{fmtWon(Number(t['월세']) || 0)}</p>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           )}
 
