@@ -15,11 +15,11 @@ type CalEvent = {
   sub: string;
   link?: string;
 };
+type WeekItem = { date: string; color: string; title: string; sub: string; link?: string };
 
 function koreaToday() {
   const now = new Date();
-  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
-  return new Date(utc + 9 * 60 * 60000);
+  return new Date(now.getTime() + (9 * 60 - now.getTimezoneOffset()) * 60000);
 }
 
 function koreaDateStr() {
@@ -56,16 +56,12 @@ function elapsed(dateStr: string) {
   return Math.max(0, Math.ceil((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24)));
 }
 
-type Issue = {
-  id: string; title: string; category: string; status: string; createdAt: string;
-  houseName?: string;
-};
+type Issue = { id: string; title: string; category: string; status: string; createdAt: string; houseName?: string };
 type Tenant = Record<string, string>;
 type Payment = { 연월: string; 청구액: string; 상태: string };
-type Worker = {
-  용역ID: string; 예정일: string; 지점명: string; 담당자명: string;
-  작업종류: string; 완료여부: string;
-};
+type Worker = { 용역ID: string; 예정일: string; 지점명: string; 담당자명: string; 작업종류: string; 완료여부: string };
+
+type WeekFilter = 'all' | 'move' | 'clean' | 'repair';
 
 export default function HomePage() {
   const router = useRouter();
@@ -76,6 +72,7 @@ export default function HomePage() {
   const [loadingT, setLoadingT] = useState(true);
   const [loadingI, setLoadingI] = useState(true);
   const [loadingP, setLoadingP] = useState(true);
+  const [weekFilter, setWeekFilter] = useState<WeekFilter>('all');
 
   const todayKey = useMemo(() => koreaKey(), []);
   const todayDate = useMemo(() => { const d = koreaToday(); d.setHours(0, 0, 0, 0); return d; }, []);
@@ -98,24 +95,11 @@ export default function HomePage() {
     const total = active + vacant;
     return total > 0 ? Math.round(active / total * 100) : 0;
   }, [tenants]);
-
   const pendingIssues = useMemo(() => issues.filter(i => i.status === '접수' || i.status === '처리중').length, [issues]);
-
   const weekEnd = useMemo(() => getWeekEnd(), []);
   const weekStart = useMemo(() => getWeekStart(), []);
-  const weeklyCheckouts = useMemo(() => {
-    return tenants.filter(t => {
-      if (!t['퇴실일']) return false;
-      const d = new Date(t['퇴실일']);
-      return d >= todayDate && d <= weekEnd;
-    }).length;
-  }, [tenants, weekEnd, todayDate]);
-
-  const unpaidAmount = useMemo(() => {
-    return payments.filter(p => p.상태 === '미납').reduce((sum, p) => sum + (Number(p.청구액) || 0), 0);
-  }, [payments]);
-
-  // Todo issues
+  const weeklyCheckouts = useMemo(() => tenants.filter(t => { if (!t['퇴실일']) return false; const d = new Date(t['퇴실일']); return d >= todayDate && d <= weekEnd; }).length, [tenants, weekEnd, todayDate]);
+  const unpaidAmount = useMemo(() => payments.filter(p => p.상태 === '미납').reduce((sum, p) => sum + (Number(p.청구액) || 0), 0), [payments]);
   const todoIssues = useMemo(() => issues.filter(i => i.status === '접수' || i.status === '처리중').slice(0, 4), [issues]);
 
   // Calendar events
@@ -138,14 +122,10 @@ export default function HomePage() {
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, CalEvent[]>();
-    for (const e of calEvents) {
-      if (!map.has(e.date)) map.set(e.date, []);
-      map.get(e.date)!.push(e);
-    }
+    for (const e of calEvents) { if (!map.has(e.date)) map.set(e.date, []); map.get(e.date)!.push(e); }
     return map;
   }, [calEvents]);
 
-  // Calendar grid
   const calendarDays = useMemo(() => {
     const first = new Date(calYear, calMonth - 1, 1);
     const startDay = first.getDay();
@@ -157,33 +137,60 @@ export default function HomePage() {
     return cells;
   }, [calYear, calMonth]);
 
-  const calPrev = useCallback(() => {
-    if (calMonth === 1) { setCalYear(y => y - 1); setCalMonth(12); } else setCalMonth(m => m - 1);
-  }, [calMonth]);
-  const calNext = useCallback(() => {
-    if (calMonth === 12) { setCalYear(y => y + 1); setCalMonth(1); } else setCalMonth(m => m + 1);
-  }, [calMonth]);
+  const calPrev = useCallback(() => { if (calMonth === 1) { setCalYear(y => y - 1); setCalMonth(12); } else setCalMonth(m => m - 1); }, [calMonth]);
+  const calNext = useCallback(() => { if (calMonth === 12) { setCalYear(y => y + 1); setCalMonth(1); } else setCalMonth(m => m + 1); }, [calMonth]);
 
   const selectedEvents = useMemo(() => eventsByDate.get(selectedDate) || [], [eventsByDate, selectedDate]);
 
-  // Week events (for fixed list)
-  const weekEvents = useMemo(() => {
+  // Week events with filter
+  const rawWeekEvents = useMemo(() => {
     return calEvents
       .filter(e => { const d = new Date(e.date); return d >= todayDate && d <= weekEnd; })
       .sort((a, b) => a.date.localeCompare(b.date));
   }, [calEvents, todayDate, weekEnd]);
 
-  const weekLabel = useMemo(() => {
-    const s = weekStart;
-    const e = weekEnd;
-    return `${s.getMonth() + 1}/${s.getDate()}~${e.getMonth() + 1}/${e.getDate()}`;
-  }, [weekStart, weekEnd]);
+  // Grouped week items based on filter
+  const weekItems = useMemo((): WeekItem[] => {
+    let filtered = rawWeekEvents;
+    if (weekFilter === 'move') filtered = rawWeekEvents.filter(e => e.type === 'checkout' || e.type === 'checkin');
+    else if (weekFilter === 'clean') filtered = rawWeekEvents.filter(e => e.type === 'clean');
+    else if (weekFilter === 'repair') filtered = rawWeekEvents.filter(e => e.type === 'repair');
 
-  const kpiStyle = {
-    background: 'rgba(255,255,255,0.15)', borderRadius: 12, padding: '14px 16px', cursor: 'pointer',
-  } as const;
+    // When "all", group clean events by date
+    if (weekFilter === 'all') {
+      const items: WeekItem[] = [];
+      const cleanByDate = new Map<string, CalEvent[]>();
+      for (const ev of filtered) {
+        if (ev.type === 'clean') {
+          if (!cleanByDate.has(ev.date)) cleanByDate.set(ev.date, []);
+          cleanByDate.get(ev.date)!.push(ev);
+        } else {
+          items.push({ date: ev.date, color: ev.color, title: ev.title, sub: ev.sub, link: ev.link });
+        }
+      }
+      for (const [date, evs] of cleanByDate) {
+        const names = [...new Set(evs.map(e => e.sub))].join(' · ');
+        items.push({ date, color: CLEAN_COLOR, title: `청소 ${evs.length}건`, sub: names });
+      }
+      items.sort((a, b) => a.date.localeCompare(b.date));
+      return items;
+    }
+
+    return filtered.map(ev => ({ date: ev.date, color: ev.color, title: ev.title, sub: ev.sub, link: ev.link }));
+  }, [rawWeekEvents, weekFilter]);
+
+  const weekLabel = useMemo(() => `${weekStart.getMonth() + 1}/${weekStart.getDate()}~${weekEnd.getMonth() + 1}/${weekEnd.getDate()}`, [weekStart, weekEnd]);
+
+  const filterChips: { key: WeekFilter; label: string; activeBg: string; activeColor: string; dotColor?: string }[] = [
+    { key: 'all', label: '전체', activeBg: '#111', activeColor: '#fff' },
+    { key: 'move', label: '입퇴실', activeBg: '#FEF2F2', activeColor: '#E24B4A', dotColor: '#E24B4A' },
+    { key: 'clean', label: '청소', activeBg: '#F0FDF4', activeColor: '#00B493', dotColor: '#00B493' },
+    { key: 'repair', label: '수리', activeBg: '#FFFBEB', activeColor: '#F59E0B', dotColor: '#F59E0B' },
+  ];
+
+  const kpiStyle = { background: 'rgba(255,255,255,0.16)', borderRadius: 12, padding: '14px 16px', cursor: 'pointer' } as const;
   const kpiLabel = { fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 } as const;
-  const kpiValue = (color?: string) => ({ fontSize: 22, fontWeight: 700 as const, color: color || '#fff' });
+  const kpiVal = (color?: string) => ({ fontSize: 22, fontWeight: 700 as const, color: color || '#fff' });
 
   return (
     <div style={{ paddingBottom: 16, background: '#F7F8FA', minHeight: '100vh' }}>
@@ -191,32 +198,22 @@ export default function HomePage() {
       <div style={{ background: BLUE, padding: '32px 20px 20px', borderRadius: '0 0 24px 24px' }}>
         <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 2 }}>{koreaDateStr()}</p>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: '#fff', marginBottom: 20 }}>안녕하세요</h1>
-
-        {/* KPI 2x2 */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           <div style={kpiStyle} onClick={() => router.push('/tenants')}>
             <div style={kpiLabel}>전체 입주율</div>
-            <div style={kpiValue()}>
-              {loadingT ? '—' : <>{occupancy}<span style={{ fontSize: 13, fontWeight: 400 }}>%</span></>}
-            </div>
+            <div style={kpiVal()}>{loadingT ? '—' : <>{occupancy}<span style={{ fontSize: 13, fontWeight: 400 }}>%</span></>}</div>
           </div>
           <div style={kpiStyle} onClick={() => router.push('/issues')}>
             <div style={kpiLabel}>미처리 이슈</div>
-            <div style={kpiValue('#FCD34D')}>
-              {loadingI ? '—' : <>{pendingIssues}<span style={{ fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.7)' }}>건</span></>}
-            </div>
+            <div style={kpiVal('#FCD34D')}>{loadingI ? '—' : <>{pendingIssues}<span style={{ fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.7)' }}>건</span></>}</div>
           </div>
           <div style={kpiStyle} onClick={() => router.push('/vacancy')}>
             <div style={kpiLabel}>이번주 퇴실</div>
-            <div style={kpiValue()}>
-              {loadingT ? '—' : <>{weeklyCheckouts}<span style={{ fontSize: 13, fontWeight: 400 }}>건</span></>}
-            </div>
+            <div style={kpiVal()}>{loadingT ? '—' : <>{weeklyCheckouts}<span style={{ fontSize: 13, fontWeight: 400 }}>건</span></>}</div>
           </div>
           <div style={kpiStyle} onClick={() => router.push('/payments')}>
             <div style={kpiLabel}>이번달 미납</div>
-            <div style={kpiValue(unpaidAmount > 0 ? '#FCA5A5' : '#fff')}>
-              {loadingP ? '—' : <>{unpaidAmount > 0 ? Math.round(unpaidAmount / 10000) : 0}<span style={{ fontSize: 13, fontWeight: 400 }}>만원</span></>}
-            </div>
+            <div style={kpiVal(unpaidAmount > 0 ? '#FCA5A5' : '#fff')}>{loadingP ? '—' : <>{unpaidAmount > 0 ? Math.round(unpaidAmount / 10000) : 0}<span style={{ fontSize: 13, fontWeight: 400 }}>만원</span></>}</div>
           </div>
         </div>
       </div>
@@ -238,10 +235,7 @@ export default function HomePage() {
                 const isUrgent = elapsed(issue.createdAt) >= 3;
                 return (
                   <div key={issue.id}>
-                    <button
-                      onClick={() => router.push(`/issues/${issue.id}`)}
-                      style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
-                    >
+                    <button onClick={() => router.push(`/issues/${issue.id}`)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
                         <div style={{ width: 8, height: 8, borderRadius: '50%', background: isUrgent ? CHECKOUT_COLOR : '#D97706', flexShrink: 0 }} />
                         <span style={{ fontSize: 14, color: '#191919', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{issue.title}</span>
@@ -260,7 +254,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* 캘린더 카드 (A-3) */}
+      {/* 캘린더 카드 */}
       <div style={{ padding: '8px 16px 0' }}>
         <div style={{ background: '#fff', padding: 16, borderRadius: 16, border: '0.5px solid #F0F0F0' }}>
           {/* 월 네비게이션 */}
@@ -286,33 +280,20 @@ export default function HomePage() {
               const isSelected = dateKey === selectedDate && !isToday;
               const isPast = new Date(dateKey) < todayDate;
               const dayEvents = eventsByDate.get(dateKey) || [];
-              const dotTypes = [...new Set(dayEvents.map(e => e.type))];
-              const dots = dotTypes.slice(0, 3);
-
+              const dots = [...new Set(dayEvents.map(e => e.type))].slice(0, 3);
               return (
-                <button
-                  key={dateKey}
-                  onClick={() => setSelectedDate(dateKey)}
-                  style={{
-                    background: isToday ? BLUE : isSelected ? '#EFF6FF' : 'none',
-                    border: isSelected ? `1.5px solid ${BLUE}` : '1.5px solid transparent',
-                    borderRadius: isToday ? '50%' : 6,
-                    width: '100%', minHeight: 48,
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    gap: 3, cursor: 'pointer', fontFamily: 'inherit', padding: 2,
-                  }}
-                >
-                  <span style={{
-                    fontSize: 13, fontWeight: isToday ? 700 : 400,
-                    color: isToday ? '#fff' : isPast ? '#ccc' : '#111',
-                  }}>{day}</span>
+                <button key={dateKey} onClick={() => setSelectedDate(dateKey)} style={{
+                  background: isToday ? BLUE : isSelected ? '#EFF6FF' : 'none',
+                  border: isSelected ? `1.5px solid ${BLUE}` : '1.5px solid transparent',
+                  borderRadius: isToday ? '50%' : 6, width: '100%', minHeight: 48,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  gap: 3, cursor: 'pointer', fontFamily: 'inherit', padding: 2,
+                }}>
+                  <span style={{ fontSize: 13, fontWeight: isToday ? 700 : 400, color: isToday ? '#fff' : isPast ? '#ccc' : '#111' }}>{day}</span>
                   {dots.length > 0 && (
                     <div style={{ display: 'flex', gap: 2 }}>
                       {dots.map(type => (
-                        <div key={type} style={{
-                          width: 4, height: 4, borderRadius: '50%',
-                          background: type === 'checkout' ? CHECKOUT_COLOR : type === 'checkin' ? CHECKIN_COLOR : type === 'repair' ? REPAIR_COLOR : CLEAN_COLOR,
-                        }} />
+                        <div key={type} style={{ width: 4, height: 4, borderRadius: '50%', background: type === 'checkout' ? CHECKOUT_COLOR : type === 'checkin' ? CHECKIN_COLOR : type === 'repair' ? REPAIR_COLOR : CLEAN_COLOR }} />
                       ))}
                     </div>
                   )}
@@ -323,22 +304,17 @@ export default function HomePage() {
 
           {/* 범례 */}
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 12, marginBottom: 12 }}>
-            {[
-              { label: '퇴실', color: CHECKOUT_COLOR },
-              { label: '입주', color: CHECKIN_COLOR },
-              { label: '수리', color: REPAIR_COLOR },
-              { label: '청소', color: CLEAN_COLOR },
-            ].map(l => (
+            {[{ label: '퇴실', color: CHECKOUT_COLOR }, { label: '입주', color: CHECKIN_COLOR }, { label: '수리', color: REPAIR_COLOR }, { label: '청소', color: CLEAN_COLOR }].map(l => (
               <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <div style={{ width: 6, height: 6, borderRadius: '50%', background: l.color }} />
-                <span style={{ fontSize: 11, color: GRAY }}>{l.label}</span>
+                <div style={{ width: 5, height: 5, borderRadius: '50%', background: l.color }} />
+                <span style={{ fontSize: 10, color: GRAY }}>{l.label}</span>
               </div>
             ))}
           </div>
 
           {/* 선택된 날 이벤트 */}
           <div style={{ borderTop: '1px solid #f2f4f6', paddingTop: 12 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: BLUE, marginBottom: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: BLUE, marginBottom: 8 }}>
               {selectedDate.replace(/^(\d{4})-(\d{2})-(\d{2})$/, (_, _y, m, d) => `${Number(m)}월 ${Number(d)}일`)} 일정
             </div>
             {selectedEvents.length === 0 ? (
@@ -346,16 +322,12 @@ export default function HomePage() {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {selectedEvents.map((ev, i) => (
-                  <button
-                    key={i}
-                    onClick={() => ev.link && router.push(ev.link)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0',
-                      background: 'none', border: 'none', cursor: ev.link ? 'pointer' : 'default',
-                      fontFamily: 'inherit', textAlign: 'left', width: '100%',
-                      borderTop: i > 0 ? '1px solid #f8f8f8' : 'none',
-                    }}
-                  >
+                  <button key={i} onClick={() => ev.link && router.push(ev.link)} style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0',
+                    background: 'none', border: 'none', cursor: ev.link ? 'pointer' : 'default',
+                    fontFamily: 'inherit', textAlign: 'left', width: '100%',
+                    borderTop: i > 0 ? '1px solid #f8f8f8' : 'none',
+                  }}>
                     <div style={{ width: 3, height: 32, borderRadius: 2, background: ev.color, flexShrink: 0 }} />
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: 1 }}>
                       <span style={{ fontSize: 13, fontWeight: 500, color: '#191919', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.title}</span>
@@ -367,27 +339,45 @@ export default function HomePage() {
             )}
           </div>
 
-          {/* 이번주 고정 리스트 */}
+          {/* 이번주 섹션 */}
           <div style={{ borderTop: '1px solid #f2f4f6', marginTop: 8, paddingTop: 12 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: GRAY, marginBottom: 8 }}>이번주 ({weekLabel})</div>
-            {weekEvents.length === 0 ? (
+            {/* 헤더 + 필터 칩 */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#191919' }}>이번주 {weekLabel}</span>
+              <div style={{ display: 'flex', gap: 4 }}>
+                {filterChips.map(chip => {
+                  const active = weekFilter === chip.key;
+                  return (
+                    <button key={chip.key} onClick={() => setWeekFilter(chip.key)} style={{
+                      background: active ? chip.activeBg : '#F2F4F6',
+                      color: active ? chip.activeColor : '#888',
+                      border: 'none', borderRadius: 20, padding: '6px 12px',
+                      fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                      display: 'flex', alignItems: 'center', gap: 4,
+                    }}>
+                      {active && chip.dotColor && <div style={{ width: 5, height: 5, borderRadius: '50%', background: chip.dotColor }} />}
+                      {chip.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 이벤트 리스트 */}
+            {weekItems.length === 0 ? (
               <p style={{ fontSize: 13, color: '#ccc', textAlign: 'center', padding: '12px 0' }}>이번주 일정이 없어요</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {weekEvents.map((ev, i) => {
+                {weekItems.map((ev, i) => {
                   const d = new Date(ev.date);
                   const dateLabel = `${d.getMonth() + 1}/${d.getDate()}`;
                   return (
-                    <button
-                      key={i}
-                      onClick={() => ev.link && router.push(ev.link)}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0',
-                        background: 'none', border: 'none', cursor: ev.link ? 'pointer' : 'default',
-                        fontFamily: 'inherit', textAlign: 'left', width: '100%',
-                        borderTop: i > 0 ? '1px solid #f8f8f8' : 'none',
-                      }}
-                    >
+                    <button key={i} onClick={() => ev.link && router.push(ev.link)} style={{
+                      display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0',
+                      background: 'none', border: 'none', cursor: ev.link ? 'pointer' : 'default',
+                      fontFamily: 'inherit', textAlign: 'left', width: '100%',
+                      borderTop: i > 0 ? '1px solid #f8f8f8' : 'none',
+                    }}>
                       <div style={{ width: 3, height: 32, borderRadius: 2, background: ev.color, flexShrink: 0 }} />
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: 1 }}>
                         <span style={{ fontSize: 13, fontWeight: 500, color: '#191919', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.title}</span>
