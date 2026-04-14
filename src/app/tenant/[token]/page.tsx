@@ -98,6 +98,10 @@ export default function TenantPortalPage() {
     tenant?.['지점명'] ? `/api/tenant-duty?house=${encodeURIComponent(tenant['지점명'])}&roomCode=${encodeURIComponent(tenant['방코드'] || '')}` : null, fetcher,
     { refreshInterval: 0, revalidateOnFocus: true }
   );
+  const { data: checkoutApp } = useSWR(
+    tenant?.['입주자ID'] ? `/api/apply/checkout?tenantId=${tenant['입주자ID']}` : null, fetcher,
+    { refreshInterval: 0, revalidateOnFocus: true }
+  );
   const loading = tenantLoading;
 
   const [lang, setLang] = useState<'ko' | 'en'>('ko');
@@ -269,6 +273,103 @@ export default function TenantPortalPage() {
             </div>
           </div>
         </div>
+
+        {/* 퇴실 정산서 / 퇴실 신청 접수 안내 */}
+        {checkoutApp && checkoutApp.정산확정여부 === 'Y' && (() => {
+          const deposit = Number(tenant['보증금']) || 0;
+          const exitFee = Number(checkoutApp.퇴실비) || 0;
+          const unpaidRent = Number(checkoutApp.미납월세) || 0;
+          const unpaidMgmt = Number(checkoutApp.미납관리비) || 0;
+          const extraDeduct = Number(checkoutApp.추가공제금액) || 0;
+          const finalAmt = Number(checkoutApp.최종반환금액) || 0;
+          const fmtS = (n: number) => n.toLocaleString() + t('원', ' KRW');
+          const deductItems = [
+            { label: t('보증금 원금', 'Deposit'), value: deposit, color: '#333', minus: false },
+            { label: t('퇴실비', 'Checkout fee'), value: exitFee, color: RED, minus: true },
+            { label: t('미납 월세', 'Unpaid rent'), value: unpaidRent, color: unpaidRent > 0 ? RED : GRAY, minus: true },
+            { label: t('미납 관리비', 'Unpaid maintenance'), value: unpaidMgmt, color: unpaidMgmt > 0 ? RED : GRAY, minus: true },
+            { label: t('추가 공제', 'Additional deduction'), value: extraDeduct, color: extraDeduct > 0 ? RED : GRAY, minus: true },
+          ];
+          return (
+            <>
+              {/* 파란 헤더 박스 */}
+              <div style={{ background: BLUE, borderRadius: 14, padding: '22px 20px 18px' }}>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.72)' }}>{t('최종 반환 보증금', 'Final Deposit Refund')}</div>
+                <div style={{ fontSize: 34, fontWeight: 500, color: '#fff', marginTop: 4 }}>{fmtS(finalAmt)}</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.72)', marginTop: 4 }}>{t('퇴실일 기준 7일 이내 환불 예정', 'Refund within 7 days of checkout')}</div>
+                <div style={{ borderTop: '0.5px solid rgba(255,255,255,0.2)', marginTop: 14, paddingTop: 12, display: 'flex', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>{t('퇴실 예정일', 'Checkout date')}</div>
+                    <div style={{ fontSize: 13, color: '#fff', marginTop: 2 }}>{checkoutApp.checkoutDate || '-'}</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>{t('환불 계좌', 'Refund account')}</div>
+                    <div style={{ fontSize: 13, color: '#fff', marginTop: 2 }}>{checkoutApp.refundAccount || '-'}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 공제 내역 카드 */}
+              <Card>
+                <div style={{ padding: '14px 18px' }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#191f28', marginBottom: 12 }}>{t('공제 내역', 'Deduction Details')}</div>
+                  {deductItems.map(item => (
+                    <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
+                      <span style={{ fontSize: 13, color: '#888' }}>{item.label}</span>
+                      <span style={{ fontSize: 13, fontWeight: 500, color: item.color }}>{item.minus ? `- ${fmtS(item.value)}` : fmtS(item.value)}</span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+
+              {/* 처리 현황 */}
+              <Card>
+                <div style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: 13, color: '#888', marginBottom: 4 }}>{t('정산 상태', 'Settlement status')}</div>
+                    <span style={{ padding: '3px 10px', borderRadius: 100, fontSize: 11, fontWeight: 600, background: '#EAF3DE', color: '#3B6D11' }}>{t('정산 완료', 'Settled')}</span>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 13, color: '#888', marginBottom: 4 }}>{t('처리 완료일', 'Completed')}</div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: '#333' }}>{checkoutApp.정산확정일 || '-'}</div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* 안내 문구 */}
+              <div style={{ background: '#fff8ed', borderRadius: 10, padding: '14px 16px', fontSize: 12, color: '#854F0B', lineHeight: 1.6 }}>
+                {t(
+                  '보증금은 퇴실 확인 후 7일 이내에 등록하신 계좌로 입금됩니다. 문의사항은 매니저에게 연락해주세요.',
+                  'Your deposit will be refunded to the registered account within 7 days after checkout. Please contact your manager for any questions.'
+                )}
+              </div>
+            </>
+          );
+        })()}
+
+        {checkoutApp && checkoutApp.id && checkoutApp.정산확정여부 !== 'Y' && (
+          <Card>
+            <div style={{ padding: '14px 18px' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#191f28', marginBottom: 8 }}>{t('퇴실 신청 접수됨', 'Checkout Request Received')}</div>
+              <div style={{ display: 'flex', gap: 16, marginBottom: 10 }}>
+                <div>
+                  <div style={{ fontSize: 10, color: GRAY }}>{t('퇴실 예정일', 'Checkout date')}</div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: '#333', marginTop: 2 }}>{checkoutApp.checkoutDate || '-'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: GRAY }}>{t('신청일', 'Applied')}</div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: '#333', marginTop: 2 }}>{checkoutApp.createdAt || '-'}</div>
+                </div>
+              </div>
+              <span style={{ padding: '3px 10px', borderRadius: 100, fontSize: 11, fontWeight: 600, background: '#FAEEDA', color: '#854F0B' }}>
+                {t('관리자 확인 중', 'Under review')}
+              </span>
+              <div style={{ fontSize: 12, color: GRAY, marginTop: 10 }}>
+                {t('정산 처리 완료 후 반환금액이 표시됩니다.', 'Refund amount will be shown after settlement is processed.')}
+              </div>
+            </div>
+          </Card>
+        )}
 
         {/* Notices */}
         <Card>
