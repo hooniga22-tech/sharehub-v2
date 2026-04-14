@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { manageMenus } from '@/lib/mockData';
-import { Home, Wrench, CalendarDays, ClipboardList, TrendingUp, CreditCard, BarChart3, Receipt, Zap, ChevronRight } from 'lucide-react';
+import { Home, Wrench, CalendarDays, ClipboardList, TrendingUp, CreditCard, BarChart3, Receipt, Zap, ChevronRight, LogOut } from 'lucide-react';
 
 const iconMap: Record<string, typeof Home> = {
   vacancy: Home, worker: Wrench, duty: CalendarDays, applications: ClipboardList, investors: TrendingUp,
@@ -61,6 +61,20 @@ export default function ManagePage() {
               </div>
             );
           })}
+          {/* 퇴실자 관리 */}
+          <div>
+            <div style={{ height: 1, background: '#F5F5F5', margin: '0 16px' }} />
+            <Link href="/checkout" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px' }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#F5F5F5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <LogOut size={20} color="#8b95a1" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: 15, fontWeight: 700 }}>퇴실자 관리</p>
+                <p style={{ fontSize: 12, color: '#888888' }}>퇴실 완료 입주자 이력</p>
+              </div>
+              <ChevronRight size={18} color="#BBBBBB" />
+            </Link>
+          </div>
         </div>
       </div>
 
