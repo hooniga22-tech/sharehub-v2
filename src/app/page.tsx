@@ -103,13 +103,15 @@ export default function HomePage() {
       if (t['퇴실일']) {
         const d = new Date(t['퇴실일']);
         if (d >= today && d <= weekEnd) {
-          items.push({ date: d, dateLabel: `${d.getMonth() + 1}/${d.getDate()}`, title: `퇴실 — ${t['지점명']} ${t['이름']}`, sub: t['방코드'] || '', color: RED });
+          const name = (t['이름'] || '').length > 6 ? (t['이름'] || '').slice(0, 6) + '...' : (t['이름'] || '');
+          items.push({ date: d, dateLabel: `${d.getMonth() + 1}/${d.getDate()}`, title: `퇴실 — ${t['지점명']} ${name}`, sub: t['방코드'] || '', color: RED });
         }
       }
       if (t['입주일']) {
         const d = new Date(t['입주일']);
         if (d >= today && d <= weekEnd) {
-          items.push({ date: d, dateLabel: `${d.getMonth() + 1}/${d.getDate()}`, title: `입주 — ${t['지점명']} ${t['이름']}`, sub: t['방코드'] || '', color: BLUE });
+          const name = (t['이름'] || '').length > 6 ? (t['이름'] || '').slice(0, 6) + '...' : (t['이름'] || '');
+          items.push({ date: d, dateLabel: `${d.getMonth() + 1}/${d.getDate()}`, title: `입주 — ${t['지점명']} ${name}`, sub: t['방코드'] || '', color: BLUE });
         }
       }
     }
@@ -206,8 +208,8 @@ export default function HomePage() {
                 <div key={i} style={{ display: 'flex', gap: 12 }}>
                   <span style={{ flexShrink: 0, textAlign: 'right', fontSize: 12, color: GRAY, width: 36, paddingTop: 2 }}>{item.dateLabel}</span>
                   <div style={{ flexShrink: 0, width: 3, borderRadius: 2, background: item.color, minHeight: 36 }} />
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <span style={{ fontSize: 14, fontWeight: 500, color: '#191919' }}>{item.title}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: 1 }}>
+                    <span style={{ fontSize: 14, fontWeight: 500, color: '#191919', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
                     <span style={{ fontSize: 12, color: GRAY }}>{item.sub}</span>
                   </div>
                 </div>
