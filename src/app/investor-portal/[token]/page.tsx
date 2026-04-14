@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 
 const BLUE = '#3182f6', GRAY = '#8b95a1';
-const fmt = (n: number) => n.toLocaleString() + '원';
+const fmt = (n: number | undefined | null) => (Number(n) || 0).toLocaleString() + '원';
 
 type House = {
   investId: string; houseName: string; investorRatio: number; jaehoonRatio: number;
@@ -79,7 +79,7 @@ export default function InvestorPortalPage() {
     );
   }
 
-  const { investor, houses, totalShare, houseCount } = data;
+  const { investor, houses = [], totalShare = 0, houseCount = 0 } = data;
 
   return (
     <div style={{ minHeight: '100vh', background: '#F7F8FA', maxWidth: 430, margin: '0 auto' }}>
@@ -125,7 +125,7 @@ export default function InvestorPortalPage() {
                 {/* House name + badge */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                   <span style={{ fontSize: 16, fontWeight: 500, color: '#191f28' }}>{h.houseName}</span>
-                  <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#EFF6FF', color: '#1E40AF' }}>{h.investorRatio}%</span>
+                  <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#EFF6FF', color: '#1E40AF' }}>{h.investorRatio || 0}%</span>
                   {h.isJoint && <span style={{ padding: '2px 6px', borderRadius: 6, fontSize: 10, fontWeight: 600, background: '#FEF3C7', color: '#92400E' }}>공동</span>}
                 </div>
 
@@ -142,11 +142,11 @@ export default function InvestorPortalPage() {
                 </div>
 
                 {/* Calculation hint */}
-                <div style={{ fontSize: 12, color: '#adb5bd' }}>월세합계 {fmt(h.revenue)} x {h.investorRatio}%</div>
+                <div style={{ fontSize: 12, color: '#adb5bd' }}>월세합계 {fmt(h.revenue)} x {h.investorRatio || 0}%</div>
 
                 {/* Ratio bar */}
                 <div style={{ height: 6, borderRadius: 3, background: '#f0f0f0', overflow: 'hidden', marginTop: 8 }}>
-                  <div style={{ width: `${Math.min(h.investorRatio, 100)}%`, height: '100%', background: BLUE, borderRadius: 3 }} />
+                  <div style={{ width: `${Math.min(h.investorRatio || 0, 100)}%`, height: '100%', background: BLUE, borderRadius: 3 }} />
                 </div>
               </div>
             ))}

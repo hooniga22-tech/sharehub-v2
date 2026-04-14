@@ -56,8 +56,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
       return { ...h, revenue, share }
     })
 
-    const totalShare = houses.reduce((s, h) => s + h.share, 0)
-    const totalRevenue = houses.reduce((s, h) => s + h.revenue, 0)
+    const totalShare = houses.reduce((s, h) => s + (h.share || 0), 0)
+    const totalRevenue = houses.reduce((s, h) => s + (h.revenue || 0), 0)
 
     return NextResponse.json({
       investor: { id: investorId, name: investorName, phone, account },
