@@ -17,24 +17,31 @@ type CalEvent = {
 };
 type WeekItem = { date: string; color: string; title: string; sub: string; link?: string };
 
-function koreaToday() {
-  const now = new Date();
-  return new Date(now.getTime() + (9 * 60 - now.getTimezoneOffset()) * 60000);
+function kstParts() {
+  const s = new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
+  const [y, m, d] = s.replace(/\./g, '').trim().split(/\s+/).map(Number);
+  return { y, m, d };
+}
+
+function kstDate() {
+  const { y, m, d } = kstParts();
+  return new Date(y, m - 1, d);
 }
 
 function koreaDateStr() {
-  const d = koreaToday();
+  const { y, m, d } = kstParts();
   const weekdays = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
-  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${weekdays[d.getDay()]}`;
+  const dow = new Date(y, m - 1, d).getDay();
+  return `${y}년 ${m}월 ${d}일 ${weekdays[dow]}`;
 }
 
 function koreaKey() {
-  const d = koreaToday();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const { y, m, d } = kstParts();
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
 function getWeekEnd() {
-  const now = koreaToday();
+  const now = kstDate();
   const day = now.getDay();
   const sun = new Date(now);
   sun.setDate(now.getDate() + (day === 0 ? 0 : 7 - day));
@@ -43,7 +50,7 @@ function getWeekEnd() {
 }
 
 function getWeekStart() {
-  const now = koreaToday();
+  const now = kstDate();
   const day = now.getDay();
   const mon = new Date(now);
   mon.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
@@ -75,13 +82,13 @@ export default function HomePage() {
   const [weekFilter, setWeekFilter] = useState<WeekFilter>('all');
 
   const todayKey = useMemo(() => koreaKey(), []);
-  const todayDate = useMemo(() => { const d = koreaToday(); d.setHours(0, 0, 0, 0); return d; }, []);
+  const todayDate = useMemo(() => { const d = kstDate(); d.setHours(0, 0, 0, 0); return d; }, []);
   const [calYear, setCalYear] = useState(todayDate.getFullYear());
   const [calMonth, setCalMonth] = useState(todayDate.getMonth() + 1);
   const [selectedDate, setSelectedDate] = useState(todayKey);
 
   useEffect(() => {
-    const now = koreaToday();
+    const now = kstDate();
     fetch('/api/tenants').then(r => r.json()).then(d => setTenants(Array.isArray(d) ? d : [])).catch(() => {}).finally(() => setLoadingT(false));
     fetch('/api/issues').then(r => r.json()).then(d => setIssues(d.issues || [])).catch(() => {}).finally(() => setLoadingI(false));
     fetch(`/api/payments?year=${now.getFullYear()}&month=${now.getMonth() + 1}`).then(r => r.json()).then(d => setPayments(Array.isArray(d) ? d : [])).catch(() => {}).finally(() => setLoadingP(false));
@@ -353,9 +360,9 @@ export default function HomePage() {
                       color: active ? chip.activeColor : '#888',
                       border: 'none', borderRadius: 20, padding: '6px 12px',
                       fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
-                      display: 'flex', alignItems: 'center', gap: 4,
+                      display: 'flex', alignItems: 'center', gap: 5,
                     }}>
-                      {active && chip.dotColor && <div style={{ width: 5, height: 5, borderRadius: '50%', background: chip.dotColor }} />}
+                      {active && chip.dotColor && <div style={{ width: 6, height: 6, borderRadius: '50%', background: chip.dotColor }} />}
                       {chip.label}
                     </button>
                   );
