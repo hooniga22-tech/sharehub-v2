@@ -175,13 +175,13 @@ export default function UtilitiesPage() {
                     // 미입력 지점
                     return (
                       <div key={key} style={{ borderTop: '1px solid #f2f4f6' }}>
-                        <button onClick={() => startNew(key)} style={{
+                        <button onClick={() => isEditing ? cancel() : startNew(key)} style={{
                           width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                           padding: '12px 18px', background: '#FEF2F2', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
                         }}>
                           <div>
                             <div style={{ fontSize: 13, fontWeight: 500, color: '#191f28' }}>{h.houseName}</div>
-                            <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>미입력 — 탭하여 입력</div>
+                            <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{isEditing ? '입력 중' : '미입력 — 탭하여 입력'}</div>
                           </div>
                           <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: '#FEE2E2', color: RED }}>미입력</span>
                         </button>

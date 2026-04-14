@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getSheetData, appendRow, updateRow } from '@/lib/sheets'
 
 // 공과금 탭: [0]ID [1]지점명 [2]연도 [3]월 [4]전기 [5]가스 [6]수도 [7]인터넷 [8]정수기 [9]메모 [10]청소 [11]기타 [12]합계메모 [13]입력일
-// 지점 탭: [0]지점ID [1]구 [2]지점명 ...
+// 지점 탭: [0]지점ID [1]지점명 [2]구 [3]주소 ... [7]집월세
 
 const normalize = (name: string) => name.replace(/하우스$/, '').trim().toLowerCase()
 
@@ -24,11 +24,11 @@ export async function GET(req: Request) {
       dataByHouse.set(normalize(r[1] || ''), r)
     }
 
-    // 구별 지점 그룹
+    // 구별 지점 그룹 ([1]지점명, [2]구)
     const districtMap = new Map<string, { houseName: string; district: string }[]>()
     for (const r of houseInfoRows) {
-      const district = r[1] || '기타'
-      const houseName = r[2] || ''
+      const houseName = r[1] || ''
+      const district = r[2] || '기타'
       if (!houseName) continue
       if (!districtMap.has(district)) districtMap.set(district, [])
       districtMap.get(district)!.push({ houseName, district })
