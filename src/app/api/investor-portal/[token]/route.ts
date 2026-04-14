@@ -3,7 +3,7 @@ import { getSheetData } from '@/lib/sheets'
 
 // 투자자 탭: [0]투자자ID [1]투자자명 [2]연락처 [3]계좌정보 [4]생년월일 [5]링크토큰 [6]메모
 // 투자지점 탭: [0]투자ID [1]투자자ID [2]투자자명 [3]지점명 [4]투자자비율 [5]유재훈비율 [6]공동여부 [7]메모
-// 입주자 탭: [0]입주자ID [1]구 [2]지점명 ... [8]상태 [10]월세 [11]관리비
+// 입주자 탭: [0]ID [1]구 [2]지점명 [3]방코드 [4]방타입 [5]이름 [6]입주일 [7]퇴실일 [8]상태 [9]보증금 [10]월세 [11]관리비
 
 const normalize = (name: string) => name.replace(/하우스$/, '').trim().toLowerCase()
 
@@ -20,7 +20,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
       getSheetData('입주자'),
     ])
 
-    // 토큰으로 투자자 찾기
     const investorRow = investorRows.find(r => r[5] === token)
     if (!investorRow) {
       return NextResponse.json({ error: 'not found' }, { status: 404 })
@@ -31,7 +30,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
     const phone = investorRow[2] || ''
     const account = investorRow[3] || ''
 
-    // 해당 투자자의 투자지점 목록
     const myHouses = houseRows
       .filter(r => r[1] === investorId)
       .map(r => ({
@@ -42,23 +40,48 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
         isJoint: r[6] === 'Y',
       }))
 
-    // 활성 입주자 (입주중/계약중)의 월세+관리비 by 정규화된 지점명
+    // 활성 입주자 by 정규화된 지점명
     const activeTenants = tenantRows.filter(r => r[8] === '입주중' || r[8] === '계약중')
-    const revenueByHouse = new Map<string, number>()
+    const tenantsByHouse = new Map<string, typeof activeTenants>()
     for (const t of activeTenants) {
-      const house = normalize(t[2] || '')
-      const rent = (Number(t[10]) || 0) + (Number(t[11]) || 0)
-      revenueByHouse.set(house, (revenueByHouse.get(house) || 0) + rent)
+      const key = normalize(t[2] || '')
+      if (!tenantsByHouse.has(key)) tenantsByHouse.set(key, [])
+      tenantsByHouse.get(key)!.push(t)
     }
 
-    // 지점별 정산 계산
     const houses = myHouses.map(h => {
-      const revenue = revenueByHouse.get(normalize(h.houseName)) || 0
-      const share = Math.round(revenue * (h.investorRatio / 100))
-      return { ...h, revenue, share }
+      const key = normalize(h.houseName)
+      const houseTenants = tenantsByHouse.get(key) || []
+      const revenue = houseTenants.reduce((s, t) => s + (Number(t[10]) || 0) + (Number(t[11]) || 0), 0)
+      const houseRent = 0 // 추후 입력 예정
+      const profit = revenue - houseRent
+      const investorShare = Math.round(profit * (h.investorRatio / 100))
+      const jaehoonShare = Math.round(profit * (h.jaehoonRatio / 100))
+
+      const tenants = houseTenants.map(t => {
+        const endRaw = t[7] || ''
+        const endDate = endRaw ? endRaw.replace(/^\d{2}(\d{2})-(\d{2})-(\d{2})$/, '$1.$2.$3').replace(/^(\d{4})-(\d{2})-(\d{2})$/, (_, y, m, d) => `${y.slice(2)}.${m}.${d}`) : ''
+        return {
+          name: t[5] || '',
+          roomCode: t[3] || '',
+          roomType: t[4] || '',
+          rent: (Number(t[10]) || 0) + (Number(t[11]) || 0),
+          endDate,
+        }
+      })
+
+      return {
+        ...h,
+        revenue,
+        houseRent,
+        profit,
+        investorShare,
+        jaehoonShare,
+        tenants,
+      }
     })
 
-    const totalShare = houses.reduce((s, h) => s + (h.share || 0), 0)
+    const totalShare = houses.reduce((s, h) => s + (h.investorShare || 0), 0)
     const totalRevenue = houses.reduce((s, h) => s + (h.revenue || 0), 0)
 
     return NextResponse.json({

@@ -1,19 +1,20 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 
-const BLUE = '#3182f6', GRAY = '#8b95a1';
+const BLUE = '#3182f6', GRAY = '#8b95a1', RED = '#E24B4A';
 const fmt = (n: number | undefined | null) => (Number(n) || 0).toLocaleString() + '원';
 
+type Tenant = { name: string; roomCode: string; roomType: string; rent: number; endDate: string };
 type House = {
   investId: string; houseName: string; investorRatio: number; jaehoonRatio: number;
-  isJoint: boolean; revenue: number; share: number;
+  isJoint: boolean; revenue: number; houseRent: number; profit: number;
+  investorShare: number; jaehoonShare: number; tenants: Tenant[];
 };
 type Data = {
   investor: { id: string; name: string; phone: string; account: string };
   houses: House[]; totalShare: number; totalRevenue: number; houseCount: number;
-  year: number; month: number;
 };
 
 export default function InvestorPortalPage() {
@@ -21,6 +22,7 @@ export default function InvestorPortalPage() {
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [copied, setCopied] = useState(false);
 
   const now = new Date();
@@ -51,14 +53,10 @@ export default function InvestorPortalPage() {
       .catch(() => { setNotFound(true); setLoading(false); });
   }, [token, year, month]);
 
-  const estimatedAnnual = useMemo(() => {
-    if (!data) return 0;
-    return data.totalShare * 12;
-  }, [data]);
+  const toggle = (id: string) => setExpanded(p => ({ ...p, [id]: !p[id] }));
 
   const copyAccount = () => {
-    const text = '카카오뱅크 유재훈 3333-30-2727013';
-    navigator.clipboard?.writeText(text);
+    navigator.clipboard?.writeText('카카오뱅크 유재훈 3333-30-2727013');
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
@@ -79,90 +77,123 @@ export default function InvestorPortalPage() {
     );
   }
 
-  const { investor, houses = [], totalShare = 0, houseCount = 0 } = data;
+  const { investor, houses = [], totalShare = 0, totalRevenue = 0, houseCount = 0 } = data;
 
   return (
     <div style={{ minHeight: '100vh', background: '#F7F8FA', maxWidth: 430, margin: '0 auto' }}>
       {/* Header */}
       <div style={{ background: '#fff', padding: '32px 20px 24px' }}>
         <div style={{ fontSize: 28, fontWeight: 700, color: '#191f28', marginBottom: 4 }}>{investor.name}</div>
-        <div style={{ fontSize: 14, color: GRAY }}>투자자 · {houseCount}개 지점</div>
+        <div style={{ fontSize: 13, color: GRAY, marginBottom: 20 }}>투자자 · {houseCount}개 지점</div>
 
-        {/* KPI */}
-        <div style={{ display: 'flex', alignItems: 'center', marginTop: 24, padding: '20px 0', borderTop: '1px solid #f2f4f6', borderBottom: '1px solid #f2f4f6' }}>
+        {/* KPI: 이달 정산액 | 이달 총 매출 */}
+        <div style={{ display: 'flex', alignItems: 'center', padding: '18px 0', borderTop: '1px solid #f2f4f6', borderBottom: '1px solid #f2f4f6' }}>
           <div style={{ flex: 1, textAlign: 'center' }}>
             <div style={{ fontSize: 11, color: GRAY, marginBottom: 6 }}>이달 정산액</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: BLUE }}>{fmt(totalShare)}</div>
           </div>
           <div style={{ width: 1, height: 36, background: '#f0f0f0' }} />
           <div style={{ flex: 1, textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: GRAY, marginBottom: 6 }}>지점수</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#191f28' }}>{houseCount}</div>
-          </div>
-          <div style={{ width: 1, height: 36, background: '#f0f0f0' }} />
-          <div style={{ flex: 1, textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: GRAY, marginBottom: 6 }}>누적 정산</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#191f28' }}>{fmt(estimatedAnnual)}</div>
+            <div style={{ fontSize: 11, color: GRAY, marginBottom: 6 }}>이달 총 매출</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: '#191f28' }}>{fmt(totalRevenue)}</div>
           </div>
         </div>
       </div>
 
       {/* Month Navigation */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, padding: '16px 20px', background: '#F7F8FA' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, padding: '14px 20px', background: '#F7F8FA' }}>
         <button onClick={prevMonth} style={{ background: 'none', border: 'none', fontSize: 18, color: '#888', cursor: 'pointer', padding: '0 8px' }}>◀</button>
         <span style={{ fontSize: 16, fontWeight: 600, color: '#191f28' }}>{year}년 {month}월</span>
         <button onClick={nextMonth} disabled={isFuture} style={{ background: 'none', border: 'none', fontSize: 18, color: isFuture ? '#ddd' : '#888', cursor: isFuture ? 'default' : 'pointer', padding: '0 8px' }}>▶</button>
       </div>
 
-      {/* House List */}
-      <div style={{ padding: '0 16px 16px' }}>
+      {/* House Accordion Cards */}
+      <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
         {houses.length === 0 ? (
           <div style={{ background: '#fff', borderRadius: 16, padding: '40px 0', textAlign: 'center', color: GRAY, fontSize: 13 }}>등록된 지점이 없어요</div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {houses.map(h => (
-              <div key={h.investId} style={{ background: '#fff', borderRadius: 16, padding: '18px 20px', border: '1px solid #f2f3f5' }}>
-                {/* House name + badge */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                  <span style={{ fontSize: 16, fontWeight: 500, color: '#191f28' }}>{h.houseName}</span>
+        ) : houses.map(h => {
+          const isOpen = !!expanded[h.investId];
+          return (
+            <div key={h.investId} style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', border: '1px solid #f2f3f5' }}>
+              {/* Accordion Header */}
+              <button onClick={() => toggle(h.investId)}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', padding: '16px 18px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 15, fontWeight: 500, color: '#191f28' }}>{h.houseName}</span>
                   <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#EFF6FF', color: '#1E40AF' }}>{h.investorRatio || 0}%</span>
                   {h.isJoint && <span style={{ padding: '2px 6px', borderRadius: 6, fontSize: 10, fontWeight: 600, background: '#FEF3C7', color: '#92400E' }}>공동</span>}
                 </div>
+                <span style={{ fontSize: 15, fontWeight: 600, color: BLUE, marginRight: 8 }}>{fmt(h.investorShare)}</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform .2s', flexShrink: 0 }}>
+                  <path d="M9 18L15 12L9 6" stroke="#c4c9d1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
 
-                {/* Revenue */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <span style={{ fontSize: 13, color: GRAY }}>이달 월세+관리비</span>
-                  <span style={{ fontSize: 14, fontWeight: 500, color: '#191f28' }}>{fmt(h.revenue)}</span>
+              {/* Expanded */}
+              {isOpen && (
+                <div>
+                  {/* 섹션1: 수익 구조 */}
+                  <div style={{ background: '#fafafa', padding: '16px 18px', borderTop: '1px solid #f2f4f6' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{ fontSize: 13, color: '#555' }}>월세+관리비 합계</span>
+                      <span style={{ fontSize: 13, fontWeight: 500, color: '#191f28' }}>{fmt(h.revenue)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+                      <span style={{ fontSize: 13, color: '#555' }}>집 월세</span>
+                      <span style={{ fontSize: 13, fontWeight: 500, color: RED }}>-{fmt(h.houseRent)}</span>
+                    </div>
+                    <div style={{ height: 1, background: '#e8e8e8', marginBottom: 12 }} />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14 }}>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: '#191f28' }}>순이익</span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: '#191f28' }}>{fmt(h.profit)}</span>
+                    </div>
+
+                    {/* 배분 바 */}
+                    <div style={{ height: 8, borderRadius: 6, background: '#f0f0f0', overflow: 'hidden', marginBottom: 10 }}>
+                      <div style={{ width: `${Math.min(h.investorRatio || 0, 100)}%`, height: '100%', background: BLUE, borderRadius: 6 }} />
+                    </div>
+
+                    {/* 배분 내역 */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                      <span style={{ color: BLUE, fontWeight: 600 }}>{investor.name} {h.investorRatio || 0}% → {fmt(h.investorShare)}</span>
+                      <span style={{ color: GRAY }}>운영자 {h.jaehoonRatio || 0}% → {fmt(h.jaehoonShare)}</span>
+                    </div>
+                  </div>
+
+                  {/* 섹션2: 입주자 현황 */}
+                  <div style={{ padding: '8px 18px 6px', background: '#fafafa', borderTop: '1px solid #f2f4f6' }}>
+                    <span style={{ fontSize: 12, color: GRAY }}>입주자 현황 · {h.tenants.length}명</span>
+                  </div>
+                  <div>
+                    {h.tenants.length === 0 ? (
+                      <div style={{ padding: '16px 18px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>입주자가 없어요</div>
+                    ) : h.tenants.map((t, i) => (
+                      <div key={`${t.roomCode}-${i}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 18px', borderTop: i === 0 ? '1px solid #f2f4f6' : '1px solid #f8f8f8' }}>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 500, color: '#191f28' }}>{t.name}</div>
+                          <div style={{ fontSize: 11, color: GRAY, marginTop: 2 }}>{t.roomCode}{t.roomType ? ' · ' + t.roomType : ''}</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          {t.endDate && <div style={{ fontSize: 11, color: GRAY }}>{t.endDate}</div>}
+                          <div style={{ fontSize: 13, fontWeight: 500, color: '#191f28' }}>{fmt(t.rent)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-
-                {/* Share */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <span style={{ fontSize: 13, color: GRAY }}>정산액</span>
-                  <span style={{ fontSize: 18, fontWeight: 700, color: BLUE }}>{fmt(h.share)}</span>
-                </div>
-
-                {/* Calculation hint */}
-                <div style={{ fontSize: 12, color: '#adb5bd' }}>월세합계 {fmt(h.revenue)} x {h.investorRatio || 0}%</div>
-
-                {/* Ratio bar */}
-                <div style={{ height: 6, borderRadius: 3, background: '#f0f0f0', overflow: 'hidden', marginTop: 8 }}>
-                  <div style={{ width: `${Math.min(h.investorRatio || 0, 100)}%`, height: '100%', background: BLUE, borderRadius: 3 }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      {/* Total Card */}
+      {/* Total + 계좌 복사 */}
       <div style={{ padding: '0 16px 24px' }}>
         <div style={{ background: '#fff', borderRadius: 16, padding: '20px', border: '1px solid #f2f3f5' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <span style={{ fontSize: 15, fontWeight: 700, color: '#191f28' }}>이달 총 정산액</span>
             <span style={{ fontSize: 22, fontWeight: 700, color: BLUE }}>{fmt(totalShare)}</span>
           </div>
-
-          {/* Account copy */}
           <button onClick={copyAccount}
             style={{ width: '100%', padding: '12px 0', borderRadius: 10, border: '1px solid #e5e8eb', background: copied ? '#f0f7ff' : '#fff', color: copied ? BLUE : '#555', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'all .2s' }}>
             {copied ? '복사됨' : '운영 계좌 복사 (카카오뱅크 유재훈)'}
@@ -170,7 +201,6 @@ export default function InvestorPortalPage() {
         </div>
       </div>
 
-      {/* Footer */}
       <div style={{ textAlign: 'center', padding: '16px 0 32px', fontSize: 11, color: '#ccc' }}>ShareHub</div>
     </div>
   );
