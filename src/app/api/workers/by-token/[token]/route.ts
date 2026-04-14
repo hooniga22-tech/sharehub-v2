@@ -36,7 +36,11 @@ export async function GET(
 
     const rows = res.data.values || []
     // 헤더: ID(0) 날짜(1) 하우스명(2) 담당자(3) 종류(4) 비용(5) 메모(6) 완료여부(7)
-    const schedules = rows.slice(1)
+    const { searchParams } = new URL(req.url)
+    const year = searchParams.get('year')
+    const month = searchParams.get('month')
+
+    let schedules = rows.slice(1)
       .map(r => ({
         id: r[0] || '',
         date: r[1] || '',
@@ -48,7 +52,13 @@ export async function GET(
         isDone: r[7] === 'Y',
       }))
       .filter(s => s.workerName === workerName)
-      .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+
+    if (year && month) {
+      const prefix = `${year}-${String(month).padStart(2, '0')}`
+      schedules = schedules.filter(s => s.date.startsWith(prefix))
+    }
+
+    schedules.sort((a, b) => a.date.localeCompare(b.date))
 
     return NextResponse.json({
       worker: { name: workerName, token },

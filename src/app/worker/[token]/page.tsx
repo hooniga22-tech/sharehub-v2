@@ -1,185 +1,266 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { ChevronDown, ChevronUp, Check, Undo2 } from 'lucide-react';
 
-const BLUE = '#3182f6', GREEN = '#00c471', GRAY = '#8b95a1';
+const BLUE = '#3182F6', GREEN_D = '#16A34A', GREEN_BG = '#D1FAE5', GREEN_FG = '#065F46';
+const AMBER_D = '#D97706', AMBER_BG = '#FFFBEB', AMBER_FG = '#92400E';
 const fmt = (n: number) => n.toLocaleString() + '원';
 
-type Staff = { 담당자ID: string; 이름: string; 연락처: string; 분야: string; 구분: string; 링크토큰: string; 기본금액: string };
-type Work = { 용역ID: string; 예정일: string; 지점명: string; 담당자명: string; 작업종류: string; 정산금액: string; 메모: string; 완료여부: string };
+const TOKEN_MAP: Record<string, { name: string; type: string }> = {
+  'b775a18c876534ee': { name: '이인실', type: '청소' },
+  '4b594c769b0aa6ab': { name: '이미경', type: '청소' },
+  'e8f27ed8eab30c68': { name: '이한나', type: '청소' },
+  '2d79c5c07cfb8e4c': { name: '진진수', type: '수리' },
+};
+
+type Schedule = { id: string; date: string; houseName: string; type: string; amount: number; isDone: boolean; memo: string };
+
+const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
 export default function WorkerTokenPage() {
   const { token } = useParams<{ token: string }>();
-  const [staff, setStaff] = useState<Staff | null>(null);
-  const [schedules, setSchedules] = useState<Work[]>([]);
+  const worker = TOKEN_MAP[token];
+
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
-  const [openMonths, setOpenMonths] = useState<Record<string, boolean>>({});
   const [toast, setToast] = useState('');
+
+  const now = new Date();
+  const [viewYear, setViewYear] = useState(now.getFullYear());
+  const [viewMonth, setViewMonth] = useState(now.getMonth() + 1);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2200); };
 
-  useEffect(() => {
-    fetch(`/api/workers?token=${token}`)
+  const fetchData = useCallback(() => {
+    if (!worker) return;
+    setLoading(true);
+    fetch(`/api/workers/by-token/${token}?year=${viewYear}&month=${viewMonth}`)
       .then(r => r.json())
       .then(data => {
-        if (data.error) { setLoading(false); return; }
-        setStaff(data.staff);
+        if (data.error) { setSchedules([]); return; }
         setSchedules(Array.isArray(data.schedules) ? data.schedules : []);
-        setLoading(false);
       })
-      .catch(() => setLoading(false));
-  }, [token]);
+      .catch(() => setSchedules([]))
+      .finally(() => setLoading(false));
+  }, [token, worker, viewYear, viewMonth]);
 
-  const pending = schedules.filter(s => s.완료여부 !== 'Y');
-  const completed = schedules.filter(s => s.완료여부 === 'Y');
-  const totalIncome = completed.reduce((s, w) => s + (Number(w.정산금액) || 0), 0);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Group by month
-  const monthGroups = useMemo(() => {
-    const map: Record<string, Work[]> = {};
-    for (const w of schedules) {
-      const m = w.예정일?.slice(0, 7) || 'unknown';
-      if (!map[m]) map[m] = [];
-      map[m].push(w);
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+  const doneCount = useMemo(() => schedules.filter(s => s.isDone).length, [schedules]);
+  const pendingCount = useMemo(() => schedules.filter(s => !s.isDone).length, [schedules]);
+  const totalAmount = useMemo(() => schedules.reduce((s, w) => s + w.amount, 0), [schedules]);
+
+  // Calendar helpers
+  const calendarDays = useMemo(() => {
+    const firstDay = new Date(viewYear, viewMonth - 1, 1).getDay();
+    const daysInMonth = new Date(viewYear, viewMonth, 0).getDate();
+    const cells: (number | null)[] = [];
+    for (let i = 0; i < firstDay; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+    while (cells.length % 7 !== 0) cells.push(null);
+    return cells;
+  }, [viewYear, viewMonth]);
+
+  const schedulesByDate = useMemo(() => {
+    const map = new Map<string, Schedule[]>();
+    for (const s of schedules) {
+      if (!map.has(s.date)) map.set(s.date, []);
+      map.get(s.date)!.push(s);
     }
-    return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0]));
+    return map;
   }, [schedules]);
 
-  const markDone = async (id: string) => {
-    await fetch('/api/workers', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, 완료여부: 'Y' }) });
-    setSchedules(prev => prev.map(s => s.용역ID === id ? { ...s, 완료여부: 'Y' } : s));
+  const todaySchedules = useMemo(() => schedulesByDate.get(todayStr) || [], [schedulesByDate, todayStr]);
+  const pendingSchedules = useMemo(() => schedules.filter(s => !s.isDone && s.date !== todayStr).sort((a, b) => a.date.localeCompare(b.date)), [schedules, todayStr]);
+  const doneSchedules = useMemo(() => schedules.filter(s => s.isDone).sort((a, b) => b.date.localeCompare(a.date)), [schedules]);
+
+  const prevMonth = () => {
+    if (viewMonth === 1) { setViewYear(y => y - 1); setViewMonth(12); }
+    else setViewMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    if (viewMonth === 12) { setViewYear(y => y + 1); setViewMonth(1); }
+    else setViewMonth(m => m + 1);
+  };
+
+  const handleDone = async (id: string) => {
+    if (!confirm('완료 처리할까요?')) return;
+    await fetch(`/api/workers/schedule/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ isDone: true }) });
+    setSchedules(prev => prev.map(s => s.id === id ? { ...s, isDone: true } : s));
     showToast('완료 처리됐어요!');
   };
 
-  const markUndone = async (id: string) => {
-    await fetch('/api/workers', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, 완료여부: 'N' }) });
-    setSchedules(prev => prev.map(s => s.용역ID === id ? { ...s, 완료여부: 'N' } : s));
+  const handleUndone = async (id: string) => {
+    if (!confirm('완료를 취소할까요?')) return;
+    await fetch(`/api/workers/schedule/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ isDone: false }) });
+    setSchedules(prev => prev.map(s => s.id === id ? { ...s, isDone: false } : s));
     showToast('되돌렸어요');
   };
 
-  const toggleMonth = (key: string) => setOpenMonths(prev => ({ ...prev, [key]: !prev[key] }));
+  const handleEditAmount = async (s: Schedule) => {
+    const input = prompt('새 금액을 입력하세요', String(s.amount));
+    if (input === null) return;
+    const newAmount = Number(input);
+    if (isNaN(newAmount) || newAmount < 0) return;
+    await fetch(`/api/workers/schedule/${s.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: newAmount }) });
+    setSchedules(prev => prev.map(x => x.id === s.id ? { ...x, amount: newAmount } : x));
+    showToast('금액이 수정됐어요');
+  };
 
-  if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', background: '#F7F8FA', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <p style={{ color: GRAY, fontSize: 13 }}>불러오는 중...</p>
-      </div>
-    );
-  }
+  const fmtMD = (d: string) => {
+    const p = d.split('-');
+    return `${Number(p[1])}월 ${Number(p[2])}일`;
+  };
 
-  if (!staff) {
+  if (!worker) {
     return (
-      <div style={{ minHeight: '100vh', background: '#F7F8FA', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <p style={{ color: '#BBB', fontSize: 15 }}>존재하지 않는 페이지입니다</p>
+      <div style={{ minHeight: '100vh', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <p style={{ color: '#bbb', fontSize: 15 }}>존재하지 않는 페이지입니다</p>
       </div>
     );
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F7F8FA' }}>
-      {/* Blue Header */}
-      <div style={{ background: BLUE, padding: '24px 20px 20px', color: '#fff' }}>
-        <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>{staff.이름} 님 👋</div>
-        <div style={{ fontSize: 13, opacity: 0.8, marginBottom: 16 }}>{staff.분야} 담당 · {staff.구분 || '정규'}</div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          {[
-            { label: '완료', value: `${completed.length}건` },
-            { label: '남은 일정', value: `${pending.length}건` },
-            { label: '수입', value: fmt(totalIncome) },
-          ].map(k => (
-            <div key={k.label} style={{ flex: 1, background: 'rgba(255,255,255,0.15)', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
-              <div style={{ fontSize: 16, fontWeight: 700 }}>{k.value}</div>
-              <div style={{ fontSize: 10, opacity: 0.8, marginTop: 2 }}>{k.label}</div>
+    <div style={{ maxWidth: 430, margin: '0 auto', minHeight: '100vh', background: '#fff' }}>
+      {/* Header */}
+      <div style={{ padding: '32px 20px 24px', borderBottom: '0.5px solid #f0f0f0' }}>
+        <div style={{ fontSize: 34, fontWeight: 700, color: '#111', marginBottom: 4 }}>{worker.name}</div>
+        <div style={{ fontSize: 15, color: '#888', marginBottom: 20 }}>{worker.type} 담당 · {viewYear}년 {viewMonth}월</div>
+        {loading ? (
+          <div style={{ height: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ccc', fontSize: 13 }}>불러오는 중...</div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <div style={{ flex: 1, textAlign: 'center' }}>
+              <div style={{ fontSize: 28, fontWeight: 700, color: GREEN_D }}>{doneCount}</div>
+              <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>완료</div>
             </div>
-          ))}
-        </div>
+            <div style={{ width: 1, height: 32, background: '#f0f0f0' }} />
+            <div style={{ flex: 1, textAlign: 'center' }}>
+              <div style={{ fontSize: 28, fontWeight: 700, color: AMBER_D }}>{pendingCount}</div>
+              <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>예정</div>
+            </div>
+            <div style={{ width: 1, height: 32, background: '#f0f0f0' }} />
+            <div style={{ flex: 1, textAlign: 'center' }}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#111' }}>{fmt(totalAmount)}</div>
+              <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>이달 합계</div>
+            </div>
+          </div>
+        )}
       </div>
 
-      <div style={{ padding: 16 }}>
-        {/* Pending */}
-        {pending.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#F04452', marginBottom: 8 }}>처리 필요 {pending.length}건</div>
-            {pending.map(w => (
-              <div key={w.용역ID} style={{ background: '#fff', borderRadius: 14, padding: 20, marginBottom: 10 }}>
-                <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>{w.지점명}</div>
-                <div style={{ fontSize: 12, color: GRAY, marginBottom: 12 }}>{w.작업종류} · {w.예정일}</div>
-                {w.메모 && <div style={{ fontSize: 12, color: '#666', marginBottom: 12 }}>📝 {w.메모}</div>}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <span style={{ fontSize: 13, color: '#666' }}>정산 금액</span>
-                  <span style={{ fontSize: 16, fontWeight: 700 }}>{fmt(Number(w.정산금액) || 0)}</span>
-                </div>
-                <button onClick={() => markDone(w.용역ID)}
-                  style={{ width: '100%', padding: 14, borderRadius: 12, border: 'none', background: BLUE, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-                  ✅ 완료 처리
-                </button>
-              </div>
+      {/* Month Navigation */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20, padding: '14px 0' }}>
+        <button onClick={prevMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, fontWeight: 600, color: '#888', padding: '4px 8px' }}>◀</button>
+        <span style={{ fontSize: 15, fontWeight: 600, color: '#111' }}>{viewYear}년 {viewMonth}월</span>
+        <button onClick={nextMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, fontWeight: 600, color: '#888', padding: '4px 8px' }}>▶</button>
+      </div>
+
+      {/* Calendar */}
+      {!loading && (
+        <div style={{ padding: '0 12px 16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', textAlign: 'center', marginBottom: 4 }}>
+            {WEEKDAYS.map(d => (
+              <div key={d} style={{ fontSize: 11, color: '#aaa', padding: '4px 0' }}>{d}</div>
             ))}
           </div>
-        )}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+            {calendarDays.map((day, i) => {
+              if (day === null) return <div key={`e${i}`} style={{ minHeight: 42 }} />;
+              const dateStr = `${viewYear}-${String(viewMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              const daySchedules = schedulesByDate.get(dateStr) || [];
+              const isToday = dateStr === todayStr;
+              const hasDone = daySchedules.some(s => s.isDone);
+              const hasPending = daySchedules.some(s => !s.isDone);
 
-        {/* Completed */}
-        {completed.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: GREEN, marginBottom: 8 }}>완료 {completed.length}건 · {fmt(totalIncome)}</div>
-            {completed.map(w => (
-              <div key={w.용역ID} style={{ background: '#fff', borderRadius: 12, padding: '12px 16px', marginBottom: 8, opacity: 0.65, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{w.지점명}</div>
-                  <div style={{ fontSize: 11, color: GRAY }}>{w.예정일} · {fmt(Number(w.정산금액) || 0)}</div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ padding: '2px 7px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: '#e8faf2', color: GREEN }}>완료</span>
-                  <button onClick={() => markUndone(w.용역ID)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}>
-                    <Undo2 size={14} color="#999" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+              let bg = 'transparent';
+              let color = '#333';
+              let border = 'none';
+              if (isToday) { bg = '#EFF6FF'; border = '2px solid #3182F6'; color = '#1D4ED8'; }
+              else if (hasDone && !hasPending) { bg = GREEN_BG; color = GREEN_FG; }
+              else if (hasPending) { bg = AMBER_BG; color = AMBER_FG; }
 
-        {/* Monthly groups */}
-        {monthGroups.length > 1 && (
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: GRAY, marginBottom: 8, textAlign: 'center' }}>── 월별 기록 ──</div>
-            {monthGroups.map(([month, tasks]) => {
-              const isOpen = openMonths[month] ?? false;
-              const total = tasks.reduce((s, t) => s + (Number(t.정산금액) || 0), 0);
-              const done = tasks.filter(t => t.완료여부 === 'Y').length;
+              const houseLabel = daySchedules.length > 0
+                ? daySchedules.length <= 2
+                  ? daySchedules.map(s => s.houseName.replace(/하우스$/, '')).join('·')
+                  : `${daySchedules[0].houseName.replace(/하우스$/, '')} +${daySchedules.length - 1}`
+                : '';
+
               return (
-                <div key={month} style={{ background: '#fff', borderRadius: 12, marginBottom: 8, overflow: 'hidden' }}>
-                  <button onClick={() => toggleMonth(month)}
-                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
-                    <span style={{ fontSize: 13, fontWeight: 600 }}>{month}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 12, color: GRAY }}>{tasks.length}건 (완료 {done}) · {fmt(total)}</span>
-                      {isOpen ? <ChevronUp size={14} color="#999" /> : <ChevronDown size={14} color="#999" />}
-                    </div>
-                  </button>
-                  {isOpen && tasks.map(t => (
-                    <div key={t.용역ID} style={{ padding: '8px 16px', borderTop: '1px solid #F5F5F5', display: 'flex', justifyContent: 'space-between', opacity: 0.8 }}>
-                      <span style={{ fontSize: 12 }}>{t.지점명} · {t.예정일}</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontSize: 12, color: GRAY }}>{fmt(Number(t.정산금액) || 0)}</span>
-                        <span style={{ padding: '2px 5px', borderRadius: 3, fontSize: 9, fontWeight: 600, background: t.완료여부 === 'Y' ? '#e8faf2' : '#f2f4f6', color: t.완료여부 === 'Y' ? GREEN : GRAY }}>{t.완료여부 === 'Y' ? '완료' : '예정'}</span>
-                      </div>
-                    </div>
-                  ))}
+                <div key={dateStr} style={{ minHeight: 42, background: bg, borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border, padding: '2px 1px' }}>
+                  <span style={{ fontSize: 13, fontWeight: isToday ? 700 : 400, color: daySchedules.length === 0 && !isToday ? '#ccc' : color }}>{day}</span>
+                  {houseLabel && <span style={{ fontSize: 8, color, marginTop: 1, lineHeight: 1, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{houseLabel}</span>}
                 </div>
               );
             })}
           </div>
-        )}
+        </div>
+      )}
 
-        {schedules.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '60px 0', color: GRAY }}>
-            <p style={{ fontSize: 14 }}>일정이 없어요</p>
-          </div>
-        )}
-      </div>
+      {/* Schedule Cards */}
+      {!loading && (
+        <div style={{ background: '#f8f8f8', padding: '16px 16px 40px', minHeight: 200 }}>
+
+          {/* Today Card */}
+          {todaySchedules.map(s => (
+            <div key={s.id} style={{ background: '#fff', borderRadius: 16, border: '0.5px solid #e5e8eb', padding: 20, marginBottom: 12 }}>
+              <div style={{ fontSize: 12, color: BLUE, fontWeight: 600, marginBottom: 8 }}>오늘 · {fmtMD(todayStr)}</div>
+              <div style={{ fontSize: 30, fontWeight: 700, color: '#111', marginBottom: 4 }}>{s.houseName}</div>
+              <div style={{ fontSize: 15, color: '#888', marginBottom: 20 }}>{s.type} · {fmt(s.amount)}</div>
+              {!s.isDone ? (
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button onClick={() => handleEditAmount(s)} style={{ flex: 1, height: 52, borderRadius: 12, border: '1px solid #e5e8eb', background: '#fff', fontSize: 16, color: '#333', cursor: 'pointer', fontFamily: 'inherit' }}>수정</button>
+                  <button onClick={() => handleDone(s.id)} style={{ flex: 2, height: 52, borderRadius: 12, border: 'none', background: BLUE, color: '#fff', fontSize: 18, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>완료 처리</button>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '8px 0', fontSize: 14, color: GREEN_D, fontWeight: 600 }}>완료됨</div>
+              )}
+            </div>
+          ))}
+
+          {/* Pending Cards */}
+          {pendingSchedules.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: AMBER_D, marginBottom: 8, padding: '0 4px' }}>예정 {pendingSchedules.length}건</div>
+              <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #f0f0f0', overflow: 'hidden' }}>
+                {pendingSchedules.map((s, i, arr) => (
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', borderBottom: i < arr.length - 1 ? '1px solid #f5f5f5' : 'none' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 22, fontWeight: 700, color: '#111' }}>{s.houseName}</div>
+                      <div style={{ fontSize: 14, color: AMBER_D, marginTop: 2 }}>{fmtMD(s.date)} · {s.type} · {fmt(s.amount)}</div>
+                    </div>
+                    <button onClick={() => handleDone(s.id)} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: BLUE, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>완료</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Done Cards */}
+          {doneSchedules.length > 0 && (
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: GREEN_D, marginBottom: 8, padding: '0 4px' }}>완료 {doneSchedules.length}건</div>
+              <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #f0f0f0', overflow: 'hidden', opacity: 0.45 }}>
+                {doneSchedules.map((s, i, arr) => (
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', borderBottom: i < arr.length - 1 ? '1px solid #f5f5f5' : 'none' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 22, fontWeight: 700, color: '#111' }}>{s.houseName}</div>
+                      <div style={{ fontSize: 14, color: GREEN_D, marginTop: 2 }}>{fmtMD(s.date)} · 완료 · {fmt(s.amount)}</div>
+                    </div>
+                    <button onClick={() => handleUndone(s.id)} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid #e5e8eb', background: '#fff', fontSize: 14, color: '#555', cursor: 'pointer', fontFamily: 'inherit' }}>되돌리기</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {schedules.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '60px 0', color: '#bbb', fontSize: 14 }}>이달 일정이 없어요</div>
+          )}
+        </div>
+      )}
 
       {toast && (
         <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: '#191f28', color: '#fff', padding: '10px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600, zIndex: 999, whiteSpace: 'nowrap' }}>{toast}</div>
