@@ -180,27 +180,25 @@ export default function TenantsPage() {
                   {isOpen ? <ChevronUp size={18} color="#BBBBBB" /> : <ChevronDown size={18} color="#BBBBBB" />}
                 </button>
                 {isOpen && (
-                  <div style={{ padding: '0 16px 12px' }}>
+                  <div style={{ padding: '0 2px 6px' }}>
                     {hTenants.map((t, i) => {
                       const isSoon = t['상태'] === '공실예정';
+                      const isLast = i === hTenants.length - 1;
                       return (
-                        <div key={t['입주자ID']}>
-                          {i > 0 && <div style={{ height: 1, background: '#F5F5F5' }} />}
-                          <Link href={`/tenants/${t['입주자ID']}`}
-                            style={{ display: 'flex', alignItems: 'center', padding: '12px 0', textDecoration: 'none', color: 'inherit' }}>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <span style={{ fontSize: 15, fontWeight: 500, color: '#191919' }}>{t['이름']}</span>
-                                {isSoon && <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: '#FEF3C7', color: '#92400E' }}>퇴실예정</span>}
-                              </div>
-                              <p style={{ fontSize: 12, color: '#8b95a1', marginTop: 2 }}>{t['방코드']} {t['방타입']}</p>
+                        <Link key={t['입주자ID']} href={`/tenants/${t['입주자ID']}`}
+                          style={{ display: 'flex', flexDirection: 'column', padding: '11px 14px', borderBottom: isLast ? 'none' : '0.5px solid rgba(0,0,0,0.05)', textDecoration: 'none', color: 'inherit' }}>
+                          <div style={{ display: 'flex', alignItems: 'center' }}>
+                            <span style={{ fontSize: 14, fontWeight: 500, color: '#111', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t['이름']}</span>
+                            <span style={{ fontSize: 13, fontWeight: 500, color: '#111', flexShrink: 0 }}>{fmtWon(Number(t['월세']) || 0)}</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', marginTop: 5 }}>
+                            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ fontSize: 11, color: '#888' }}>{t['방코드']}</span>
+                              {isSoon && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 100, background: '#FFF0E0', color: '#C06A00', fontWeight: 500 }}>퇴실예정</span>}
                             </div>
-                            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                              {t['퇴실일'] && <p style={{ fontSize: 12, color: isSoon ? '#F59E0B' : '#8b95a1', fontWeight: isSoon ? 500 : 400 }}>{t['퇴실일']}</p>}
-                              <p style={{ fontSize: 13, fontWeight: 500, color: '#191919', marginTop: 2 }}>{fmtWon(Number(t['월세']) || 0)}</p>
-                            </div>
-                          </Link>
-                        </div>
+                            <span style={{ fontSize: 12, color: isSoon ? '#E07000' : '#888', flexShrink: 0 }}>~{t['퇴실일'] || '-'}</span>
+                          </div>
+                        </Link>
                       );
                     })}
                   </div>
