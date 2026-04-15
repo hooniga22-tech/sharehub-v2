@@ -34,7 +34,7 @@ export default function TenantsPage() {
   const guList = useMemo(() => [...new Set(tenants.map(t => t['구']).filter(Boolean))].sort(), [tenants]);
   const guFiltered = useMemo(() => gu === '전체' ? tenants : tenants.filter(t => t['구'] === gu), [tenants, gu]);
 
-  const occupied = guFiltered.filter(t => t['상태'] === '입주중' || t['상태'] === '계약중');
+  const occupied = guFiltered.filter(t => t['상태'] === '입주중' || t['상태'] === '계약중' || t['상태'] === '공실예정');
   const checkout = guFiltered.filter(t => t['상태'] === '공실예정');
 
   // Group by 지점명
@@ -61,7 +61,7 @@ export default function TenantsPage() {
   }, [search, isSearching, guFiltered]);
 
   const tabs: { key: FilterTab; label: string; count: number }[] = [
-    { key: 'occupied', label: '입주중', count: occupied.length },
+    { key: 'occupied', label: '현재 입주중', count: occupied.length },
     { key: 'checkout', label: '공실예정', count: checkout.length },
     { key: 'vacant', label: '전체', count: guFiltered.length },
   ];
