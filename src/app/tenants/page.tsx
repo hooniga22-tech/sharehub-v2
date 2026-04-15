@@ -23,7 +23,7 @@ export default function TenantsPage() {
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
   });
-  const tenants = Array.isArray(rawTenants) ? rawTenants : [];
+  const tenants = (Array.isArray(rawTenants) ? rawTenants : []).filter(t => t['상태'] !== '퇴실완료');
   const error = swrError ? '데이터를 불러오지 못했어요' : '';
   const [filter, setFilter] = useState<FilterTab>('occupied');
   const [expanded, setExpanded] = useState<string | null>(null);
