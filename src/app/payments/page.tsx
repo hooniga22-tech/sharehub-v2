@@ -226,6 +226,25 @@ export default function PaymentsPage() {
         <div style={{ textAlign: 'center', padding: '80px 0', color: '#b0b8c1', fontSize: 13 }}>불러오는 중...</div>
       ) : (
         <>
+          {/* 플랫폼 이체 관리 카드 */}
+          <div onClick={() => router.push('/payments/platform')}
+            style={{ background:'#fff', borderRadius:14, padding:'14px 16px',
+              margin:'10px 14px', cursor:'pointer', border:'1px solid #E5E8EC',
+              display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <div>
+              <div style={{ fontSize:14, fontWeight:800, color:'#191F28' }}>플랫폼 이체 관리</div>
+              <div style={{ fontSize:12, color:'#8B95A1', marginTop:3 }}>
+                우주 · 앤코 · 준오 입주자 이체 현황
+              </div>
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="#8B95A1" strokeWidth="2" strokeLinecap="round">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+            </div>
+          </div>
+
           {/* 구/지점 드롭다운 */}
           <div style={{ background: '#fff', padding: '10px 14px', display: 'flex', gap: 8, borderBottom: '1px solid #f2f2f2' }}>
             <select value={selectedGu} onChange={e => { setSelectedGu(e.target.value); setSelectedBranch(''); }}
