@@ -104,6 +104,9 @@ export function buildTimelines(tenants: any[]): HouseTimeline[] {
       )
 
       const nowDate = new Date()
+      const YEAR = nowDate.getFullYear()
+      const YEAR_START = new Date(YEAR, 0, 1)
+      const YEAR_END   = new Date(YEAR, 11, 31)
 
       sorted.forEach((t, i) => {
         const inDate  = parseSheetDate(t['입주일'])
@@ -112,8 +115,20 @@ export function buildTimelines(tenants: any[]): HouseTimeline[] {
 
         if (!inDate) return
 
-        const startMonth = inDate.getMonth()
-        const endMonth   = outDate ? outDate.getMonth() : 11
+        // 퇴실일이 올해 1월 1일 이전이면 → 이미 떠난 사람, 스킵
+        if (outDate && outDate < YEAR_START) return
+
+        // 입주일이 올해 12월 31일 이후면 → 아직 안 온 사람, 스킵
+        if (inDate > YEAR_END) return
+
+        // 상태가 '공실'이고 퇴실일이 올해 이전 → 스킵
+        if (status === '공실' && outDate && outDate < YEAR_START) return
+
+        const startMonth = Math.max(0, inDate.getFullYear() < YEAR ? 0 : inDate.getMonth())
+        const endMonth   = Math.min(11, outDate ? (outDate.getFullYear() > YEAR ? 11 : outDate.getMonth()) : 11)
+
+        // startMonth > endMonth 이면 올해 범위 밖 → skip
+        if (startMonth > endMonth) return
         const inDay      = inDate.getDate()
         const outDay     = outDate?.getDate()
 
