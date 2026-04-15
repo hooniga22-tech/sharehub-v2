@@ -96,18 +96,7 @@ export default function TenantsPage() {
       <div style={{ position: 'sticky', top: 0, zIndex: 20, background: '#fff', padding: '20px 16px 0', borderBottom: '1px solid #F0F0F0' }}>
         <h1 style={{ fontSize: 20, fontWeight: 700, letterSpacing: -0.5, marginBottom: 12 }}>입주자</h1>
 
-        {/* 목록/타임라인 탭 */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-          {([['list', '목록'], ['timeline', '타임라인']] as const).map(([key, label]) => (
-            <button key={key} onClick={() => setActiveTab(key)}
-              style={{ padding: '6px 16px', borderRadius: 100, border: activeTab === key ? '1px solid #191f28' : '1px solid #e5e8eb', background: activeTab === key ? '#191f28' : '#fff', color: activeTab === key ? '#fff' : '#4e5968', fontSize: 13, fontWeight: activeTab === key ? 600 : 400, cursor: 'pointer', fontFamily: 'inherit' }}>
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* 검색창 — 목록 탭만 */}
-        {activeTab === 'list' && (<>
+        {/* 검색창 — 항상 표시 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', height: 40, borderRadius: 12, background: searchFocused ? '#fff' : '#F5F5F5', border: searchFocused ? '1.5px solid #3182F6' : '1.5px solid transparent', transition: 'all 0.2s' }}>
             <Search size={16} color="#BBBBBB" />
@@ -123,7 +112,7 @@ export default function TenantsPage() {
           )}
         </div>
 
-        {/* 구 필터 칩 */}
+        {/* 구 필터 칩 — 항상 표시 */}
         {!isSearching && guList.length > 0 && (
           <div style={{ display: 'flex', overflowX: 'auto', gap: 6, padding: '0 16px 12px', scrollbarWidth: 'none' }}>
             {['전체', ...guList].map(g => (
@@ -132,8 +121,18 @@ export default function TenantsPage() {
           </div>
         )}
 
-        {/* 필터 탭 */}
-        {!isSearching && (
+        {/* 목록/타임라인 탭 */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+          {([['list', '목록'], ['timeline', '타임라인']] as const).map(([key, label]) => (
+            <button key={key} onClick={() => setActiveTab(key)}
+              style={{ padding: '6px 16px', borderRadius: 100, border: activeTab === key ? '1px solid #191f28' : '1px solid #e5e8eb', background: activeTab === key ? '#191f28' : '#fff', color: activeTab === key ? '#fff' : '#4e5968', fontSize: 13, fontWeight: activeTab === key ? 600 : 400, cursor: 'pointer', fontFamily: 'inherit' }}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* 필터 탭 — 목록 탭만 */}
+        {activeTab === 'list' && !isSearching && (
           <div style={{ display: 'flex' }}>
             {tabs.map(tab => (
               <button key={tab.key}
@@ -145,7 +144,6 @@ export default function TenantsPage() {
             ))}
           </div>
         )}
-        </>)}
       </div>
 
       {/* 목록 탭 콘텐츠 */}
@@ -291,6 +289,8 @@ export default function TenantsPage() {
       {activeTab === 'timeline' && (
         <TenantTimeline
           houses={timelines}
+          searchQuery={search}
+          selectedGu={gu}
           onTenantClick={(tenantId) => router.push(`/tenants/${tenantId}`)}
         />
       )}

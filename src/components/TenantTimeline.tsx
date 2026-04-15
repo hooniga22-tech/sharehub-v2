@@ -9,10 +9,31 @@ const ROW_H = 36
 
 interface Props {
   houses: HouseTimeline[]
+  searchQuery?: string
+  selectedGu?: string
   onTenantClick?: (tenantId: string) => void
 }
 
-export default function TenantTimeline({ houses, onTenantClick }: Props) {
+export default function TenantTimeline({ houses, searchQuery, selectedGu, onTenantClick }: Props) {
+  // 구 필터
+  const guFiltered = houses.filter(h => {
+    if (selectedGu && selectedGu !== '전체') return h.district === selectedGu
+    return true
+  })
+
+  // 검색 필터 (하우스명 또는 입주자 이름)
+  const filtered = guFiltered.filter(h => {
+    if (!searchQuery) return true
+    const q = searchQuery.toLowerCase()
+    if (h.name.toLowerCase().includes(q)) return true
+    return h.rooms.some(r =>
+      r.tenants.some(t =>
+        t.type === 'handover'
+          ? ((t as HandoverSpan).n1.toLowerCase().includes(q) || (t as HandoverSpan).n2.toLowerCase().includes(q))
+          : (t as TenantSpan).name?.toLowerCase().includes(q)
+      )
+    )
+  })
   const [openHouses, setOpenHouses] = useState<Record<string, boolean>>({})
   const [modal, setModal] = useState<{
     visible: boolean
@@ -36,7 +57,7 @@ export default function TenantTimeline({ houses, onTenantClick }: Props) {
 
   // Summary counts
   let inC = 0, soonC = 0, outC = 0, vacC = 0
-  houses.forEach(h => h.rooms.forEach(r => {
+  filtered.forEach(h => h.rooms.forEach(r => {
     const cur = r.tenants.find(t =>
       t.type === 'handover'
         ? (t as HandoverSpan).month === TODAY_MONTH
@@ -81,7 +102,7 @@ export default function TenantTimeline({ houses, onTenantClick }: Props) {
       </div>
 
       {/* House cards */}
-      {houses.map(house => {
+      {filtered.map(house => {
         const isOpen = !!openHouses[house.id]
         const vacRooms = house.rooms.filter(r => r.tenants.length === 0).length
         const soonRooms = house.rooms.filter(r =>
