@@ -52,6 +52,10 @@ export default function TenantDetailPage() {
   const [toast, setToast] = useState('');
   const [payProcessing, setPayProcessing] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelFee, setCancelFee] = useState('');
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelProcessing, setCancelProcessing] = useState(false);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2200); };
 
@@ -88,6 +92,59 @@ export default function TenantDetailPage() {
       showToast('납부 완료 처리됐어요');
     } catch { }
     finally { setPayProcessing(null); }
+  };
+
+  const handleCancelContract = async () => {
+    if (!tenant || cancelProcessing) return;
+    setCancelProcessing(true);
+    try {
+      const memoAppend = `계약취소: ${cancelReason || '사유없음'} / 위약금: ${cancelFee || '0'}원`;
+      const existingMemo = tenant.메모 || '';
+      const newMemo = existingMemo ? `${existingMemo} / ${memoAppend}` : memoAppend;
+
+      // Step 1: 상태 + 메모 업데이트
+      await fetch('/api/tenants', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: tenant.입주자ID, 상태: '계약취소', 메모: newMemo }),
+      });
+
+      // Step 2: 위약금 수납 등록
+      const fee = Number(cancelFee) || 0;
+      if (fee > 0) {
+        const kst = new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' }).replace(/\./g, '').trim().split(/\s+/).map(s => s.padStart(2, '0'));
+        const todayStr = `${kst[0]}-${kst[1]}-${kst[2]}`;
+        const ymStr = `${kst[0]}-${kst[1]}`;
+        await fetch('/api/payments', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            입주자ID: tenant.입주자ID,
+            지점명: tenant.지점명,
+            방코드: tenant.방코드,
+            이름: tenant.이름,
+            연월: ymStr,
+            청구액: String(fee),
+            납부액: String(fee),
+            납부일: todayStr,
+            상태: '납부완료',
+            메모: '계약취소 위약금',
+          }),
+        });
+      }
+
+      // Step 3: 완료
+      setShowCancelModal(false);
+      setCancelFee('');
+      setCancelReason('');
+      mutateTenant();
+      mutatePayments();
+      const msg = fee > 0 ? `계약취소 처리 완료. 위약금 ${fee.toLocaleString()}원 수납 등록됨.` : '계약취소 처리 완료.';
+      setToast(msg);
+      setTimeout(() => setToast(''), 2500);
+    } catch {
+      showToast('처리 중 오류가 발생했어요');
+    } finally {
+      setCancelProcessing(false);
+    }
   };
 
   if (loading) {
@@ -441,6 +498,49 @@ export default function TenantDetailPage() {
           </p>
         )}
       </div>
+
+      {/* 계약 취소 버튼 */}
+      {(status === '계약예정' || status === '입주중') && (
+        <div style={{ padding: '0 16px', marginTop: 8 }}>
+          <button onClick={() => setShowCancelModal(true)}
+            style={{ width: '100%', padding: 13, borderRadius: 12, border: '1px solid #E24B4A', background: '#fff', color: '#E24B4A', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+            계약 취소 처리
+          </button>
+        </div>
+      )}
+
+      {/* 계약 취소 바텀시트 */}
+      {showCancelModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowCancelModal(false); }}>
+          <div style={{ width: '100%', maxWidth: 430, background: '#fff', borderRadius: '20px 20px 0 0', padding: 20 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>계약 취소 처리</h3>
+            <p style={{ fontSize: 12, color: '#888', marginBottom: 18, lineHeight: 1.5 }}>입주 전 계약 해지입니다. 위약금 발생 시 수납 내역에 자동 등록됩니다.</p>
+
+            <input type="number" value={cancelFee} onChange={e => setCancelFee(e.target.value)}
+              placeholder="위약금 (원, 없으면 0)"
+              style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e8eb', fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box', outline: 'none', marginBottom: 14 }} />
+
+            <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+              {['입주자 변심', '연락두절', '기타'].map(r => (
+                <button key={r} onClick={() => setCancelReason(r)}
+                  style={{ flex: 1, padding: '8px 0', borderRadius: 8, border: cancelReason === r ? 'none' : '1px solid #e5e8eb', background: cancelReason === r ? '#3182F6' : '#fff', color: cancelReason === r ? '#fff' : '#333', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  {r}
+                </button>
+              ))}
+            </div>
+
+            <button onClick={handleCancelContract} disabled={cancelProcessing}
+              style={{ width: '100%', padding: 13, borderRadius: 12, border: 'none', background: '#E24B4A', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 8, opacity: cancelProcessing ? 0.5 : 1 }}>
+              {cancelProcessing ? '처리 중...' : '계약 취소 확정'}
+            </button>
+            <button onClick={() => setShowCancelModal(false)}
+              style={{ width: '100%', padding: 13, borderRadius: 12, border: '1px solid #e5e8eb', background: '#fff', color: '#333', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+              닫기
+            </button>
+          </div>
+        </div>
+      )}
 
       {toast && (
         <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: '#191f28', color: '#fff', padding: '10px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600, zIndex: 999, whiteSpace: 'nowrap' }}>{toast}</div>
