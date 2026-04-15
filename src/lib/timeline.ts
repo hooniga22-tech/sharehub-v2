@@ -2,6 +2,40 @@ import type { TenantSpan, HandoverSpan, RoomTimeline, HouseTimeline } from '@/ty
 
 export type { TenantSpan, HandoverSpan, RoomTimeline, HouseTimeline }
 
+// 날짜 파싱 (Sheets 다양한 형식 대응)
+function parseSheetDate(raw: any): Date | null {
+  if (!raw) return null
+
+  // 이미 Date 객체
+  if (raw instanceof Date) return isNaN(raw.getTime()) ? null : raw
+
+  const str = String(raw).trim()
+  if (!str) return null
+
+  // 형식 시도: YYYY-MM-DD, YYYY/MM/DD, YYYY.MM.DD, MM/DD/YYYY
+  const patterns = [
+    /^(\d{4})-(\d{1,2})-(\d{1,2})/,
+    /^(\d{4})\/(\d{1,2})\/(\d{1,2})/,
+    /^(\d{4})\.(\d{1,2})\.(\d{1,2})/,
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})/,  // MM/DD/YYYY
+  ]
+
+  for (const pat of patterns) {
+    const m = str.match(pat)
+    if (m) {
+      const [y, mo, d] = pat === patterns[3]
+        ? [parseInt(m[3]), parseInt(m[1]) - 1, parseInt(m[2])]
+        : [parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3])]
+      const date = new Date(y, mo, d)
+      if (!isNaN(date.getTime())) return date
+    }
+  }
+
+  // fallback: native Date parse
+  const d = new Date(str)
+  return isNaN(d.getTime()) ? null : d
+}
+
 // 컬러 규칙
 export const STATUS_COLORS = {
   in:   { bg: '#EBF3FF', fg: '#3182F6' },
@@ -36,6 +70,8 @@ export function barStyle(startMonth: number, endMonth: number) {
 
 // Google Sheets 입주자 데이터 → HouseTimeline 변환
 export function buildTimelines(tenants: any[]): HouseTimeline[] {
+  console.log('[Timeline] 첫 번째 입주자 날짜 raw:', tenants[0]?.['입주일'], tenants[0]?.['퇴실일'])
+
   // 퇴실완료, 계약취소 제외
   const active = tenants.filter(t => {
     const s = t['상태'] as string
@@ -64,14 +100,14 @@ export function buildTimelines(tenants: any[]): HouseTimeline[] {
 
       // 입주일 기준 정렬
       const sorted = [...roomTenants].sort((a, b) =>
-        new Date(a['입주일'] || '2099').getTime() - new Date(b['입주일'] || '2099').getTime()
+        (parseSheetDate(a['입주일'])?.getTime() ?? Date.parse('2099')) - (parseSheetDate(b['입주일'])?.getTime() ?? Date.parse('2099'))
       )
 
       const nowDate = new Date()
 
       sorted.forEach((t, i) => {
-        const inDate  = t['입주일'] ? new Date(t['입주일']) : null
-        const outDate = t['퇴실일'] ? new Date(t['퇴실일']) : null
+        const inDate  = parseSheetDate(t['입주일'])
+        const outDate = parseSheetDate(t['퇴실일'])
         const status  = t['상태'] as string
 
         if (!inDate) return
@@ -83,7 +119,7 @@ export function buildTimelines(tenants: any[]): HouseTimeline[] {
 
         // 다음 입주자와 같은 달 교체 여부 확인
         const next = sorted[i + 1]
-        const nextIn = next?.['입주일'] ? new Date(next['입주일']) : null
+        const nextIn = parseSheetDate(next?.['입주일'])
         const isHandover = nextIn && outDate &&
           nextIn.getMonth() === outDate.getMonth() &&
           nextIn.getFullYear() === outDate.getFullYear()
@@ -116,7 +152,7 @@ export function buildTimelines(tenants: any[]): HouseTimeline[] {
 
           // handover 셀
           const nextStatus = next?.['상태'] as string
-          const nextOut = next?.['퇴실일'] ? new Date(next['퇴실일']) : null
+          const nextOut = parseSheetDate(next?.['퇴실일'])
           const nextMonthsLeft = nextOut
             ? (nextOut.getFullYear() - nowDate.getFullYear()) * 12 + nextOut.getMonth() - nowDate.getMonth()
             : 999
@@ -130,7 +166,7 @@ export function buildTimelines(tenants: any[]): HouseTimeline[] {
             n1: t['이름'],
             outDay: outDay || 1,
             n2: next['이름'],
-            inDay: new Date(next['입주일']).getDate(),
+            inDay: parseSheetDate(next['입주일'])!.getDate(),
             rent1: Number(t['월세']) || 0,
             rent2: Number(next['월세']) || 0,
             deposit1: Number(t['보증금']) || 0,
