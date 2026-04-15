@@ -78,9 +78,38 @@ export function buildTimelines(tenants: any[]): HouseTimeline[] {
     return s !== '퇴실완료' && s !== '계약취소'
   })
 
+  // 중복 제거: 같은 이름+지점명이면 퇴실일이 있는(더 완전한) 레코드 우선
+  const deduped: any[] = []
+  const seen = new Map<string, any>()
+  active.forEach(t => {
+    const key = `${t['이름']}__${t['지점명']}`
+    const existing = seen.get(key)
+    if (!existing) {
+      seen.set(key, t)
+      deduped.push(t)
+    } else {
+      // 퇴실일이 있는 쪽 우선, 둘 다 있으면 입주일이 나중인 쪽
+      const existHasOut = !!existing['퇴실일']
+      const newHasOut = !!t['퇴실일']
+      if (!existHasOut && newHasOut) {
+        const idx = deduped.indexOf(existing)
+        deduped[idx] = t
+        seen.set(key, t)
+      } else if (existHasOut === newHasOut) {
+        const existIn = parseSheetDate(existing['입주일'])?.getTime() ?? 0
+        const newIn = parseSheetDate(t['입주일'])?.getTime() ?? 0
+        if (newIn > existIn) {
+          const idx = deduped.indexOf(existing)
+          deduped[idx] = t
+          seen.set(key, t)
+        }
+      }
+    }
+  })
+
   // 지점명으로 그룹핑
   const houseMap: Record<string, any[]> = {}
-  active.forEach(t => {
+  deduped.forEach(t => {
     const key = t['지점명'] || '미분류'
     if (!houseMap[key]) houseMap[key] = []
     houseMap[key].push(t)
