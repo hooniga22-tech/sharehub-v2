@@ -147,12 +147,14 @@ export default function TenantTimeline({ houses, searchQuery, selectedGu, onTena
                   ))}
 
                   {/* Room rows */}
-                  {house.rooms.map(room => (
+                  {house.rooms.map(room => {
+                    const isVacant = room.tenants.length === 0
+                    return (
                     <div key={room.code} style={{ display: 'contents' }}>
                       {/* Label */}
-                      <div style={{ padding: '0 0 0 10px', display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'sticky', left: 0, background: '#fff', zIndex: 4, borderRight: '1px solid #E5E8EC', height: ROW_H }}>
-                        <span style={{ fontSize: 9, color: '#8B95A1', fontWeight: 800, letterSpacing: .3 }}>{room.code}</span>
-                        <span style={{ fontSize: 9, color: '#C8CDD3', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 68 }}>{room.loc}</span>
+                      <div style={{ padding: '0 0 0 10px', display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'sticky', left: 0, background: isVacant ? '#FAFBFC' : '#fff', zIndex: 4, borderRight: '1px solid #E5E8EC', height: ROW_H }}>
+                        <span style={{ fontSize: 9, color: isVacant ? '#C8CDD3' : '#8B95A1', fontWeight: 800, letterSpacing: .3 }}>{room.code}</span>
+                        <span style={{ fontSize: 9, color: '#C8CDD3', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 68 }}>{isVacant ? '공실' : room.loc}</span>
                       </div>
 
                       {/* Bar area */}
@@ -201,7 +203,7 @@ export default function TenantTimeline({ houses, searchQuery, selectedGu, onTena
                         })}
                       </div>
                     </div>
-                  ))}
+                  )})}
                 </div>
               </div>
             )}

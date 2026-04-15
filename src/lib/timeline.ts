@@ -68,10 +68,93 @@ export function barStyle(startMonth: number, endMonth: number) {
   }
 }
 
-// Google Sheets 입주자 데이터 → HouseTimeline 변환
-export function buildTimelines(tenants: any[]): HouseTimeline[] {
-  console.log('[Timeline] 첫 번째 입주자 날짜 raw:', tenants[0]?.['입주일'], tenants[0]?.['퇴실일'])
+// 입주자 span 생성 헬퍼
+function buildSpans(roomTenants: any[]): (TenantSpan | HandoverSpan)[] {
+  const spans: (TenantSpan | HandoverSpan)[] = []
+  if (roomTenants.length === 0) return spans
 
+  const sorted = [...roomTenants].sort((a, b) =>
+    (parseSheetDate(a['입주일'])?.getTime() ?? Date.parse('2099')) - (parseSheetDate(b['입주일'])?.getTime() ?? Date.parse('2099'))
+  )
+
+  const nowDate = new Date()
+  const YEAR = nowDate.getFullYear()
+  const YEAR_START = new Date(YEAR, 0, 1)
+  const YEAR_END = new Date(YEAR, 11, 31)
+
+  sorted.forEach((t, i) => {
+    const inDate = parseSheetDate(t['입주일'])
+    const outDate = parseSheetDate(t['퇴실일'])
+    const status = t['상태'] as string
+
+    if (!inDate) return
+    if (outDate && outDate < YEAR_START) return
+    if (inDate > YEAR_END) return
+    if (status === '공실' && outDate && outDate < YEAR_START) return
+
+    const startMonth = Math.max(0, inDate.getFullYear() < YEAR ? 0 : inDate.getMonth())
+    const endMonth = Math.min(11, outDate ? (outDate.getFullYear() > YEAR ? 11 : outDate.getMonth()) : 11)
+    if (startMonth > endMonth) return
+
+    const inDay = inDate.getDate()
+    const outDay = outDate?.getDate()
+
+    const next = sorted[i + 1]
+    const nextIn = parseSheetDate(next?.['입주일'])
+    const isHandover = nextIn && outDate &&
+      nextIn.getMonth() === outDate.getMonth() &&
+      nextIn.getFullYear() === outDate.getFullYear()
+
+    const daysLeft = outDate
+      ? Math.floor((outDate.getTime() - nowDate.getTime()) / (1000 * 60 * 60 * 24))
+      : 999
+
+    let type: 'in' | 'soon' | 'out' = 'in'
+    if (status === '퇴실예정' || status === '퇴실확정') type = 'out'
+    else if (daysLeft <= 50) type = 'soon'
+
+    if (isHandover) {
+      const handoverMonth = outDate.getMonth()
+
+      if (startMonth <= handoverMonth - 1) {
+        spans.push({
+          type, name: t['이름'], startMonth, endMonth: handoverMonth - 1, inDay,
+          rent: Number(t['월세']) || 0, deposit: Number(t['보증금']) || 0,
+          contractEnd: t['퇴실일'], tenantId: t['입주자ID'],
+        } as TenantSpan)
+      }
+
+      const nextStatus = next?.['상태'] as string
+      const nextOut = parseSheetDate(next?.['퇴실일'])
+      const nextDaysLeft = nextOut
+        ? Math.floor((nextOut.getTime() - nowDate.getTime()) / (1000 * 60 * 60 * 24))
+        : 999
+      let typeN2: 'in' | 'soon' | 'out' = 'in'
+      if (nextStatus === '퇴실예정' || nextStatus === '퇴실확정') typeN2 = 'out'
+      else if (nextDaysLeft <= 50) typeN2 = 'soon'
+
+      spans.push({
+        type: 'handover', month: handoverMonth, n1: t['이름'], outDay: outDay || 1,
+        n2: next['이름'], inDay: parseSheetDate(next['입주일'])!.getDate(),
+        rent1: Number(t['월세']) || 0, rent2: Number(next['월세']) || 0,
+        deposit1: Number(t['보증금']) || 0, deposit2: Number(next['보증금']) || 0,
+        contractEnd1: t['퇴실일'], contractEnd2: next['퇴실일'], typeN2,
+        tenantId1: t['입주자ID'], tenantId2: next['입주자ID'],
+      } as HandoverSpan)
+    } else {
+      spans.push({
+        type, name: t['이름'], startMonth, endMonth, inDay, outDay,
+        rent: Number(t['월세']) || 0, deposit: Number(t['보증금']) || 0,
+        contractEnd: t['퇴실일'], tenantId: t['입주자ID'],
+      } as TenantSpan)
+    }
+  })
+
+  return spans
+}
+
+// Google Sheets 입주자+방 데이터 → HouseTimeline 변환
+export function buildTimelines(tenants: any[], rooms?: any[]): HouseTimeline[] {
   // 퇴실완료, 계약취소 제외
   const active = tenants.filter(t => {
     const s = t['상태'] as string
@@ -88,7 +171,6 @@ export function buildTimelines(tenants: any[]): HouseTimeline[] {
       seen.set(key, t)
       deduped.push(t)
     } else {
-      // 퇴실일이 있는 쪽 우선, 둘 다 있으면 입주일이 나중인 쪽
       const existHasOut = !!existing['퇴실일']
       const newHasOut = !!t['퇴실일']
       if (!existHasOut && newHasOut) {
@@ -107,7 +189,55 @@ export function buildTimelines(tenants: any[]): HouseTimeline[] {
     }
   })
 
-  // 지점명으로 그룹핑
+  // 입주자를 지점명+방코드로 인덱싱
+  const tenantsByHouseRoom: Record<string, any[]> = {}
+  deduped.forEach(t => {
+    const key = `${t['지점명']}__${t['방코드']}`
+    if (!tenantsByHouseRoom[key]) tenantsByHouseRoom[key] = []
+    tenantsByHouseRoom[key].push(t)
+  })
+
+  // 방 탭 데이터가 있으면 방 탭 기준으로 빌드
+  if (rooms && rooms.length > 0) {
+    // 방을 지점명으로 그룹핑
+    const roomsByHouse: Record<string, any[]> = {}
+    const houseDistricts: Record<string, string> = {}
+    rooms.forEach(r => {
+      const house = r.houseName || '미분류'
+      if (!roomsByHouse[house]) roomsByHouse[house] = []
+      roomsByHouse[house].push(r)
+    })
+
+    // 구 정보는 입주자 데이터에서 가져옴
+    deduped.forEach(t => {
+      const house = t['지점명']
+      if (house && t['구'] && !houseDistricts[house]) {
+        houseDistricts[house] = t['구']
+      }
+    })
+
+    return Object.entries(roomsByHouse).sort((a, b) => a[0].localeCompare(b[0])).map(([houseName, houseRooms]) => {
+      const sortedRooms = [...houseRooms].sort((a, b) => (a.roomCode || '').localeCompare(b.roomCode || ''))
+
+      const timelineRooms: RoomTimeline[] = sortedRooms.map(room => {
+        const key = `${houseName}__${room.roomCode}`
+        const roomTenants = tenantsByHouseRoom[key] || []
+        const spans = buildSpans(roomTenants)
+        return { code: room.roomCode, loc: room.roomType || '', tenants: spans }
+      })
+
+      return {
+        id: houseName,
+        name: houseName,
+        district: houseDistricts[houseName] || '',
+        rentDisplay: '',
+        total: sortedRooms.length,
+        rooms: timelineRooms,
+      }
+    })
+  }
+
+  // fallback: 방 탭 없으면 기존 방식 (입주자 데이터만으로 빌드)
   const houseMap: Record<string, any[]> = {}
   deduped.forEach(t => {
     const key = t['지점명'] || '미분류'
@@ -116,7 +246,6 @@ export function buildTimelines(tenants: any[]): HouseTimeline[] {
   })
 
   return Object.entries(houseMap).sort((a, b) => a[0].localeCompare(b[0])).map(([houseName, tenantList]) => {
-    // 방코드로 그룹핑
     const roomMap: Record<string, any[]> = {}
     tenantList.forEach(t => {
       const code = t['방코드'] || '?'
@@ -124,119 +253,8 @@ export function buildTimelines(tenants: any[]): HouseTimeline[] {
       roomMap[code].push(t)
     })
 
-    const rooms: RoomTimeline[] = Object.entries(roomMap).sort((a, b) => a[0].localeCompare(b[0])).map(([code, roomTenants]) => {
-      const spans: (TenantSpan | HandoverSpan)[] = []
-
-      // 입주일 기준 정렬
-      const sorted = [...roomTenants].sort((a, b) =>
-        (parseSheetDate(a['입주일'])?.getTime() ?? Date.parse('2099')) - (parseSheetDate(b['입주일'])?.getTime() ?? Date.parse('2099'))
-      )
-
-      const nowDate = new Date()
-      const YEAR = nowDate.getFullYear()
-      const YEAR_START = new Date(YEAR, 0, 1)
-      const YEAR_END   = new Date(YEAR, 11, 31)
-
-      sorted.forEach((t, i) => {
-        const inDate  = parseSheetDate(t['입주일'])
-        const outDate = parseSheetDate(t['퇴실일'])
-        const status  = t['상태'] as string
-
-        if (!inDate) return
-
-        // 퇴실일이 올해 1월 1일 이전이면 → 이미 떠난 사람, 스킵
-        if (outDate && outDate < YEAR_START) return
-
-        // 입주일이 올해 12월 31일 이후면 → 아직 안 온 사람, 스킵
-        if (inDate > YEAR_END) return
-
-        // 상태가 '공실'이고 퇴실일이 올해 이전 → 스킵
-        if (status === '공실' && outDate && outDate < YEAR_START) return
-
-        const startMonth = Math.max(0, inDate.getFullYear() < YEAR ? 0 : inDate.getMonth())
-        const endMonth   = Math.min(11, outDate ? (outDate.getFullYear() > YEAR ? 11 : outDate.getMonth()) : 11)
-
-        // startMonth > endMonth 이면 올해 범위 밖 → skip
-        if (startMonth > endMonth) return
-        const inDay      = inDate.getDate()
-        const outDay     = outDate?.getDate()
-
-        // 다음 입주자와 같은 달 교체 여부 확인
-        const next = sorted[i + 1]
-        const nextIn = parseSheetDate(next?.['입주일'])
-        const isHandover = nextIn && outDate &&
-          nextIn.getMonth() === outDate.getMonth() &&
-          nextIn.getFullYear() === outDate.getFullYear()
-
-        // 상태 결정 (계약종료 50일 이하 → soon)
-        const daysLeft = outDate
-          ? Math.floor((outDate.getTime() - nowDate.getTime()) / (1000 * 60 * 60 * 24))
-          : 999
-
-        let type: 'in' | 'soon' | 'out' = 'in'
-        if (status === '퇴실예정' || status === '퇴실확정') type = 'out'
-        else if (daysLeft <= 50) type = 'soon'
-
-        if (isHandover) {
-          const handoverMonth = outDate.getMonth()
-
-          if (startMonth <= handoverMonth - 1) {
-            spans.push({
-              type,
-              name: t['이름'],
-              startMonth,
-              endMonth: handoverMonth - 1,
-              inDay,
-              rent: Number(t['월세']) || 0,
-              deposit: Number(t['보증금']) || 0,
-              contractEnd: t['퇴실일'],
-              tenantId: t['입주자ID'],
-            } as TenantSpan)
-          }
-
-          // handover 셀
-          const nextStatus = next?.['상태'] as string
-          const nextOut = parseSheetDate(next?.['퇴실일'])
-          const nextDaysLeft = nextOut
-            ? Math.floor((nextOut.getTime() - nowDate.getTime()) / (1000 * 60 * 60 * 24))
-            : 999
-          let typeN2: 'in' | 'soon' | 'out' = 'in'
-          if (nextStatus === '퇴실예정' || nextStatus === '퇴실확정') typeN2 = 'out'
-          else if (nextDaysLeft <= 50) typeN2 = 'soon'
-
-          spans.push({
-            type: 'handover',
-            month: handoverMonth,
-            n1: t['이름'],
-            outDay: outDay || 1,
-            n2: next['이름'],
-            inDay: parseSheetDate(next['입주일'])!.getDate(),
-            rent1: Number(t['월세']) || 0,
-            rent2: Number(next['월세']) || 0,
-            deposit1: Number(t['보증금']) || 0,
-            deposit2: Number(next['보증금']) || 0,
-            contractEnd1: t['퇴실일'],
-            contractEnd2: next['퇴실일'],
-            typeN2,
-            tenantId1: t['입주자ID'],
-            tenantId2: next['입주자ID'],
-          } as HandoverSpan)
-        } else {
-          spans.push({
-            type,
-            name: t['이름'],
-            startMonth,
-            endMonth,
-            inDay,
-            outDay,
-            rent: Number(t['월세']) || 0,
-            deposit: Number(t['보증금']) || 0,
-            contractEnd: t['퇴실일'],
-            tenantId: t['입주자ID'],
-          } as TenantSpan)
-        }
-      })
-
+    const timelineRooms: RoomTimeline[] = Object.entries(roomMap).sort((a, b) => a[0].localeCompare(b[0])).map(([code, roomTenants]) => {
+      const spans = buildSpans(roomTenants)
       return { code, loc: roomTenants[0]?.['방타입'] || '', tenants: spans }
     })
 
@@ -245,8 +263,8 @@ export function buildTimelines(tenants: any[]): HouseTimeline[] {
       name: houseName,
       district: tenantList[0]?.['구'] || '',
       rentDisplay: '',
-      total: rooms.length,
-      rooms,
+      total: timelineRooms.length,
+      rooms: timelineRooms,
     }
   })
 }

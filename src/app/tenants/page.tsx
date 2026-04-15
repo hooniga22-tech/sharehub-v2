@@ -26,6 +26,7 @@ export default function TenantsPage() {
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
   });
+  const { data: rawRooms } = useSWR('/api/rooms', fetcher);
   const tenants = (Array.isArray(rawTenants) ? rawTenants : []).filter(t => t['상태'] !== '퇴실완료');
   const error = swrError ? '데이터를 불러오지 못했어요' : '';
   const router = useRouter();
@@ -37,7 +38,8 @@ export default function TenantsPage() {
   const [gu, setGu] = useState('전체');
 
   const allTenants = Array.isArray(rawTenants) ? rawTenants : [];
-  const timelines = useMemo(() => buildTimelines(allTenants), [allTenants]);
+  const allRooms = Array.isArray(rawRooms) ? rawRooms : [];
+  const timelines = useMemo(() => buildTimelines(allTenants, allRooms), [allTenants, allRooms]);
 
   const guList = useMemo(() => [...new Set(tenants.map(t => t['구']).filter(Boolean))].sort(), [tenants]);
   const guFiltered = useMemo(() => gu === '전체' ? tenants : tenants.filter(t => t['구'] === gu), [tenants, gu]);
