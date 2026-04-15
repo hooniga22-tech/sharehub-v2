@@ -168,14 +168,14 @@ export function buildTimelines(tenants: any[]): HouseTimeline[] {
           nextIn.getMonth() === outDate.getMonth() &&
           nextIn.getFullYear() === outDate.getFullYear()
 
-        // 상태 결정
-        const monthsLeft = outDate
-          ? (outDate.getFullYear() - nowDate.getFullYear()) * 12 + outDate.getMonth() - nowDate.getMonth()
+        // 상태 결정 (계약종료 50일 이하 → soon)
+        const daysLeft = outDate
+          ? Math.floor((outDate.getTime() - nowDate.getTime()) / (1000 * 60 * 60 * 24))
           : 999
 
         let type: 'in' | 'soon' | 'out' = 'in'
         if (status === '퇴실예정' || status === '퇴실확정') type = 'out'
-        else if (status === '공실예정' || (monthsLeft >= 0 && monthsLeft <= 2)) type = 'soon'
+        else if (daysLeft <= 50) type = 'soon'
 
         if (isHandover) {
           const handoverMonth = outDate.getMonth()
@@ -197,12 +197,12 @@ export function buildTimelines(tenants: any[]): HouseTimeline[] {
           // handover 셀
           const nextStatus = next?.['상태'] as string
           const nextOut = parseSheetDate(next?.['퇴실일'])
-          const nextMonthsLeft = nextOut
-            ? (nextOut.getFullYear() - nowDate.getFullYear()) * 12 + nextOut.getMonth() - nowDate.getMonth()
+          const nextDaysLeft = nextOut
+            ? Math.floor((nextOut.getTime() - nowDate.getTime()) / (1000 * 60 * 60 * 24))
             : 999
           let typeN2: 'in' | 'soon' | 'out' = 'in'
           if (nextStatus === '퇴실예정' || nextStatus === '퇴실확정') typeN2 = 'out'
-          else if (nextStatus === '공실예정' || (nextMonthsLeft >= 0 && nextMonthsLeft <= 2)) typeN2 = 'soon'
+          else if (nextDaysLeft <= 50) typeN2 = 'soon'
 
           spans.push({
             type: 'handover',
