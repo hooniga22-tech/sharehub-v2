@@ -20,6 +20,19 @@ function kstMonth() {
   return `${y}-${String(m).padStart(2, '0')}`
 }
 
+function recentMonths(count: number): string[] {
+  const s = new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })
+  const [y, m] = s.replace(/\./g, '').trim().split(/\s+/).map(Number)
+  const arr: string[] = []
+  let yy = y, mm = m
+  for (let i = 0; i < count; i++) {
+    arr.push(`${yy}-${String(mm).padStart(2, '0')}`)
+    mm--
+    if (mm === 0) { mm = 12; yy-- }
+  }
+  return arr
+}
+
 export default function PlatformTransferPage() {
   const router = useRouter()
   const [data, setData] = useState<Data | null>(null)
@@ -29,17 +42,18 @@ export default function PlatformTransferPage() {
   const [selectedSheet, setSelectedSheet] = useState<Tenant | null>(null)
   const [saving, setSaving] = useState(false)
   const [checked, setChecked] = useState<Set<string>>(new Set())
+  const [selectedMonth, setSelectedMonth] = useState(kstMonth())
 
-  const month = kstMonth()
+  const months = recentMonths(6)
 
   const fetchData = useCallback(() => {
     setLoading(true)
-    fetch(`/api/platform-transfers?month=${month}`)
+    fetch(`/api/platform-transfers?month=${selectedMonth}`)
       .then(r => r.json())
       .then(d => setData(d))
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [month])
+  }, [selectedMonth])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -90,9 +104,33 @@ export default function PlatformTransferPage() {
           </button>
           <div>
             <div style={{ fontSize: 18, fontWeight: 700, color: '#191919' }}>플랫폼 이체 관리</div>
-            <div style={{ fontSize: 12, color: '#b0b8c1' }}>{month}</div>
+            <div style={{ fontSize: 12, color: '#b0b8c1' }}>{selectedMonth}</div>
           </div>
         </div>
+      </div>
+
+      {/* Month Picker */}
+      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', padding: '10px 14px', background: '#fff', borderBottom: '1px solid #f2f2f2' }}>
+        {months.map(m => {
+          const active = selectedMonth === m
+          const [y, mm] = m.split('-')
+          return (
+            <button key={m} onClick={() => setSelectedMonth(m)}
+              style={{
+                padding: '6px 14px',
+                borderRadius: 20,
+                border: '1.5px solid',
+                borderColor: active ? '#3182F6' : '#E5E8EC',
+                background: active ? '#EBF3FF' : '#fff',
+                color: active ? '#3182F6' : '#8B95A1',
+                fontSize: 13, fontWeight: 700,
+                cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                fontFamily: 'inherit',
+              }}>
+              {y}년 {Number(mm)}월
+            </button>
+          )
+        })}
       </div>
 
       {loading ? (
