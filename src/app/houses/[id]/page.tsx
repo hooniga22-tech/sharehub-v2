@@ -55,7 +55,7 @@ export default function HouseDetailPage() {
       } catch { /* not JSON */ }
 
       const ts = Array.isArray(tenantData) ? tenantData : [];
-      setTenants(ts.filter((t: any) => t['지점명'] === houseData['지점명']));
+      setTenants(ts.filter((t: any) => t['지점명'] === houseData['지점명'] && t['상태'] !== '퇴실완료'));
 
       // Load investor
       if (houseData['투자자토큰']) {
