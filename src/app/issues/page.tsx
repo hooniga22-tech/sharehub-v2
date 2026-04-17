@@ -14,9 +14,8 @@ type Work = {
   작업종류: string; 정산금액: string; 메모: string; 완료여부: string;
 };
 
-type Staff = {
-  담당자ID: string; 이름: string; 연락처: string; 계좌번호: string;
-  분야: string; 구분: string; 링크토큰: string; 기본금액: string;
+type StaffStat = {
+  이름: string; count: number; amount: number;
 };
 
 type MainTab = 'schedule' | 'workers' | 'settle';
@@ -29,7 +28,6 @@ const CATEGORIES: Category[] = ['전체', '청소', '수리', '기타'];
 export default function IssuesPage() {
   const [issues, setIssues] = useState<Issue[]>([]);
   const [works, setWorks] = useState<Work[]>([]);
-  const [staffList, setStaffList] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [mainTab, setMainTab] = useState<MainTab>('schedule');
@@ -45,11 +43,9 @@ export default function IssuesPage() {
     Promise.all([
       fetch('/api/issues').then(r => r.json()),
       fetch('/api/workers').then(r => r.json()),
-      fetch('/api/workers/staff').then(r => r.json()),
-    ]).then(([issueData, workData, staffData]) => {
+    ]).then(([issueData, workData]) => {
       setIssues(issueData.issues || []);
       setWorks(Array.isArray(workData) ? workData : []);
-      setStaffList(Array.isArray(staffData) ? staffData : []);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
@@ -168,17 +164,18 @@ export default function IssuesPage() {
     return Object.entries(map).sort((a, b) => b[1].amount - a[1].amount);
   }, [settleWorks]);
 
-  // 담당자 탭 데이터
+  // 담당자 탭 데이터 — 용역 시트 담당자명에서 unique 추출
   const now = new Date();
   const thisMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const staffStats = useMemo(() => {
-    return staffList.map(s => {
-      const myWorks = works.filter(w => w.담당자명 === s.이름 && w.예정일.startsWith(thisMonthPrefix));
+  const staffStats = useMemo<StaffStat[]>(() => {
+    const names = Array.from(new Set(works.map(w => w.담당자명).filter(n => n.trim() !== '')));
+    return names.map(name => {
+      const myWorks = works.filter(w => w.담당자명 === name && w.예정일.startsWith(thisMonthPrefix));
       const count = myWorks.length;
       const amount = myWorks.reduce((sum, w) => sum + (parseInt(w.정산금액) || 0), 0);
-      return { ...s, count, amount };
-    });
-  }, [staffList, works, thisMonthPrefix]);
+      return { 이름: name, count, amount };
+    }).sort((a, b) => b.amount - a.amount);
+  }, [works, thisMonthPrefix]);
 
   if (loading) {
     return (
@@ -366,7 +363,7 @@ export default function IssuesPage() {
             <div style={{ textAlign: 'center', padding: '60px 0', color: GRAY, fontSize: 13 }}>등록된 담당자가 없어요</div>
           ) : (
             staffStats.map(s => (
-              <div key={s.담당자ID} style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 8 }}>
+              <div key={s.이름} style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   {/* 아바타 */}
                   <div style={{
@@ -387,16 +384,6 @@ export default function IssuesPage() {
                 </div>
                 {/* 버튼 */}
                 <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                  {s.링크토큰 && (
-                    <Link href={`/worker/${s.링크토큰}`}
-                      style={{
-                        flex: 1, padding: '8px 0', borderRadius: 8, textAlign: 'center',
-                        border: `1px solid ${BLUE}`, color: BLUE,
-                        fontSize: 12, fontWeight: 600, textDecoration: 'none',
-                      }}>
-                      개인 페이지
-                    </Link>
-                  )}
                   <button
                     onClick={() => { setMainTab('schedule'); setFilterStaff(s.이름); }}
                     style={{
