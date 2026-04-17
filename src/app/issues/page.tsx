@@ -26,6 +26,9 @@ const BLUE = '#3182F6', GREEN = '#00B493', RED = '#E24B4A', GRAY = '#888888';
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 const CATEGORIES: Category[] = ['전체', '청소', '수리', '기타'];
 
+const monthPrefix = (y: number, m1Indexed: number) =>
+  `${y}-${String(m1Indexed).padStart(2, '0')}`;
+
 export default function IssuesPage() {
   const [issues, setIssues] = useState<Issue[]>([]);
   const [works, setWorks] = useState<Work[]>([]);
@@ -60,23 +63,34 @@ export default function IssuesPage() {
     return Math.max(0, Math.ceil((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24)));
   };
 
-  // 통계
-  const cleanCount = useMemo(() => works.filter(w => w.작업종류.includes('청소')).length, [works]);
-  const repairCount = useMemo(() => issues.filter(i => i.status !== '완료').length, [issues]);
-  const etcCount = useMemo(() => works.filter(w => !w.작업종류.includes('청소') && !w.작업종류.includes('수리')).length, [works]);
+  // 월 필터된 파생 배열
+  const worksInMonth = useMemo(() => {
+    const prefix = monthPrefix(calYear, calMonth + 1);
+    return works.filter(w => (w.예정일 || '').startsWith(prefix));
+  }, [works, calYear, calMonth]);
 
-  // 캘린더 점 표시용
+  const issuesInMonth = useMemo(() => {
+    const prefix = monthPrefix(calYear, calMonth + 1);
+    return issues.filter(i => (i.createdAt || '').startsWith(prefix));
+  }, [issues, calYear, calMonth]);
+
+  // 통계 (월 기준)
+  const cleanCount = useMemo(() => worksInMonth.filter(w => w.작업종류.includes('청소')).length, [worksInMonth]);
+  const repairCount = useMemo(() => issuesInMonth.filter(i => i.status !== '완료').length, [issuesInMonth]);
+  const etcCount = useMemo(() => worksInMonth.filter(w => !w.작업종류.includes('청소') && !w.작업종류.includes('수리')).length, [worksInMonth]);
+
+  // 캘린더 점 표시용 (월 기준)
   const cleanDateSet = useMemo(() => {
     const s = new Set<string>();
-    works.forEach(w => { if (w.예정일 && w.작업종류.includes('청소')) s.add(w.예정일.substring(0, 10)); });
+    worksInMonth.forEach(w => { if (w.예정일 && w.작업종류.includes('청소')) s.add(w.예정일.substring(0, 10)); });
     return s;
-  }, [works]);
+  }, [worksInMonth]);
 
   const issueDateSet = useMemo(() => {
     const s = new Set<string>();
-    issues.forEach(i => { if (i.createdAt) s.add(i.createdAt.substring(0, 10)); });
+    issuesInMonth.forEach(i => { if (i.createdAt) s.add(i.createdAt.substring(0, 10)); });
     return s;
-  }, [issues]);
+  }, [issuesInMonth]);
 
   // 캘린더 날짜 생성
   const calendarDays = useMemo(() => {
@@ -97,10 +111,12 @@ export default function IssuesPage() {
     `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
   const handlePrev = () => {
+    setSelectedDate(null);
     if (calMonth === 0) { setCalYear(calYear - 1); setCalMonth(11); }
     else setCalMonth(calMonth - 1);
   };
   const handleNext = () => {
+    setSelectedDate(null);
     if (calMonth === 11) { setCalYear(calYear + 1); setCalMonth(0); }
     else setCalMonth(calMonth + 1);
   };
@@ -126,15 +142,15 @@ export default function IssuesPage() {
     const items: ListItem[] = [];
 
     if (selCat === '전체' || selCat === '청소') {
-      works.filter(w => w.작업종류.includes('청소')).forEach(w =>
+      worksInMonth.filter(w => w.작업종류.includes('청소')).forEach(w =>
         items.push({ type: 'clean', date: w.예정일, data: w }));
     }
     if (selCat === '전체' || selCat === '수리') {
-      issues.filter(i => i.status !== '완료').forEach(i =>
+      issuesInMonth.filter(i => i.status !== '완료').forEach(i =>
         items.push({ type: 'repair', date: i.createdAt, data: i }));
     }
     if (selCat === '전체' || selCat === '기타') {
-      works.filter(w => !w.작업종류.includes('청소') && !w.작업종류.includes('수리')).forEach(w =>
+      worksInMonth.filter(w => !w.작업종류.includes('청소') && !w.작업종류.includes('수리')).forEach(w =>
         items.push({ type: 'etc', date: w.예정일, data: w }));
     }
 
@@ -150,7 +166,7 @@ export default function IssuesPage() {
     }
     list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     return list;
-  }, [works, issues, selCat, selectedDate, filterStaff]);
+  }, [worksInMonth, issuesInMonth, selCat, selectedDate, filterStaff]);
 
   // 정산 탭 데이터
   const settlePrefix = `${settleYear}-${String(settleMonth + 1).padStart(2, '0')}`;
