@@ -7,21 +7,16 @@ const BLUE = '#3182F6', GREEN_D = '#16A34A', GREEN_BG = '#D1FAE5', GREEN_FG = '#
 const AMBER_D = '#D97706', AMBER_BG = '#FFFBEB', AMBER_FG = '#92400E';
 const fmt = (n: number) => n.toLocaleString() + '원';
 
-const TOKEN_MAP: Record<string, { name: string; type: string }> = {
-  'b775a18c876534ee': { name: '이인실', type: '청소' },
-  '4b594c769b0aa6ab': { name: '이미경', type: '청소' },
-  'e8f27ed8eab30c68': { name: '이한나', type: '청소' },
-  '2d79c5c07cfb8e4c': { name: '진진수', type: '수리' },
-};
-
+type Worker = { name: string; type: string; token: string };
 type Schedule = { id: string; date: string; houseName: string; type: string; amount: number; isDone: boolean; memo: string };
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
 export default function WorkerTokenPage() {
   const { token } = useParams<{ token: string }>();
-  const worker = TOKEN_MAP[token];
 
+  const [worker, setWorker] = useState<Worker | null>(null);
+  const [notFound, setNotFound] = useState(false);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState('');
@@ -33,17 +28,19 @@ export default function WorkerTokenPage() {
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2200); };
 
   const fetchData = useCallback(() => {
-    if (!worker) return;
     setLoading(true);
-    fetch(`/api/workers/by-token/${token}?year=${viewYear}&month=${viewMonth}`)
-      .then(r => r.json())
-      .then(data => {
-        if (data.error) { setSchedules([]); return; }
+    fetch(`/api/workers/by-token/${token}?year=${viewYear}&month=${viewMonth}`, { cache: 'no-store' })
+      .then(async r => {
+        if (r.status === 404) { setNotFound(true); setWorker(null); setSchedules([]); return; }
+        const data = await r.json();
+        if (data.error) { setNotFound(true); setWorker(null); setSchedules([]); return; }
+        setNotFound(false);
+        setWorker(data.worker || null);
         setSchedules(Array.isArray(data.schedules) ? data.schedules : []);
       })
-      .catch(() => setSchedules([]))
+      .catch(() => { setSchedules([]); })
       .finally(() => setLoading(false));
-  }, [token, worker, viewYear, viewMonth]);
+  }, [token, viewYear, viewMonth]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -117,10 +114,18 @@ export default function WorkerTokenPage() {
     return `${Number(p[1])}월 ${Number(p[2])}일`;
   };
 
-  if (!worker) {
+  if (notFound) {
     return (
       <div style={{ minHeight: '100vh', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <p style={{ color: '#bbb', fontSize: 15 }}>존재하지 않는 페이지입니다</p>
+      </div>
+    );
+  }
+
+  if (!worker) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <p style={{ color: '#bbb', fontSize: 15 }}>불러오는 중...</p>
       </div>
     );
   }

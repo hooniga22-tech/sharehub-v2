@@ -1,13 +1,8 @@
 import { NextResponse } from 'next/server'
-import { google } from 'googleapis'
+import { getSheetData } from '@/lib/sheets'
 
-const WORKERS: Record<string, string> = {
-  'b775a18c876534ee': '이인실',
-  '4b594c769b0aa6ab': '이미경',
-  'e8f27ed8eab30c68': '이한나',
-  '2d79c5c07cfb8e4c': '진진수',
-  '9a495582ad427525': '김기진',
-}
+// 용역담당자 시트 (8열): [0]담당자ID [1]이름 [2]연락처 [3]계좌번호 [4]분야 [5]구분 [6]링크토큰 [7]기본금액
+// 용역 시트 (8열): [0]용역ID [1]예정일 [2]지점명 [3]담당자명 [4]작업종류 [5]정산금액 [6]메모 [7]완료여부
 
 export async function GET(
   req: Request,
@@ -15,32 +10,28 @@ export async function GET(
 ) {
   try {
     const { token } = await params
-    const workerName = WORKERS[token]
-    if (!workerName) {
+
+    // 1. 용역담당자 시트에서 토큰 매칭
+    const staffRows = await getSheetData('용역담당자')
+    const staffRow = staffRows.find(r => (r[6] || '') === token)
+
+    if (!staffRow) {
       return NextResponse.json({ error: 'invalid token' }, { status: 404 })
     }
 
-    const auth = new google.auth.GoogleAuth({
-      credentials: {
-        client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-        private_key: (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
-      },
-      scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly']
-    })
-    const sheets = google.sheets({ version: 'v4', auth })
+    const worker = {
+      name: staffRow[1] || '',
+      type: staffRow[4] || '',
+      token: staffRow[6] || '',
+    }
 
-    const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: process.env.GOOGLE_SHEETS_ID,
-      range: '용역!A:H'
-    })
-
-    const rows = res.data.values || []
-    // 헤더: ID(0) 날짜(1) 하우스명(2) 담당자(3) 종류(4) 비용(5) 메모(6) 완료여부(7)
+    // 2. 용역 시트에서 해당 담당자 스케줄 조회
+    const workRows = await getSheetData('용역')
     const { searchParams } = new URL(req.url)
     const year = searchParams.get('year')
     const month = searchParams.get('month')
 
-    let schedules = rows.slice(1)
+    let schedules = workRows
       .map(r => ({
         id: r[0] || '',
         date: r[1] || '',
@@ -51,7 +42,7 @@ export async function GET(
         memo: r[6] || '',
         isDone: r[7] === 'Y',
       }))
-      .filter(s => s.workerName === workerName)
+      .filter(s => s.workerName === worker.name)
 
     if (year && month) {
       const prefix = `${year}-${String(month).padStart(2, '0')}`
@@ -60,10 +51,7 @@ export async function GET(
 
     schedules.sort((a, b) => a.date.localeCompare(b.date))
 
-    return NextResponse.json({
-      worker: { name: workerName, token },
-      schedules,
-    })
+    return NextResponse.json({ worker, schedules })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
