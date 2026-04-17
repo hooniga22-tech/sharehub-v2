@@ -150,19 +150,22 @@ export default function WorkerTokenPage() {
     );
   }
 
+  // ── 완료 판정: 미래 날짜의 isDone=true는 예정으로 취급 ─
+  const isActuallyDone = (s: Schedule) => s.isDone === true && s.date <= todayStr;
+
   // ── 파생 데이터 ──────────────────────────────────────
   const todayAll = schedules.filter(s => s.date === todayStr);
-  const todayPending = todayAll.filter(s => !s.isDone);
+  const todayPending = todayAll.filter(s => !isActuallyDone(s));
   const nextUpcoming = schedules
-    .filter(s => !s.isDone && s.date > todayStr)
+    .filter(s => s.date > todayStr && !isActuallyDone(s))
     .sort((a, b) => a.date.localeCompare(b.date))[0];
-  const monthRemaining = schedules.filter(s => !s.isDone && s.date >= todayStr).length;
+  const monthRemaining = schedules.filter(s => !isActuallyDone(s) && s.date >= todayStr).length;
 
   // Full view data
   const upcomingAll = schedules
-    .filter(s => s.date > todayStr && !s.isDone)
+    .filter(s => s.date > todayStr && !isActuallyDone(s))
     .sort((a, b) => a.date.localeCompare(b.date));
-  const doneAll = schedules.filter(s => s.isDone).sort((a, b) => b.date.localeCompare(a.date));
+  const doneAll = schedules.filter(s => isActuallyDone(s)).sort((a, b) => b.date.localeCompare(a.date));
   const monthTotalAmount = schedules.reduce((sum, s) => sum + s.amount, 0);
 
   // ══════════════════════════════════════════════════════
@@ -173,7 +176,7 @@ export default function WorkerTokenPage() {
     const upcomingHidden = upcomingAll.length - upcomingShown.length;
     const doneShown = expandedDone ? doneAll : doneAll.slice(0, 2);
     const doneHidden = doneAll.length - doneShown.length;
-    const todayForFull = todayAll.filter(s => !s.isDone);
+    const todayForFull = todayAll.filter(s => !isActuallyDone(s));
 
     return (
       <div style={{ minHeight: '100vh', background: BG }}>
@@ -405,7 +408,7 @@ export default function WorkerTokenPage() {
         )}
 
         {todayAll.length === 1 && (
-          todayAll[0].isDone
+          isActuallyDone(todayAll[0])
             ? renderDoneCard(todayAll[0], 'big')
             : renderPendingCard(todayAll[0], 'big')
         )}
@@ -437,7 +440,7 @@ export default function WorkerTokenPage() {
                 오늘 할 일 {todayPending.length}건 남았어요
               </div>
             </div>
-            {todayAll.map(s => s.isDone ? renderDoneCard(s, 'small') : renderPendingCard(s, 'small'))}
+            {todayAll.map(s => isActuallyDone(s) ? renderDoneCard(s, 'small') : renderPendingCard(s, 'small'))}
           </>
         )}
 
