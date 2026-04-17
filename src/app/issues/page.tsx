@@ -50,7 +50,7 @@ export default function IssuesPage() {
       setIssues(issueData.issues || []);
       setWorks(Array.isArray(workData) ? workData : []);
       const sArr = Array.isArray(staffData) ? staffData : [];
-      setStaffInfoList(sArr.map((s: any) => ({ 이름: s.이름 || '', 링크토큰: s.링크토큰 || '' })));
+      setStaffInfoList(sArr.map((s: any) => ({ 이름: (s.이름 || '').trim(), 링크토큰: (s.링크토큰 || '').trim() })));
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
@@ -145,7 +145,7 @@ export default function IssuesPage() {
     if (filterStaff) {
       list = list.filter(it => {
         if (it.type === 'repair') return false;
-        return (it.data as Work).담당자명 === filterStaff;
+        return ((it.data as Work).담당자명 || '').trim() === filterStaff.trim();
       });
     }
     list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
@@ -173,9 +173,9 @@ export default function IssuesPage() {
   const now = new Date();
   const thisMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const staffStats = useMemo<StaffStat[]>(() => {
-    const names = Array.from(new Set(works.map(w => w.담당자명).filter(n => n.trim() !== '')));
+    const names = Array.from(new Set(works.map(w => (w.담당자명 || '').trim()).filter(n => n !== '')));
     return names.map(name => {
-      const myWorks = works.filter(w => w.담당자명 === name && w.예정일.startsWith(thisMonthPrefix));
+      const myWorks = works.filter(w => (w.담당자명 || '').trim() === name && w.예정일.startsWith(thisMonthPrefix));
       const count = myWorks.length;
       const amount = myWorks.reduce((sum, w) => sum + (parseInt(w.정산금액) || 0), 0);
       const matched = staffInfoList.find(si => si.이름 === name);
@@ -228,9 +228,23 @@ export default function IssuesPage() {
         <div style={{ padding: '16px 16px 0' }}>
           {/* 담당자 필터 표시 */}
           {filterStaff && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '8px 12px', background: '#E8F1FD', borderRadius: 8 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: BLUE }}>{filterStaff} 일정</span>
-              <button onClick={() => setFilterStaff(null)} style={{ background: 'none', border: 'none', fontSize: 12, color: GRAY, cursor: 'pointer', fontFamily: 'inherit' }}>해제</button>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '10px 14px', background: '#E8F1FD', borderRadius: 10, border: `1px solid ${BLUE}30` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: BLUE }}>{filterStaff}</span>
+                <span style={{ fontSize: 12, color: BLUE }}>일정 보는 중</span>
+              </div>
+              <button
+                onClick={() => setFilterStaff(null)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  padding: '4px 10px', borderRadius: 6,
+                  background: '#fff', border: `1px solid ${BLUE}`, color: BLUE,
+                  fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                전체 보기
+              </button>
             </div>
           )}
 
