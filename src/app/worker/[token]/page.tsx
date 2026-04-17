@@ -17,12 +17,7 @@ const CARD = '#FFFFFF';
 const TEXT_MAIN = '#191F28';
 const TEXT_SUB = '#4E5968';
 const BLUE = '#3182F6';
-const GREEN = '#00B493';
-const GRAY_DISABLED = '#C0C6CD';
 const LINE_THIN = '#E5E8EB';
-const LINE_LIGHT = '#F2F4F6';
-const WARN_BG = '#FFF7E6';
-const WARN_FG = '#8A5A00';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -36,7 +31,6 @@ function fmtDay(dateStr: string) {
   const dd = new Date(y, m - 1, d);
   return `${m}월 ${d}일 ${WEEKDAYS[dd.getDay()]}요일`;
 }
-const comma = (n: number) => n.toLocaleString();
 
 const shortHouse = (name: string): string => {
   if (!name) return '';
@@ -52,11 +46,6 @@ const formatAmount = (amount: number): string => {
 };
 
 // ── SVG 아이콘 ──────────────────────────────────────────
-const CheckBig = () => (
-  <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden>
-    <path d="M5 12L10 17L20 7" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
 const CalArrowLeft = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
     <path d="M15 18L9 12L15 6" stroke={TEXT_SUB} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -82,7 +71,6 @@ export default function WorkerTokenPage() {
   const [notFound, setNotFound] = useState(false);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
-  const [undoTimers, setUndoTimers] = useState<Record<string, number>>({});
   const [sheetId, setSheetId] = useState<string | null>(null);
 
   const now = useMemo(() => new Date(), []);
@@ -108,50 +96,6 @@ export default function WorkerTokenPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // ── 30초 카운트다운 ──────────────────────────────────
-  useEffect(() => {
-    if (Object.keys(undoTimers).length === 0) return;
-    const iv = setInterval(() => {
-      setUndoTimers(prev => {
-        const next: Record<string, number> = {};
-        for (const [id, sec] of Object.entries(prev)) {
-          if (sec > 1) next[id] = sec - 1;
-        }
-        return next;
-      });
-    }, 1000);
-    return () => clearInterval(iv);
-  }, [undoTimers]);
-
-  // ── 액션 ─────────────────────────────────────────────
-  const handleDone = async (id: string) => {
-    setSchedules(prev => prev.map(s => s.id === id ? { ...s, isDone: true } : s));
-    setUndoTimers(prev => ({ ...prev, [id]: 30 }));
-    try {
-      await fetch(`/api/workers/schedule/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isDone: true }),
-      });
-    } catch { /* ignore */ }
-  };
-
-  const handleUndone = async (id: string) => {
-    setSchedules(prev => prev.map(s => s.id === id ? { ...s, isDone: false } : s));
-    setUndoTimers(prev => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-    try {
-      await fetch(`/api/workers/schedule/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isDone: false }),
-      });
-    } catch { /* ignore */ }
-  };
-
   // ── 404 / 로딩 ───────────────────────────────────────
   if (notFound) {
     return (
@@ -169,10 +113,7 @@ export default function WorkerTokenPage() {
   }
 
   // ── 파생 데이터 ──────────────────────────────────────
-  const isActuallyDone = (s: Schedule) => s.isDone === true && s.date <= todayStr;
-
   const todayAll = schedules.filter(s => s.date === todayStr);
-  const todaySchedule = todayAll[0] || null; // 오늘은 보통 1~2건, 일단 첫 건 기준
   const monthTotalAmount = schedules.reduce((sum, s) => sum + s.amount, 0);
 
   // 캘린더 cells
@@ -190,9 +131,6 @@ export default function WorkerTokenPage() {
     schedulesByDate.get(s.date)!.push(s);
   }
 
-  const monthDoneCount = schedules.filter(s => isActuallyDone(s)).length;
-  const monthPendingCount = schedules.length - monthDoneCount;
-
   const WEEKDAY_LABELS = [
     { label: '일', color: TEXT_SUB },
     { label: '월', color: TEXT_SUB },
@@ -208,7 +146,7 @@ export default function WorkerTokenPage() {
 
   // ── 오늘 카드 렌더 ────────────────────────────────────
   const renderTodayContent = () => {
-    if (!todaySchedule) {
+    if (todayAll.length === 0) {
       return (
         <div style={{ background: CARD, borderRadius: 18, padding: '28px 20px', textAlign: 'center' }}>
           <div style={{ fontSize: 22, fontWeight: 500, color: TEXT_MAIN, letterSpacing: '-0.3px' }}>
@@ -218,82 +156,24 @@ export default function WorkerTokenPage() {
       );
     }
 
-    const s = todaySchedule;
-    const done = isActuallyDone(s);
-    const remaining = undoTimers[s.id];
-
-    if (done) {
-      return (
-        <div style={{ background: CARD, borderRadius: 18, padding: '28px 20px', textAlign: 'center' }}>
-          <div style={{
-            width: 84, height: 84, borderRadius: '50%', background: GREEN,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 16px',
-          }}>
-            <CheckBig />
-          </div>
-          <div style={{ fontSize: 22, fontWeight: 500, color: TEXT_MAIN, marginBottom: 6 }}>수고하셨어요!</div>
-          <div style={{ fontSize: 14, color: TEXT_SUB, marginBottom: 18 }}>
-            {s.houseName} {worker.type || '청소'} 완료
-          </div>
-          <div style={{
-            background: LINE_LIGHT, borderRadius: 10, padding: '14px 18px',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          }}>
-            <span style={{ fontSize: 13, color: TEXT_SUB }}>정산 예정</span>
-            <span style={{ fontSize: 16, fontWeight: 500, color: TEXT_MAIN }}>{comma(s.amount)}원</span>
-          </div>
-          {remaining !== undefined && remaining > 0 ? (
-            <>
-              <div style={{
-                background: WARN_BG, borderRadius: 8, padding: '10px 14px',
-                fontSize: 13, color: WARN_FG, marginTop: 14, lineHeight: 1.4,
-              }}>
-                실수로 눌렀나요? {remaining}초 안에 되돌릴 수 있어요
-              </div>
-              <button onClick={() => handleUndone(s.id)}
-                style={{
-                  width: '100%', marginTop: 8, padding: '14px 0',
-                  background: CARD, border: `1px solid ${GRAY_DISABLED}`, borderRadius: 10,
-                  fontSize: 15, fontWeight: 500, color: TEXT_MAIN,
-                  cursor: 'pointer', fontFamily: 'inherit',
-                }}>
-                되돌리기
-              </button>
-            </>
-          ) : (
-            <div style={{ fontSize: 13, color: TEXT_SUB, marginTop: 14 }}>
-              끝냈어요. 매니저에게 보고되었습니다
-            </div>
-          )}
-        </div>
-      );
-    }
-
     return (
-      <div style={{
-        background: 'linear-gradient(135deg, #3182F6 0%, #2772E3 100%)',
-        borderRadius: 16, padding: 18, color: '#FFFFFF',
-      }}>
-        <div style={{ fontSize: 12, opacity: 0.85 }}>
-          오늘 · {fmtDay(s.date)}
-        </div>
-        <div style={{ fontSize: 24, fontWeight: 500, letterSpacing: '-0.4px', marginTop: 6 }}>
-          {s.houseName}
-        </div>
-        <div style={{ fontSize: 13, opacity: 0.9, marginTop: 3 }}>
-          {s.type} · {s.amount.toLocaleString()}원
-        </div>
-        <button onClick={() => handleDone(s.id)}
-          style={{
-            width: '100%', marginTop: 12,
-            background: 'rgba(255,255,255,0.22)', color: '#FFFFFF',
-            border: 'none', padding: 11, borderRadius: 10,
-            fontSize: 14, fontWeight: 500,
-            cursor: 'pointer', fontFamily: 'inherit',
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {todayAll.map(s => (
+          <div key={s.id} style={{
+            background: 'linear-gradient(135deg, #3182F6 0%, #2772E3 100%)',
+            borderRadius: 16, padding: 18, color: '#FFFFFF',
           }}>
-          {worker.type === '수리' ? '수리 끝났어요' : '청소 끝났어요'}
-        </button>
+            <div style={{ fontSize: 12, opacity: 0.85 }}>
+              오늘 · {fmtDay(s.date)}
+            </div>
+            <div style={{ fontSize: 24, fontWeight: 500, letterSpacing: '-0.4px', marginTop: 6 }}>
+              {s.houseName}
+            </div>
+            <div style={{ fontSize: 13, opacity: 0.9, marginTop: 3 }}>
+              {s.type} · {s.amount.toLocaleString()}원
+            </div>
+          </div>
+        ))}
       </div>
     );
   };
@@ -349,9 +229,7 @@ export default function WorkerTokenPage() {
               const dateStr = `${viewYear}-${String(viewMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
               const daySchedules = schedulesByDate.get(dateStr) || [];
               const isToday = dateStr === todayStr;
-
-              const hasPending = daySchedules.some(s => !isActuallyDone(s));
-              const hasDone = daySchedules.some(s => isActuallyDone(s));
+              const hasSchedule = daySchedules.length > 0;
 
               let bg = '#FAFBFC';
               let dateColor = '#C0C6CD';
@@ -359,17 +237,11 @@ export default function WorkerTokenPage() {
               let amountColor = '#C0C6CD';
               let dateWeight: 400 | 500 = 400;
 
-              if (hasPending) {
+              if (hasSchedule) {
                 bg = '#E6F0FE';
                 dateColor = '#1B64DA';
                 houseColor = '#1B64DA';
                 amountColor = '#1B64DA';
-                dateWeight = 500;
-              } else if (hasDone) {
-                bg = '#E1F5EE';
-                dateColor = '#0F6E56';
-                houseColor = '#0F6E56';
-                amountColor = '#0F6E56';
                 dateWeight = 500;
               }
 
@@ -383,25 +255,19 @@ export default function WorkerTokenPage() {
                 dateWeight = 500;
               }
 
-              const sorted = [...daySchedules].sort((a, b) => {
-                const ad = isActuallyDone(a) ? 1 : 0;
-                const bd = isActuallyDone(b) ? 1 : 0;
-                return ad - bd;
-              });
-              const topSchedule = sorted[0];
+              const topSchedule = daySchedules[0];
               const topHouse = topSchedule ? shortHouse(topSchedule.houseName) : '';
               const topAmount = topSchedule ? formatAmount(topSchedule.amount) : '';
-              const clickable = daySchedules.length > 0;
 
               return (
                 <button key={dateStr}
-                  onClick={() => clickable && topSchedule && setSheetId(topSchedule.id)}
-                  disabled={!clickable}
+                  onClick={() => hasSchedule && topSchedule && setSheetId(topSchedule.id)}
+                  disabled={!hasSchedule}
                   style={{
                     height: 62, background: bg, borderRadius: 7, padding, border,
                     boxSizing: 'border-box', display: 'flex', flexDirection: 'column',
                     alignItems: 'center', justifyContent: 'flex-start',
-                    cursor: clickable ? 'pointer' : 'default',
+                    cursor: hasSchedule ? 'pointer' : 'default',
                     fontFamily: 'inherit', textAlign: 'center',
                   }}>
                   <span style={{ fontSize: 10, fontWeight: dateWeight, color: dateColor, lineHeight: 1.2 }}>{day}</span>
@@ -427,18 +293,6 @@ export default function WorkerTokenPage() {
               );
             })}
           </div>
-
-          {/* 범례 */}
-          <div style={{ display: 'flex', gap: 12, padding: '10px 4px 0', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 10, height: 10, background: '#E1F5EE', borderRadius: 2 }} />
-              <span style={{ fontSize: 10, color: TEXT_SUB }}>완료 {monthDoneCount}</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 10, height: 10, background: '#E6F0FE', borderRadius: 2 }} />
-              <span style={{ fontSize: 10, color: TEXT_SUB }}>예정 {monthPendingCount}</span>
-            </div>
-          </div>
         </div>
 
         {/* 4. 합계 카드 */}
@@ -463,16 +317,6 @@ export default function WorkerTokenPage() {
               fontWeight: 400,
               marginLeft: '3px',
             }}>원</span>
-          </div>
-          <div style={{
-            display: 'flex',
-            gap: '14px',
-            marginTop: '8px',
-            fontSize: '11px',
-            color: '#4E5968',
-          }}>
-            <div>완료 <span style={{ color: '#00B493', fontWeight: 500 }}>{monthDoneCount}건</span></div>
-            <div>예정 <span style={{ color: '#3182F6', fontWeight: 500 }}>{monthPendingCount}건</span></div>
           </div>
         </div>
       </div>
