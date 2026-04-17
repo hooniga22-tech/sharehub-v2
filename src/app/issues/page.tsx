@@ -14,8 +14,9 @@ type Work = {
   작업종류: string; 정산금액: string; 메모: string; 완료여부: string;
 };
 
+type StaffInfo = { 이름: string; 링크토큰: string };
 type StaffStat = {
-  이름: string; count: number; amount: number;
+  이름: string; count: number; amount: number; 링크토큰: string;
 };
 
 type MainTab = 'schedule' | 'workers' | 'settle';
@@ -28,6 +29,7 @@ const CATEGORIES: Category[] = ['전체', '청소', '수리', '기타'];
 export default function IssuesPage() {
   const [issues, setIssues] = useState<Issue[]>([]);
   const [works, setWorks] = useState<Work[]>([]);
+  const [staffInfoList, setStaffInfoList] = useState<StaffInfo[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [mainTab, setMainTab] = useState<MainTab>('schedule');
@@ -43,9 +45,12 @@ export default function IssuesPage() {
     Promise.all([
       fetch('/api/issues').then(r => r.json()),
       fetch('/api/workers').then(r => r.json()),
-    ]).then(([issueData, workData]) => {
+      fetch('/api/workers/staff').then(r => r.json()).catch(() => []),
+    ]).then(([issueData, workData, staffData]) => {
       setIssues(issueData.issues || []);
       setWorks(Array.isArray(workData) ? workData : []);
+      const sArr = Array.isArray(staffData) ? staffData : [];
+      setStaffInfoList(sArr.map((s: any) => ({ 이름: s.이름 || '', 링크토큰: s.링크토큰 || '' })));
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
@@ -173,9 +178,11 @@ export default function IssuesPage() {
       const myWorks = works.filter(w => w.담당자명 === name && w.예정일.startsWith(thisMonthPrefix));
       const count = myWorks.length;
       const amount = myWorks.reduce((sum, w) => sum + (parseInt(w.정산금액) || 0), 0);
-      return { 이름: name, count, amount };
+      const matched = staffInfoList.find(si => si.이름 === name);
+      const 링크토큰 = matched?.링크토큰 || '';
+      return { 이름: name, count, amount, 링크토큰 };
     }).sort((a, b) => b.amount - a.amount);
-  }, [works, thisMonthPrefix]);
+  }, [works, thisMonthPrefix, staffInfoList]);
 
   if (loading) {
     return (
@@ -364,35 +371,42 @@ export default function IssuesPage() {
           ) : (
             staffStats.map(s => (
               <div key={s.이름} style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  {/* 아바타 */}
-                  <div style={{
-                    width: 40, height: 40, borderRadius: '50%',
-                    background: '#E8F3FF', color: '#185FA5',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 14, fontWeight: 700, flexShrink: 0,
-                  }}>
-                    {s.이름.substring(0, 2)}
-                  </div>
-                  {/* 정보 */}
-                  <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: 14, fontWeight: 700, color: '#191919', marginBottom: 2 }}>{s.이름}</p>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: '#191919', marginBottom: 2 }}>{s.이름}</p>
                     <p style={{ fontSize: 11, color: GRAY }}>
                       이달 {s.count}건 · {s.amount > 0 ? `${s.amount.toLocaleString()}원` : '0원'}
                     </p>
                   </div>
-                </div>
-                {/* 버튼 */}
-                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                  <button
-                    onClick={() => { setMainTab('schedule'); setFilterStaff(s.이름); }}
-                    style={{
-                      flex: 1, padding: '8px 0', borderRadius: 8, textAlign: 'center',
-                      border: '1px solid #DDD', background: 'none', color: '#555',
-                      fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
-                    }}>
-                    일정 보기
-                  </button>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    {s.링크토큰 ? (
+                      <Link href={`/worker/${s.링크토큰}`}
+                        style={{
+                          padding: '6px 12px', borderRadius: 8,
+                          border: `1px solid ${BLUE}`, color: BLUE,
+                          fontSize: 11, fontWeight: 600, textDecoration: 'none',
+                        }}>
+                        개인 페이지
+                      </Link>
+                    ) : (
+                      <span style={{
+                        padding: '6px 12px', borderRadius: 8,
+                        border: '1px solid #DDD', color: '#999',
+                        fontSize: 11, fontWeight: 600, opacity: 0.4, cursor: 'not-allowed',
+                      }}>
+                        개인 페이지
+                      </span>
+                    )}
+                    <button
+                      onClick={() => { setMainTab('schedule'); setFilterStaff(s.이름); }}
+                      style={{
+                        padding: '6px 12px', borderRadius: 8,
+                        border: '1px solid #DDD', background: 'none', color: '#555',
+                        fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                      }}>
+                      일정 보기
+                    </button>
+                  </div>
                 </div>
               </div>
             ))
