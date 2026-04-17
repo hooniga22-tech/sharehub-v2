@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 
 // ── 타입 ───────────────────────────────────────────────
@@ -69,32 +69,60 @@ export default function WorkerTokenPage() {
 
   const [worker, setWorker] = useState<Worker | null>(null);
   const [notFound, setNotFound] = useState(false);
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [todaySchedules, setTodaySchedules] = useState<Schedule[]>([]);
+  const [monthSchedules, setMonthSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
+  const [monthLoading, setMonthLoading] = useState(false);
   const [sheetId, setSheetId] = useState<string | null>(null);
 
   const now = useMemo(() => new Date(), []);
-  const viewYear = now.getFullYear();
-  const viewMonth = now.getMonth() + 1;
+  const nowYear = now.getFullYear();
+  const nowMonth = now.getMonth() + 1;
   const todayStr = ymd(now);
 
-  // ── 데이터 로드 ──────────────────────────────────────
-  const fetchData = useCallback(() => {
+  const [viewYear, setViewYear] = useState<number>(nowYear);
+  const [viewMonth, setViewMonth] = useState<number>(nowMonth);
+  const isCurrentMonth = viewYear === nowYear && viewMonth === nowMonth;
+
+  // ── 오늘 월 fetch (1회) ──────────────────────────────
+  useEffect(() => {
     setLoading(true);
-    fetch(`/api/workers/by-token/${token}?year=${viewYear}&month=${viewMonth}`, { cache: 'no-store' })
+    fetch(`/api/workers/by-token/${token}?year=${nowYear}&month=${nowMonth}`, { cache: 'no-store' })
       .then(async r => {
-        if (r.status === 404) { setNotFound(true); setWorker(null); setSchedules([]); return; }
+        if (r.status === 404) { setNotFound(true); setWorker(null); setTodaySchedules([]); return; }
         const data = await r.json();
-        if (data.error) { setNotFound(true); setWorker(null); setSchedules([]); return; }
+        if (data.error) { setNotFound(true); setWorker(null); setTodaySchedules([]); return; }
         setNotFound(false);
         setWorker(data.worker || null);
-        setSchedules(Array.isArray(data.schedules) ? data.schedules : []);
+        setTodaySchedules(Array.isArray(data.schedules) ? data.schedules : []);
       })
-      .catch(() => { /* network error: leave state as-is */ })
+      .catch(() => { /* 유지 */ })
       .finally(() => setLoading(false));
+  }, [token, nowYear, nowMonth]);
+
+  // ── 선택된 월 fetch ──────────────────────────────────
+  useEffect(() => {
+    setMonthLoading(true);
+    fetch(`/api/workers/by-token/${token}?year=${viewYear}&month=${viewMonth}`, { cache: 'no-store' })
+      .then(async r => {
+        if (r.status === 404) { setMonthSchedules([]); return; }
+        const data = await r.json();
+        if (data.error) { setMonthSchedules([]); return; }
+        setMonthSchedules(Array.isArray(data.schedules) ? data.schedules : []);
+      })
+      .catch(() => { setMonthSchedules([]); })
+      .finally(() => setMonthLoading(false));
   }, [token, viewYear, viewMonth]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  // ── 월 이동 핸들러 ───────────────────────────────────
+  const handlePrevMonth = () => {
+    if (viewMonth === 1) { setViewYear(y => y - 1); setViewMonth(12); }
+    else setViewMonth(m => m - 1);
+  };
+  const handleNextMonth = () => {
+    if (viewMonth === 12) { setViewYear(y => y + 1); setViewMonth(1); }
+    else setViewMonth(m => m + 1);
+  };
 
   // ── 404 / 로딩 ───────────────────────────────────────
   if (notFound) {
@@ -113,10 +141,12 @@ export default function WorkerTokenPage() {
   }
 
   // ── 파생 데이터 ──────────────────────────────────────
-  const todayAll = schedules.filter(s => s.date === todayStr);
-  const monthTotalAmount = schedules.reduce((sum, s) => sum + s.amount, 0);
+  // 오늘 카드: 항상 오늘 월 데이터에서 오늘 날짜 건만
+  const todayAll = todaySchedules.filter(s => s.date === todayStr);
+  // 합계: 선택된 월 데이터 전체
+  const monthTotalAmount = monthSchedules.reduce((sum, s) => sum + s.amount, 0);
 
-  // 캘린더 cells
+  // 캘린더 cells (선택된 월 기준)
   const firstDay = new Date(viewYear, viewMonth - 1, 1).getDay();
   const daysInMonth = new Date(viewYear, viewMonth, 0).getDate();
   const cells: (number | null)[] = [];
@@ -124,9 +154,9 @@ export default function WorkerTokenPage() {
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
   while (cells.length % 7 !== 0) cells.push(null);
 
-  // 날짜별 일정 맵
+  // 날짜별 일정 맵 (선택된 월)
   const schedulesByDate = new Map<string, Schedule[]>();
-  for (const s of schedules) {
+  for (const s of monthSchedules) {
     if (!schedulesByDate.has(s.date)) schedulesByDate.set(s.date, []);
     schedulesByDate.get(s.date)!.push(s);
   }
@@ -141,8 +171,8 @@ export default function WorkerTokenPage() {
     { label: '토', color: TEXT_SUB },
   ];
 
-  // 바텀시트 대상
-  const sheetSchedule = sheetId ? schedules.find(s => s.id === sheetId) || null : null;
+  // 바텀시트 대상 (캘린더 = 선택된 월에서 조회)
+  const sheetSchedule = sheetId ? monthSchedules.find(s => s.id === sheetId) || null : null;
 
   // ── 오늘 카드 렌더 ────────────────────────────────────
   const renderTodayContent = () => {
@@ -189,23 +219,23 @@ export default function WorkerTokenPage() {
           </div>
         </div>
 
-        {/* 2. 오늘 카드 */}
+        {/* 2. 오늘 카드 (항상 고정 — 오늘 월 데이터) */}
         <div style={{ marginBottom: 14 }}>
           {renderTodayContent()}
         </div>
 
-        {/* 3. 월 캘린더 */}
+        {/* 3. 월 캘린더 (선택된 월 데이터) */}
         <div style={{ background: CARD, padding: '14px 10px', borderRadius: 14, marginBottom: 14 }}>
           {/* 월 헤더 */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px 8px' }}>
-            <button onClick={() => { /* TODO: 다음 작업 */ }}
+            <button onClick={handlePrevMonth}
               style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
               <CalArrowLeft />
             </button>
             <div style={{ fontSize: 14, fontWeight: 500, color: TEXT_MAIN }}>
               {viewYear}년 {viewMonth}월
             </div>
-            <button onClick={() => { /* TODO: 다음 작업 */ }}
+            <button onClick={handleNextMonth}
               style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
               <CalArrowRight />
             </button>
@@ -221,14 +251,18 @@ export default function WorkerTokenPage() {
           </div>
 
           {/* 날짜 그리드 */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3,
+            opacity: monthLoading ? 0.5 : 1,
+            transition: 'opacity 0.15s',
+          }}>
             {cells.map((day, i) => {
               if (day === null) {
                 return <div key={`e${i}`} style={{ height: 62 }} />;
               }
               const dateStr = `${viewYear}-${String(viewMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
               const daySchedules = schedulesByDate.get(dateStr) || [];
-              const isToday = dateStr === todayStr;
+              const isToday = isCurrentMonth && dateStr === todayStr;
               const hasSchedule = daySchedules.length > 0;
 
               let bg = '#FAFBFC';
@@ -295,14 +329,16 @@ export default function WorkerTokenPage() {
           </div>
         </div>
 
-        {/* 4. 합계 카드 */}
+        {/* 4. 합계 카드 (선택된 월 데이터) */}
         <div style={{
           background: '#FFFFFF',
           borderRadius: '16px',
           padding: '18px 20px',
+          opacity: monthLoading ? 0.5 : 1,
+          transition: 'opacity 0.15s',
         }}>
           <div style={{ fontSize: '12px', color: '#8B95A1', fontWeight: 500 }}>
-            이번 달 예상 수익
+            {isCurrentMonth ? '이번 달 예상 수익' : `${viewYear}년 ${viewMonth}월 예상 수익`}
           </div>
           <div style={{
             fontSize: '28px',
