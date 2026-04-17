@@ -228,22 +228,22 @@ export default function IssuesPage() {
         <div style={{ padding: '16px 16px 0' }}>
           {/* 담당자 필터 표시 */}
           {filterStaff && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '10px 14px', background: '#E8F1FD', borderRadius: 10, border: `1px solid ${BLUE}30` }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: BLUE }}>{filterStaff}</span>
-                <span style={{ fontSize: 12, color: BLUE }}>일정 보는 중</span>
-              </div>
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              background: BLUE, padding: '12px 16px', borderRadius: 12, margin: '0 0 14px 0',
+            }}>
+              <span style={{ color: '#FFFFFF', fontSize: 14, fontWeight: 500 }}>
+                {filterStaff} 일정만 보는 중
+              </span>
               <button
                 onClick={() => setFilterStaff(null)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  padding: '4px 10px', borderRadius: 6,
-                  background: '#fff', border: `1px solid ${BLUE}`, color: BLUE,
-                  fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                  background: 'rgba(255,255,255,0.2)', color: '#FFFFFF', border: 'none',
+                  padding: '5px 11px', borderRadius: 999,
+                  fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
                 }}
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                전체 보기
+                전체
               </button>
             </div>
           )}
