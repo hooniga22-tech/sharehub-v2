@@ -46,7 +46,7 @@ export default function ManagePage() {
   ];
 
   const smallCards = [
-    { title: '용역 관리', sub: '용역 배정·출결', href: '/workers' },
+    { title: '청소·수리', sub: '청소·수리 일정', href: '/issues' },
     { title: '당번 관리', sub: '청소 당번표', href: '/duty' },
     { title: '공과금', sub: '공과금 내역', href: '/utilities' },
     { title: '지출 관리', sub: '지출 기록', href: '/expenses' },
@@ -103,7 +103,7 @@ export default function ManagePage() {
             { title: '입주 신청', sub: '입주 신청서 관리', href: '/apply' },
             { title: '수납 관리', sub: '월세 수납 현황', href: '/payments' },
             { title: '공실 관리', sub: '공실 현황 및 모집', href: '/vacancy' },
-            { title: '용역 관리', sub: '용역 배정·출결', href: '/workers' },
+            { title: '청소·수리', sub: '청소·수리 일정', href: '/issues' },
             { title: '당번 관리', sub: '청소 당번표', href: '/duty' },
             { title: '공과금 관리', sub: '공과금 내역 관리', href: '/utilities' },
             { title: '지출 관리', sub: '지출 기록 관리', href: '/expenses' },

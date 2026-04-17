@@ -7,7 +7,7 @@ import { Home, Users, AlertTriangle, Settings } from 'lucide-react';
 const tabs = [
   { href: '/', label: '홈', icon: Home },
   { href: '/tenants', label: '입주자', icon: Users },
-  { href: '/issues', label: '이슈', icon: AlertTriangle },
+  { href: '/issues', label: '청소·수리', icon: AlertTriangle },
   { href: '/manage', label: '관리', icon: Settings },
 ];
 
