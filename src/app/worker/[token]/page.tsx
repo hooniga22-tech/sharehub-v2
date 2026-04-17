@@ -37,6 +37,13 @@ function fmtDay(dateStr: string) {
 }
 const comma = (n: number) => n.toLocaleString();
 
+const shortHouse = (name: string): string => {
+  if (!name) return '';
+  const stripped = name.replace(/하우스$/, '');
+  if (stripped.length <= 2) return stripped;
+  return stripped.slice(0, 2);
+};
+
 // ── SVG 아이콘 ──────────────────────────────────────────
 const CheckBig = () => (
   <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -53,6 +60,16 @@ const Chevron = () => (
     <path d="M9 6L15 12L9 18" stroke={BLUE} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
+const CalArrowLeft = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <path d="M15 18L9 12L15 6" stroke={TEXT_SUB} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+const CalArrowRight = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <path d="M9 6L15 12L9 18" stroke={TEXT_SUB} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
 
 // ── 페이지 ──────────────────────────────────────────────
 export default function WorkerTokenPage() {
@@ -64,8 +81,6 @@ export default function WorkerTokenPage() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'main' | 'full'>('main');
   const [undoTimers, setUndoTimers] = useState<Record<string, number>>({});
-  const [expandedUpcoming, setExpandedUpcoming] = useState(false);
-  const [expandedDone, setExpandedDone] = useState(false);
 
   const now = useMemo(() => new Date(), []);
   const viewYear = now.getFullYear();
@@ -162,21 +177,42 @@ export default function WorkerTokenPage() {
   const monthRemaining = schedules.filter(s => !isActuallyDone(s) && s.date >= todayStr).length;
 
   // Full view data
-  const upcomingAll = schedules
-    .filter(s => s.date > todayStr && !isActuallyDone(s))
-    .sort((a, b) => a.date.localeCompare(b.date));
-  const doneAll = schedules.filter(s => isActuallyDone(s)).sort((a, b) => b.date.localeCompare(a.date));
   const monthTotalAmount = schedules.reduce((sum, s) => sum + s.amount, 0);
 
   // ══════════════════════════════════════════════════════
   // FULL VIEW
   // ══════════════════════════════════════════════════════
   if (view === 'full') {
-    const upcomingShown = expandedUpcoming ? upcomingAll : upcomingAll.slice(0, 4);
-    const upcomingHidden = upcomingAll.length - upcomingShown.length;
-    const doneShown = expandedDone ? doneAll : doneAll.slice(0, 2);
-    const doneHidden = doneAll.length - doneShown.length;
     const todayForFull = todayAll.filter(s => !isActuallyDone(s));
+
+    // 캘린더 cells
+    const firstDay = new Date(viewYear, viewMonth - 1, 1).getDay();
+    const daysInMonth = new Date(viewYear, viewMonth, 0).getDate();
+    const cells: (number | null)[] = [];
+    for (let i = 0; i < firstDay; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+    while (cells.length % 7 !== 0) cells.push(null);
+
+    // 날짜별 일정 맵
+    const schedulesByDate = new Map<string, Schedule[]>();
+    for (const s of schedules) {
+      if (!schedulesByDate.has(s.date)) schedulesByDate.set(s.date, []);
+      schedulesByDate.get(s.date)!.push(s);
+    }
+
+    // 이번달 완료/예정 건수
+    const monthDoneCount = schedules.filter(s => isActuallyDone(s)).length;
+    const monthPendingCount = schedules.length - monthDoneCount;
+
+    const WEEKDAY_LABELS = [
+      { label: '일', color: TEXT_SUB },
+      { label: '월', color: TEXT_SUB },
+      { label: '화', color: TEXT_SUB },
+      { label: '수', color: TEXT_SUB },
+      { label: '목', color: TEXT_SUB },
+      { label: '금', color: '#E24B4A' },
+      { label: '토', color: TEXT_SUB },
+    ];
 
     return (
       <div style={{ minHeight: '100vh', background: BG }}>
@@ -191,6 +227,115 @@ export default function WorkerTokenPage() {
               <div style={{ fontSize: 24, fontWeight: 500, color: TEXT_MAIN, letterSpacing: '-0.4px' }}>이번 달 전체 일정</div>
               <div style={{ fontSize: 17, color: TEXT_SUB, marginTop: 2 }}>
                 {worker.name}님 · {viewMonth}월 · {schedules.length}건
+              </div>
+            </div>
+          </div>
+
+          {/* 캘린더 */}
+          <div style={{ background: CARD, padding: '14px 10px', borderRadius: 14, marginBottom: 14 }}>
+            {/* 월 헤더 */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px 8px' }}>
+              <button onClick={() => { /* TODO: 다음 작업 */ }}
+                style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
+                <CalArrowLeft />
+              </button>
+              <div style={{ fontSize: 14, fontWeight: 500, color: TEXT_MAIN }}>
+                {viewYear}년 {viewMonth}월
+              </div>
+              <button onClick={() => { /* TODO: 다음 작업 */ }}
+                style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
+                <CalArrowRight />
+              </button>
+            </div>
+
+            {/* 요일 헤더 */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, padding: '4px 0 6px' }}>
+              {WEEKDAY_LABELS.map(w => (
+                <div key={w.label} style={{ textAlign: 'center', fontSize: 10, fontWeight: 500, color: w.color }}>
+                  {w.label}
+                </div>
+              ))}
+            </div>
+
+            {/* 날짜 그리드 */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
+              {cells.map((day, i) => {
+                if (day === null) {
+                  return <div key={`e${i}`} style={{ height: 54 }} />;
+                }
+                const dateStr = `${viewYear}-${String(viewMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const daySchedules = schedulesByDate.get(dateStr) || [];
+                const isToday = dateStr === todayStr;
+
+                // 상태 판별
+                const hasPending = daySchedules.some(s => !isActuallyDone(s));
+                const hasDone = daySchedules.some(s => isActuallyDone(s));
+
+                let bg = '#FAFBFC';
+                let dateColor = '#C0C6CD';
+                let houseColor = '#C0C6CD';
+                let dateWeight: 400 | 500 = 400;
+
+                if (hasPending) {
+                  bg = '#E6F0FE';
+                  dateColor = '#1B64DA';
+                  houseColor = '#1B64DA';
+                  dateWeight = 500;
+                } else if (hasDone) {
+                  bg = '#E1F5EE';
+                  dateColor = '#0F6E56';
+                  houseColor = '#0F6E56';
+                  dateWeight = 500;
+                }
+
+                // 오늘 강조: 파란 테두리 + 파랑 계열로 통일
+                const border = isToday ? `2px solid ${BLUE}` : 'none';
+                const padding = isToday ? '3px 2px' : '5px 2px';
+                if (isToday) {
+                  if (hasDone && !hasPending) {
+                    bg = '#E6F0FE';
+                  }
+                  dateColor = '#1B64DA';
+                  houseColor = '#1B64DA';
+                  dateWeight = 500;
+                }
+
+                // 표시할 일정 (예정 우선)
+                const sorted = [...daySchedules].sort((a, b) => {
+                  const ad = isActuallyDone(a) ? 1 : 0;
+                  const bd = isActuallyDone(b) ? 1 : 0;
+                  return ad - bd;
+                });
+                const topHouse = sorted[0] ? shortHouse(sorted[0].houseName) : '';
+
+                return (
+                  <div key={dateStr} style={{
+                    height: 54, background: bg, borderRadius: 7, padding, border,
+                    boxSizing: 'border-box', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start',
+                  }}>
+                    <span style={{ fontSize: 11, fontWeight: dateWeight, color: dateColor, lineHeight: 1.2 }}>{day}</span>
+                    {topHouse && (
+                      <span style={{
+                        fontSize: 10, fontWeight: 500, color: houseColor, marginTop: 4, lineHeight: 1,
+                        maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>
+                        {topHouse}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* 범례 */}
+            <div style={{ display: 'flex', gap: 12, padding: '10px 4px 0', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ width: 10, height: 10, background: '#E1F5EE', borderRadius: 2 }} />
+                <span style={{ fontSize: 10, color: TEXT_SUB }}>완료 {monthDoneCount}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ width: 10, height: 10, background: '#E6F0FE', borderRadius: 2 }} />
+                <span style={{ fontSize: 10, color: TEXT_SUB }}>예정 {monthPendingCount}</span>
               </div>
             </div>
           </div>
@@ -210,69 +355,6 @@ export default function WorkerTokenPage() {
               ))}
             </div>
           )}
-
-          {/* 예정 */}
-          <div style={{ marginBottom: 24 }}>
-            <div style={{ fontSize: 22, fontWeight: 500, color: TEXT_MAIN, marginBottom: 10 }}>
-              예정 <span style={{ fontWeight: 400, color: TEXT_SUB }}>{upcomingAll.length}건</span>
-            </div>
-            {upcomingAll.length === 0 ? (
-              <div style={{ background: CARD, borderRadius: 18, padding: '28px 20px', textAlign: 'center', color: TEXT_SUB, fontSize: 17 }}>
-                예정된 일정이 없어요
-              </div>
-            ) : (
-              <div style={{ background: CARD, borderRadius: 18, overflow: 'hidden' }}>
-                {upcomingShown.map((s, i) => (
-                  <div key={s.id} style={{
-                    padding: '20px', borderBottom: i < upcomingShown.length - 1 || upcomingHidden > 0 ? `1px solid ${LINE_LIGHT}` : 'none',
-                  }}>
-                    <div style={{ fontSize: 16, color: TEXT_SUB, marginBottom: 4 }}>{fmtDay(s.date)}</div>
-                    <div style={{ fontSize: 22, fontWeight: 500, color: TEXT_MAIN, marginBottom: 4 }}>{s.houseName}</div>
-                    <div style={{ fontSize: 17, color: TEXT_SUB }}>{comma(s.amount)}원</div>
-                  </div>
-                ))}
-                {upcomingHidden > 0 && (
-                  <button onClick={() => setExpandedUpcoming(true)}
-                    style={{ width: '100%', padding: '20px', background: 'none', border: 'none',
-                      fontSize: 17, fontWeight: 500, color: BLUE, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center' }}>
-                    남은 {upcomingHidden}건 더 보기<Chevron />
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* 완료 */}
-          <div style={{ marginBottom: 24 }}>
-            <div style={{ fontSize: 22, fontWeight: 500, color: TEXT_SUB, marginBottom: 10 }}>
-              완료 <span style={{ fontWeight: 400 }}>{doneAll.length}건</span>
-            </div>
-            {doneAll.length === 0 ? (
-              <div style={{ background: CARD, borderRadius: 18, padding: '28px 20px', textAlign: 'center', color: TEXT_SUB, fontSize: 17, opacity: 0.6 }}>
-                완료한 일정이 없어요
-              </div>
-            ) : (
-              <div style={{ background: CARD, borderRadius: 18, overflow: 'hidden' }}>
-                {doneShown.map((s, i) => (
-                  <div key={s.id} style={{
-                    padding: '20px', opacity: 0.6,
-                    borderBottom: i < doneShown.length - 1 || doneHidden > 0 ? `1px solid ${LINE_LIGHT}` : 'none',
-                  }}>
-                    <div style={{ fontSize: 16, fontWeight: 500, color: GREEN, marginBottom: 4 }}>{fmtDay(s.date)} · 끝냄</div>
-                    <div style={{ fontSize: 20, fontWeight: 500, color: TEXT_MAIN, marginBottom: 4 }}>{s.houseName}</div>
-                    <div style={{ fontSize: 16, color: TEXT_SUB }}>{comma(s.amount)}원</div>
-                  </div>
-                ))}
-                {doneHidden > 0 && (
-                  <button onClick={() => setExpandedDone(true)}
-                    style={{ width: '100%', padding: '20px', background: 'none', border: 'none',
-                      fontSize: 17, fontWeight: 500, color: BLUE, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center' }}>
-                    지난 {doneHidden}건 더 보기<Chevron />
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
 
           {/* 합계 */}
           <div style={{ height: 1, background: LINE_THIN, margin: '24px 0' }} />
