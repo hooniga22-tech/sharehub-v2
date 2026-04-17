@@ -45,6 +45,12 @@ const shortHouse = (name: string): string => {
   return stripped.slice(0, 2);
 };
 
+const formatAmount = (amount: number): string => {
+  if (!amount || amount === 0) return '';
+  const man = Math.floor(amount / 10000);
+  return `${man}만`;
+};
+
 // ── SVG 아이콘 ──────────────────────────────────────────
 const CheckBig = () => (
   <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -265,20 +271,25 @@ export default function WorkerTokenPage() {
     }
 
     return (
-      <div style={{ background: CARD, borderRadius: 18, padding: 18 }}>
-        <div style={{ fontSize: 12, fontWeight: 500, color: BLUE, marginBottom: 6 }}>
+      <div style={{
+        background: 'linear-gradient(135deg, #3182F6 0%, #2772E3 100%)',
+        borderRadius: 16, padding: 18, color: '#FFFFFF',
+      }}>
+        <div style={{ fontSize: 12, opacity: 0.85 }}>
           오늘 · {fmtDay(s.date)}
         </div>
-        <div style={{ fontSize: 24, fontWeight: 500, color: TEXT_MAIN, letterSpacing: '-0.4px', marginBottom: 4 }}>
+        <div style={{ fontSize: 24, fontWeight: 500, letterSpacing: '-0.4px', marginTop: 6 }}>
           {s.houseName}
         </div>
-        <div style={{ fontSize: 13, color: TEXT_SUB, marginBottom: 16 }}>
-          {s.type} · {comma(s.amount)}원
+        <div style={{ fontSize: 13, opacity: 0.9, marginTop: 3 }}>
+          {s.type} · {s.amount.toLocaleString()}원
         </div>
         <button onClick={() => handleDone(s.id)}
           style={{
-            width: '100%', padding: '16px 0', border: 'none', borderRadius: 12,
-            background: BLUE, color: '#fff', fontSize: 16, fontWeight: 500,
+            width: '100%', marginTop: 12,
+            background: 'rgba(255,255,255,0.22)', color: '#FFFFFF',
+            border: 'none', padding: 11, borderRadius: 10,
+            fontSize: 14, fontWeight: 500,
             cursor: 'pointer', fontFamily: 'inherit',
           }}>
           {worker.type === '수리' ? '수리 끝났어요' : '청소 끝났어요'}
@@ -333,7 +344,7 @@ export default function WorkerTokenPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
             {cells.map((day, i) => {
               if (day === null) {
-                return <div key={`e${i}`} style={{ height: 54 }} />;
+                return <div key={`e${i}`} style={{ height: 62 }} />;
               }
               const dateStr = `${viewYear}-${String(viewMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
               const daySchedules = schedulesByDate.get(dateStr) || [];
@@ -345,28 +356,30 @@ export default function WorkerTokenPage() {
               let bg = '#FAFBFC';
               let dateColor = '#C0C6CD';
               let houseColor = '#C0C6CD';
+              let amountColor = '#C0C6CD';
               let dateWeight: 400 | 500 = 400;
 
               if (hasPending) {
                 bg = '#E6F0FE';
                 dateColor = '#1B64DA';
                 houseColor = '#1B64DA';
+                amountColor = '#1B64DA';
                 dateWeight = 500;
               } else if (hasDone) {
                 bg = '#E1F5EE';
                 dateColor = '#0F6E56';
                 houseColor = '#0F6E56';
+                amountColor = '#0F6E56';
                 dateWeight = 500;
               }
 
               const border = isToday ? `2px solid ${BLUE}` : 'none';
               const padding = isToday ? '3px 2px' : '5px 2px';
               if (isToday) {
-                if (hasDone && !hasPending) {
-                  bg = '#E6F0FE';
-                }
-                dateColor = '#1B64DA';
-                houseColor = '#1B64DA';
+                bg = BLUE;
+                dateColor = '#FFFFFF';
+                houseColor = '#FFFFFF';
+                amountColor = '#FFFFFF';
                 dateWeight = 500;
               }
 
@@ -375,27 +388,39 @@ export default function WorkerTokenPage() {
                 const bd = isActuallyDone(b) ? 1 : 0;
                 return ad - bd;
               });
-              const topHouse = sorted[0] ? shortHouse(sorted[0].houseName) : '';
+              const topSchedule = sorted[0];
+              const topHouse = topSchedule ? shortHouse(topSchedule.houseName) : '';
+              const topAmount = topSchedule ? formatAmount(topSchedule.amount) : '';
               const clickable = daySchedules.length > 0;
 
               return (
                 <button key={dateStr}
-                  onClick={() => clickable && sorted[0] && setSheetId(sorted[0].id)}
+                  onClick={() => clickable && topSchedule && setSheetId(topSchedule.id)}
                   disabled={!clickable}
                   style={{
-                    height: 54, background: bg, borderRadius: 7, padding, border,
+                    height: 62, background: bg, borderRadius: 7, padding, border,
                     boxSizing: 'border-box', display: 'flex', flexDirection: 'column',
                     alignItems: 'center', justifyContent: 'flex-start',
                     cursor: clickable ? 'pointer' : 'default',
                     fontFamily: 'inherit', textAlign: 'center',
                   }}>
-                  <span style={{ fontSize: 11, fontWeight: dateWeight, color: dateColor, lineHeight: 1.2 }}>{day}</span>
+                  <span style={{ fontSize: 10, fontWeight: dateWeight, color: dateColor, lineHeight: 1.2 }}>{day}</span>
                   {topHouse && (
                     <span style={{
-                      fontSize: 10, fontWeight: 500, color: houseColor, marginTop: 4, lineHeight: 1,
+                      fontSize: 12, fontWeight: 500, color: houseColor, marginTop: 2, lineHeight: 1,
+                      letterSpacing: '-0.2px',
                       maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>
                       {topHouse}
+                    </span>
+                  )}
+                  {topAmount && (
+                    <span style={{
+                      fontSize: 9, marginTop: 1, lineHeight: 1,
+                      color: amountColor,
+                      opacity: isToday ? 0.85 : 0.75,
+                    }}>
+                      {topAmount}
                     </span>
                   )}
                 </button>
@@ -418,11 +443,37 @@ export default function WorkerTokenPage() {
 
         {/* 4. 합계 카드 */}
         <div style={{
-          background: CARD, borderRadius: 14, padding: '18px 22px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: '#FFFFFF',
+          borderRadius: '16px',
+          padding: '18px 20px',
         }}>
-          <span style={{ fontSize: 15, color: TEXT_SUB }}>이번 달 받을 돈</span>
-          <span style={{ fontSize: 22, fontWeight: 500, color: TEXT_MAIN }}>{comma(monthTotalAmount)}원</span>
+          <div style={{ fontSize: '12px', color: '#8B95A1', fontWeight: 500 }}>
+            이번 달 예상 수익
+          </div>
+          <div style={{
+            fontSize: '28px',
+            fontWeight: 500,
+            marginTop: '4px',
+            letterSpacing: '-0.5px',
+          }}>
+            {monthTotalAmount.toLocaleString()}
+            <span style={{
+              fontSize: '15px',
+              color: '#4E5968',
+              fontWeight: 400,
+              marginLeft: '3px',
+            }}>원</span>
+          </div>
+          <div style={{
+            display: 'flex',
+            gap: '14px',
+            marginTop: '8px',
+            fontSize: '11px',
+            color: '#4E5968',
+          }}>
+            <div>완료 <span style={{ color: '#00B493', fontWeight: 500 }}>{monthDoneCount}건</span></div>
+            <div>예정 <span style={{ color: '#3182F6', fontWeight: 500 }}>{monthPendingCount}건</span></div>
+          </div>
         </div>
       </div>
 
@@ -460,24 +511,43 @@ export default function WorkerTokenPage() {
               <CloseIcon />
             </button>
 
-            <div style={{ fontSize: 12, fontWeight: 500, color: BLUE, marginBottom: 6 }}>
+            <div style={{ fontSize: 12, fontWeight: 500, color: BLUE }}>
               {fmtDay(sheetSchedule.date)}
             </div>
-            <div style={{ fontSize: 22, fontWeight: 500, color: TEXT_MAIN, letterSpacing: '-0.3px', marginBottom: 4 }}>
+            <div style={{ fontSize: 22, fontWeight: 500, color: TEXT_MAIN, letterSpacing: '-0.3px', marginTop: 6 }}>
               {sheetSchedule.houseName}
             </div>
-            <div style={{ fontSize: 13, color: TEXT_SUB, marginBottom: 14 }}>
-              {sheetSchedule.type} · {comma(sheetSchedule.amount)}원
+            <div style={{ fontSize: 13, color: TEXT_SUB, marginTop: 2 }}>
+              {sheetSchedule.type} · {sheetSchedule.amount.toLocaleString()}원
             </div>
 
-            <div style={{ fontSize: 12, color: TEXT_SUB, marginBottom: 4 }}>
-              주소: {sheetSchedule.address || '등록된 정보 없음'}
-            </div>
-            <div style={{ fontSize: 12, color: TEXT_SUB, marginBottom: 4 }}>
-              비번: {sheetSchedule.doorCode || '—'}
-            </div>
-            <div style={{ fontSize: 12, color: TEXT_SUB }}>
-              메모: {sheetSchedule.houseMemo || '—'}
+            {/* 박스 3개 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14 }}>
+              {/* 박스 1 - 주소 */}
+              <div style={{ background: '#F7F8FA', borderRadius: 10, padding: '11px 13px' }}>
+                <div style={{ fontSize: 10, fontWeight: 500, color: '#8B95A1' }}>주소</div>
+                <div style={{ fontSize: 13, marginTop: 3, lineHeight: 1.4, color: TEXT_MAIN }}>
+                  {sheetSchedule.address || '등록된 정보가 없어요'}
+                </div>
+              </div>
+
+              {/* 박스 2 - 현관 비밀번호 */}
+              <div style={{ background: '#F7F8FA', borderRadius: 10, padding: '11px 13px' }}>
+                <div style={{ fontSize: 10, fontWeight: 500, color: '#8B95A1' }}>현관 비밀번호</div>
+                <div style={{ fontSize: 15, fontWeight: 500, marginTop: 3, letterSpacing: '1px', color: TEXT_MAIN }}>
+                  {sheetSchedule.doorCode || '등록된 정보가 없어요'}
+                </div>
+              </div>
+
+              {/* 박스 3 - 운영자 요청사항 (값 없으면 생략) */}
+              {sheetSchedule.houseMemo && (
+                <div style={{ background: '#E6F0FE', borderRadius: 10, padding: '11px 13px' }}>
+                  <div style={{ fontSize: 10, fontWeight: 500, color: '#1B64DA' }}>운영자 요청사항</div>
+                  <div style={{ fontSize: 13, marginTop: 3, lineHeight: 1.45, color: '#0B4BA3' }}>
+                    {sheetSchedule.houseMemo}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </>
