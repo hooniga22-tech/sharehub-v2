@@ -308,7 +308,7 @@ async function readSourcePayments(sheets: ReturnType<typeof google.sheets>): Pro
 
       // 이름에서 날짜 등 부가정보 제거하여 깨끗한 이름 추출
       // "BILLON Zoe 2/28\n柯吟 周 Ko Yin Zhou (엔코) 2/28" → 마지막 이름 사용
-      const nameLines = rawName.split('\n').filter(l => l.trim())
+      const nameLines = rawName.split('\n').filter((l: string) => l.trim() !== '')
       // 여러 이름이 있으면 마지막 이름 사용 (교체 입주자)
       let 이름 = nameLines[nameLines.length - 1].trim()
       // 날짜 패턴 제거 (끝에 붙는 "6/22", "4/1~30" 등)
