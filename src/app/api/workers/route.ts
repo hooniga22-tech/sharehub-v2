@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getSheetData, appendRow, updateRow } from '@/lib/sheets'
+import { getSheetData, appendRow, updateRow, getSheetWithHeaders, colIdx } from '@/lib/sheets'
 
 // 용역 시트 (8열): [0]용역ID [1]예정일 [2]지점명 [3]담당자명 [4]작업종류 [5]정산금액 [6]메모 [7]완료여부
 
@@ -30,13 +30,23 @@ export async function GET(req: Request) {
     let works = rows.map((r, i) => rowToWork(r, i))
 
     if (token) {
-      const staffRows = await getSheetData('용역담당자')
-      const found = staffRows.find(r => r[6] === token)
+      const { headers, rows: staffRows } = await getSheetWithHeaders('용역담당자')
+      const tokCol = colIdx(headers, '링크토큰')
+      const get = (r: string[], name: string) => {
+        const i = colIdx(headers, name)
+        return i >= 0 ? (r[i] || '') : ''
+      }
+      const found = staffRows.find(r => (r[tokCol] || '') === token)
       if (!found) return NextResponse.json({ error: '없음' }, { status: 404 })
-      const staffName = found[1] || ''
+      const staffName = get(found, '이름')
       const staffInfo = {
-        담당자ID: found[0] || '', 이름: found[1] || '', 연락처: found[2] || '',
-        분야: found[4] || '', 구분: found[5] || '', 링크토큰: found[6] || '', 기본금액: found[7] || '',
+        담당자ID: get(found, '담당자ID'),
+        이름: staffName,
+        연락처: get(found, '연락처'),
+        분야: get(found, '분야'),
+        구분: get(found, '구분'),
+        링크토큰: get(found, '링크토큰'),
+        기본금액: get(found, '기본금액'),
       }
       works = works.filter(w => w.담당자명 === staffName)
       return NextResponse.json({ staff: staffInfo, schedules: works })

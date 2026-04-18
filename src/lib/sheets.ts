@@ -90,6 +90,20 @@ export async function getSheetDataWithHeader(sheetName: string): Promise<string[
   return res.data.values || []
 }
 
+// 헤더명 기반 파싱용 — { headers, rows } 반환 (rows는 헤더 제외 raw)
+export async function getSheetWithHeaders(
+  sheetName: string,
+): Promise<{ headers: string[]; rows: string[][] }> {
+  const all = await getSheetDataWithHeader(sheetName)
+  const headers = ((all[0] || []) as string[]).map(h => (h || '').trim())
+  return { headers, rows: all.slice(1) as string[][] }
+}
+
+// 헤더명 → 컬럼 인덱스. 없으면 -1.
+export function colIdx(headers: string[], name: string): number {
+  return headers.indexOf(name)
+}
+
 export async function getUtilityCosts(): Promise<string[][]> {
   return getSheetData('공과금')
 }
