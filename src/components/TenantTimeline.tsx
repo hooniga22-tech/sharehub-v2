@@ -4,14 +4,56 @@ import { useState } from 'react'
 import type { TenantSpan, HandoverSpan, HouseTimeline } from '@/types/timeline'
 import { STATUS_COLORS, STATUS_LABEL, MONTHS, DAYS_IN_MONTH, calcProRata, barStyle } from '@/lib/timeline'
 
-const TODAY_MONTH = new Date().getMonth()
+const TODAY = new Date()
+const TODAY_YEAR = TODAY.getFullYear()
+const TODAY_MONTH = TODAY.getMonth()
+const TODAY_DAY = TODAY.getDate()
+const TODAY_LEFT_PCT =
+  ((TODAY_MONTH + (TODAY_DAY - 1) / DAYS_IN_MONTH[TODAY_MONTH]) / 12) * 100
 const ROW_H = 36
+
+// 바에 적용되는 진한 상태 색상 (spec)
+const BAR_STYLES = {
+  in:   { bg: '#dbeafe', border: '#3182f6', fg: '#1d4ed8' },
+  soon: { bg: '#fde7b8', border: '#f59e0b', fg: '#92400e' },
+  out:  { bg: '#ffcfcf', border: '#F04452', fg: '#991b1b' },
+} as const
+
+type StatusFilter = 'all' | 'soon' | 'out'
 
 interface Props {
   houses: HouseTimeline[]
   searchQuery?: string
   selectedGu?: string
   onTenantClick?: (tenantId: string) => void
+}
+
+// 퇴실일 원본 문자열 → MM/DD ("2026-06-22", "2026. 10. 31" 등 수용)
+function exitMMDD(raw?: string): string {
+  if (!raw) return ''
+  const s = String(raw).replace(/\s+/g, '')
+  const m = s.match(/(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/)
+  if (!m) return ''
+  return `${Number(m[2])}/${Number(m[3])}`
+}
+
+// 현재 오늘 시점에 활성인지 (handover는 해당 월이 오늘 달과 같은지)
+function isActiveNow(t: TenantSpan | HandoverSpan): boolean {
+  if (t.type === 'handover') {
+    return (t as HandoverSpan).month === TODAY_MONTH
+  }
+  const sp = t as TenantSpan
+  return sp.startMonth <= TODAY_MONTH && sp.endMonth >= TODAY_MONTH
+}
+
+// 상태 타입이 필터와 매칭되는지
+function matchesFilter(t: TenantSpan | HandoverSpan, f: StatusFilter): boolean {
+  if (f === 'all') return true
+  if (t.type === 'handover') {
+    return f === 'out'
+  }
+  const sp = t as TenantSpan
+  return sp.type === f
 }
 
 export default function TenantTimeline({ houses, searchQuery, selectedGu, onTenantClick }: Props) {
@@ -34,7 +76,9 @@ export default function TenantTimeline({ houses, searchQuery, selectedGu, onTena
       )
     )
   })
+
   const [openHouses, setOpenHouses] = useState<Record<string, boolean>>({})
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [modal, setModal] = useState<{
     visible: boolean
     code: string
@@ -55,50 +99,55 @@ export default function TenantTimeline({ houses, searchQuery, selectedGu, onTena
     setModal(p => ({ ...p, visible: false }))
   }
 
-  // Summary counts
-  let inC = 0, soonC = 0, outC = 0, vacC = 0
+  // 상태별 카운트 (오늘 시점 기준)
+  let inC = 0, soonC = 0, outC = 0
   filtered.forEach(h => h.rooms.forEach(r => {
-    const cur = r.tenants.find(t =>
-      t.type === 'handover'
-        ? (t as HandoverSpan).month === TODAY_MONTH
-        : (t as TenantSpan).startMonth <= TODAY_MONTH && (t as TenantSpan).endMonth >= TODAY_MONTH
-    )
-    if (!cur) { vacC++; return }
+    const cur = r.tenants.find(isActiveNow)
+    if (!cur) return
     if (cur.type === 'handover' || cur.type === 'in') inC++
     else if (cur.type === 'soon') soonC++
     else if (cur.type === 'out') outC++
   }))
+  const totalC = inC + soonC + outC
+
+  const statusChips: { key: StatusFilter; label: string; count: number; color: string }[] = [
+    { key: 'all',  label: '전체',     count: totalC, color: '#191f28' },
+    { key: 'soon', label: '종료임박', count: soonC,  color: '#f59e0b' },
+    { key: 'out',  label: '퇴실확정', count: outC,   color: '#F04452' },
+  ]
 
   return (
     <div>
-      {/* Summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, margin: '10px 14px' }}>
-        {[
-          { n: inC,   l: '입주중',   c: '#3182F6' },
-          { n: soonC, l: '종료임박', c: '#F59E0B' },
-          { n: outC,  l: '퇴실확정', c: '#EF4444' },
-          { n: vacC,  l: '공실',     c: '#8B95A1' },
-        ].map(({ n, l, c }) => (
-          <div key={l} style={{ background: '#fff', borderRadius: 14, padding: '12px 8px', textAlign: 'center', boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>
-            <div style={{ fontSize: 22, fontWeight: 800, color: c, lineHeight: 1 }}>{n}</div>
-            <div style={{ fontSize: 10, color: '#8B95A1', marginTop: 4, fontWeight: 600 }}>{l}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Legend */}
-      <div style={{ background: '#fff', padding: '8px 14px', borderBottom: '4px solid #F2F4F6', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        {[
-          { label: '입주중', bg: '#EBF3FF', border: '#3182F6' },
-          { label: '계약종료임박', bg: '#FFFBEB', border: '#F59E0B' },
-          { label: '퇴실확정', bg: '#FEF2F2', border: '#EF4444' },
-          { label: '월중교체', bg: 'linear-gradient(#FEF2F2 50%,#EBF3FF 50%)', border: '#E5E8EC' },
-        ].map(({ label, bg, border }) => (
-          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#8B95A1', fontWeight: 600 }}>
-            <div style={{ width: 22, height: 8, borderRadius: 20, background: bg, border: `1px solid ${border}`, flexShrink: 0 }} />
-            {label}
-          </div>
-        ))}
+      {/* 상태 필터 칩 */}
+      <div style={{ display: 'flex', gap: 6, padding: '12px 14px 10px', background: '#fff' }}>
+        {statusChips.map(chip => {
+          const active = statusFilter === chip.key
+          return (
+            <button
+              key={chip.key}
+              onClick={() => setStatusFilter(prev => prev === chip.key ? 'all' : chip.key)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '6px 12px', borderRadius: 100,
+                border: active ? `1px solid ${chip.color}` : `1px solid ${chip.color}`,
+                background: active ? chip.color : '#fff',
+                color: active ? '#fff' : chip.color,
+                fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              {chip.label}
+              <span style={{
+                fontSize: 10, fontWeight: 700,
+                padding: '1px 7px', borderRadius: 10, minWidth: 18, textAlign: 'center',
+                background: active ? 'rgba(255,255,255,0.25)' : '#f2f4f6',
+                color: active ? '#fff' : chip.color,
+              }}>
+                {chip.count}
+              </span>
+            </button>
+          )
+        })}
       </div>
 
       {/* House cards */}
@@ -128,7 +177,7 @@ export default function TenantTimeline({ houses, searchQuery, selectedGu, onTena
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 {vacRooms > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: '#F2F4F6', color: '#8B95A1' }}>공실 {vacRooms}</span>}
                 {soonRooms > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: '#FFFBEB', color: '#F59E0B' }}>종료임박 {soonRooms}</span>}
-                {outRooms > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: '#FEF2F2', color: '#EF4444' }}>퇴실 {outRooms}</span>}
+                {outRooms > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: '#FEF2F2', color: '#F04452' }}>퇴실 {outRooms}</span>}
                 <svg style={{ transition: 'transform .25s', transform: isOpen ? 'rotate(180deg)' : '' }}
                   width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8B95A1" strokeWidth="2.5" strokeLinecap="round">
                   <polyline points="6 9 12 15 18 9" />
@@ -143,48 +192,92 @@ export default function TenantTimeline({ houses, searchQuery, selectedGu, onTena
                   {/* Month header */}
                   <div style={{ padding: '6px 10px', fontSize: 9, fontWeight: 700, color: '#8B95A1', background: '#FAFBFC', borderRight: '1px solid #E5E8EC', borderBottom: '1px solid #E5E8EC', position: 'sticky', left: 0, zIndex: 6 }}>호실</div>
                   {MONTHS.map((m, i) => (
-                    <div key={m} style={{ padding: '6px 2px', fontSize: 9, fontWeight: 700, textAlign: 'center', background: i === TODAY_MONTH ? '#EBF3FF' : '#FAFBFC', color: i === TODAY_MONTH ? '#3182F6' : '#8B95A1', borderBottom: '1px solid #E5E8EC', borderRight: '1px solid #F2F4F6' }}>{m}월</div>
+                    <div key={m} style={{
+                      padding: '6px 2px', fontSize: 9,
+                      fontWeight: i === TODAY_MONTH ? 700 : 700,
+                      textAlign: 'center',
+                      background: i === TODAY_MONTH ? '#e8f3ff' : '#FAFBFC',
+                      color: i === TODAY_MONTH ? '#3182f6' : '#8B95A1',
+                      borderBottom: '1px solid #E5E8EC',
+                      borderRight: '1px solid #F2F4F6',
+                    }}>{m}월</div>
                   ))}
 
                   {/* Room rows */}
                   {house.rooms.map(room => {
                     const isVacant = room.tenants.length === 0
+                    // 활성 bar가 현재 상태 필터에 매칭되는지 → row 배경 하이라이트
+                    const rowMatches = statusFilter !== 'all' && room.tenants.some(t =>
+                      isActiveNow(t) && matchesFilter(t, statusFilter)
+                    )
+                    const rowBg = rowMatches ? '#fffbf0' : (isVacant ? '#FAFBFC' : '#fff')
+
                     return (
                     <div key={room.code} style={{ display: 'contents' }}>
                       {/* Label */}
-                      <div style={{ padding: '0 0 0 10px', display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'sticky', left: 0, background: isVacant ? '#FAFBFC' : '#fff', zIndex: 4, borderRight: '1px solid #E5E8EC', height: ROW_H }}>
+                      <div style={{ padding: '0 0 0 10px', display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'sticky', left: 0, background: rowBg, zIndex: 4, borderRight: '1px solid #E5E8EC', height: ROW_H }}>
                         <span style={{ fontSize: 9, color: isVacant ? '#C8CDD3' : '#8B95A1', fontWeight: 800, letterSpacing: .3 }}>{room.code}</span>
                         <span style={{ fontSize: 9, color: '#C8CDD3', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 68 }}>{isVacant ? '공실' : room.loc}</span>
                       </div>
 
                       {/* Bar area */}
-                      <div style={{ gridColumn: '2/14', display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', position: 'relative', height: ROW_H, borderBottom: '1px solid #F2F4F6' }}>
+                      <div style={{
+                        gridColumn: '2/14', display: 'grid', gridTemplateColumns: 'repeat(12,1fr)',
+                        position: 'relative', height: ROW_H,
+                        borderBottom: '1px solid #F2F4F6',
+                        background: rowBg,
+                      }}>
                         {/* Month BG cells */}
                         {Array.from({ length: 12 }, (_, i) => (
-                          <div key={i} style={{ borderRight: '1px solid #F2F4F6', background: i === TODAY_MONTH ? 'rgba(49,130,246,.05)' : 'transparent' }} />
+                          <div key={i} style={{
+                            borderRight: '1px solid #F2F4F6',
+                            background: i === TODAY_MONTH && !rowMatches ? 'rgba(49,130,246,.05)' : 'transparent',
+                          }} />
                         ))}
+
+                        {/* 오늘 세로선 */}
+                        <div style={{
+                          position: 'absolute',
+                          top: 0, bottom: 0,
+                          left: `${TODAY_LEFT_PCT}%`,
+                          width: 2,
+                          background: '#3182f6',
+                          pointerEvents: 'none',
+                          zIndex: 1,
+                        }} />
 
                         {/* Bars */}
                         {room.tenants.map((t, ti) => {
+                          const matched = matchesFilter(t, statusFilter)
+                          const dim = statusFilter !== 'all' && !matched
+                          const opacity = dim ? 0.3 : 1
+
                           if (t.type === 'handover') {
                             const hov = t as HandoverSpan
                             const bs = barStyle(hov.month, hov.month)
-                            const botBg = STATUS_COLORS[hov.typeN2]?.bg || '#EBF3FF'
-                            const botFg = STATUS_COLORS[hov.typeN2]?.fg || '#3182F6'
+                            const top = BAR_STYLES.out
+                            const bottom = BAR_STYLES[hov.typeN2] || BAR_STYLES.in
                             return (
                               <div key={ti}
                                 onClick={() => openModal(room.code, room.loc, house.name, hov)}
-                                style={{ position: 'absolute', top: 5, height: ROW_H - 10, left: bs.left, width: bs.width, borderRadius: 12, overflow: 'hidden', cursor: 'pointer', display: 'flex', flexDirection: 'column', zIndex: 2 }}>
-                                <div style={{ flex: 1, display: 'flex', alignItems: 'center', padding: '0 7px', fontSize: 8, fontWeight: 800, background: '#FEF2F2', color: '#EF4444', overflow: 'hidden', whiteSpace: 'nowrap', borderBottom: '1px solid rgba(255,255,255,.6)' }}>{hov.n1}</div>
-                                <div style={{ flex: 1, display: 'flex', alignItems: 'center', padding: '0 7px', fontSize: 8, fontWeight: 800, background: botBg, color: botFg, overflow: 'hidden', whiteSpace: 'nowrap' }}>{hov.n2}</div>
+                                style={{
+                                  position: 'absolute', top: 5, height: ROW_H - 10,
+                                  left: bs.left, width: bs.width,
+                                  borderRadius: 12, overflow: 'hidden', cursor: 'pointer',
+                                  display: 'flex', flexDirection: 'column', zIndex: 2,
+                                  opacity,
+                                  border: `1px solid ${bottom.border}`,
+                                }}>
+                                <div style={{ flex: 1, display: 'flex', alignItems: 'center', padding: '0 7px', fontSize: 9, fontWeight: 700, background: top.bg, color: top.fg, overflow: 'hidden', whiteSpace: 'nowrap', borderBottom: '1px solid rgba(255,255,255,.6)' }}>{hov.n1}</div>
+                                <div style={{ flex: 1, display: 'flex', alignItems: 'center', padding: '0 7px', fontSize: 9, fontWeight: 700, background: bottom.bg, color: bottom.fg, overflow: 'hidden', whiteSpace: 'nowrap' }}>{hov.n2}</div>
                               </div>
                             )
                           }
 
                           const sp = t as TenantSpan
                           const bs = barStyle(sp.startMonth, sp.endMonth)
-                          const colors = STATUS_COLORS[sp.type] || STATUS_COLORS.in
-                          const isTod = sp.startMonth <= TODAY_MONTH && sp.endMonth >= TODAY_MONTH
+                          const colors = BAR_STYLES[sp.type] || BAR_STYLES.in
+                          const exit = exitMMDD(sp.contractEnd)
                           return (
                             <div key={ti}
                               onClick={() => openModal(room.code, room.loc, house.name, sp)}
@@ -192,12 +285,20 @@ export default function TenantTimeline({ houses, searchQuery, selectedGu, onTena
                                 position: 'absolute', top: 5, height: ROW_H - 10,
                                 left: bs.left, width: bs.width, borderRadius: 20,
                                 background: colors.bg, color: colors.fg,
-                                display: 'flex', alignItems: 'center', overflow: 'hidden',
-                                whiteSpace: 'nowrap', cursor: 'pointer', zIndex: 2,
-                                boxShadow: isTod ? `0 0 0 1.5px ${colors.fg}` : 'none',
+                                border: `1px solid ${colors.border}`,
+                                display: 'flex', alignItems: 'center',
+                                padding: '0 10px', gap: 6,
+                                overflow: 'hidden', whiteSpace: 'nowrap',
+                                cursor: 'pointer', zIndex: 2,
+                                opacity,
                               }}
                             >
-                              <span style={{ fontSize: 9, fontWeight: 700, padding: '0 9px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sp.name}</span>
+                              <span style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }}>{sp.name}</span>
+                              {exit && (
+                                <span style={{ fontSize: 10, fontWeight: 400, opacity: 0.7, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                                  {exit}
+                                </span>
+                              )}
                             </div>
                           )
                         })}
@@ -266,7 +367,7 @@ function ModalContent({ code, loc, house, span, onClose, onDetail }: {
               ].map(([k, v]) => (
                 <div key={k as string} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: 13 }}>
                   <span style={{ color: '#8B95A1' }}>{k}</span>
-                  <span style={{ fontWeight: 700, color: sec.isOut ? '#EF4444' : '#10B981' }}>{v}</span>
+                  <span style={{ fontWeight: 700, color: sec.isOut ? '#F04452' : '#10B981' }}>{v}</span>
                 </div>
               ))}
               <div style={{ background: '#F2F4F6', borderRadius: 10, padding: '10px 14px', marginTop: 8 }}>
@@ -310,9 +411,9 @@ function ModalContent({ code, loc, house, span, onClose, onDetail }: {
             ['임대료', `${fmtW(sp.rent)}/월`, '#3182F6'],
             ['보증금', fmtW(sp.deposit), ''],
             ['기간', period, ''],
-            ['계약 종료일', fmtD(sp.contractEnd), sp.type === 'soon' ? '#F59E0B' : sp.type === 'out' ? '#EF4444' : ''],
+            ['계약 종료일', fmtD(sp.contractEnd), sp.type === 'soon' ? '#F59E0B' : sp.type === 'out' ? '#F04452' : ''],
             sp.inDay && sp.inDay > 1 ? ['입실일', `${MONTHS[sp.startMonth]}월 ${sp.inDay}일`, '#10B981'] : null,
-            sp.outDay ? ['퇴실일', `${MONTHS[sp.endMonth]}월 ${sp.outDay}일`, '#EF4444'] : null,
+            sp.outDay ? ['퇴실일', `${MONTHS[sp.endMonth]}월 ${sp.outDay}일`, '#F04452'] : null,
           ] as (string[] | null)[]).filter(Boolean).map(row => {
             const [k, v, c] = row as string[]
             return (
