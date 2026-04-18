@@ -10,7 +10,8 @@ const TODAY_MONTH = TODAY.getMonth()
 const TODAY_DAY = TODAY.getDate()
 const TODAY_LEFT_PCT =
   ((TODAY_MONTH + (TODAY_DAY - 1) / DAYS_IN_MONTH[TODAY_MONTH]) / 12) * 100
-const ROW_H = 36
+const ROW_H = 48
+const LABEL_W = 110
 
 // 바에 적용되는 진한 상태 색상 (spec)
 const BAR_STYLES = {
@@ -188,9 +189,9 @@ export default function TenantTimeline({ houses, searchQuery, selectedGu, onTena
             {/* Timeline rows */}
             {isOpen && (
               <div style={{ overflowX: 'auto' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '76px repeat(12,1fr)', minWidth: 500 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: `${LABEL_W}px repeat(12,1fr)`, minWidth: 500 }}>
                   {/* Month header */}
-                  <div style={{ padding: '6px 10px', fontSize: 9, fontWeight: 700, color: '#8B95A1', background: '#FAFBFC', borderRight: '1px solid #E5E8EC', borderBottom: '1px solid #E5E8EC', position: 'sticky', left: 0, zIndex: 6 }}>호실</div>
+                  <div style={{ width: LABEL_W, padding: '6px 12px', fontSize: 10, fontWeight: 700, color: '#8B95A1', background: '#FAFBFC', borderRight: '1px solid #E5E8EC', borderBottom: '1px solid #E5E8EC', position: 'sticky', left: 0, zIndex: 6, boxSizing: 'border-box', flexShrink: 0 }}>호실</div>
                   {MONTHS.map((m, i) => (
                     <div key={m} style={{
                       padding: '6px 2px', fontSize: 9,
@@ -215,9 +216,25 @@ export default function TenantTimeline({ houses, searchQuery, selectedGu, onTena
                     return (
                     <div key={room.code} style={{ display: 'contents' }}>
                       {/* Label */}
-                      <div style={{ padding: '0 0 0 10px', display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'sticky', left: 0, background: rowBg, zIndex: 4, borderRight: '1px solid #E5E8EC', height: ROW_H }}>
-                        <span style={{ fontSize: 9, color: isVacant ? '#C8CDD3' : '#8B95A1', fontWeight: 800, letterSpacing: .3 }}>{room.code}</span>
-                        <span style={{ fontSize: 9, color: '#C8CDD3', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 68 }}>{isVacant ? '공실' : room.loc}</span>
+                      <div style={{
+                        width: LABEL_W, padding: '0 12px',
+                        display: 'flex', flexDirection: 'column', justifyContent: 'center',
+                        position: 'sticky', left: 0, zIndex: 4,
+                        background: rowBg,
+                        borderRight: '1px solid #E5E8EC',
+                        height: ROW_H, flexShrink: 0, boxSizing: 'border-box',
+                      }}>
+                        <span style={{
+                          fontSize: 12, fontWeight: 600,
+                          color: isVacant ? '#8b95a1' : '#191f28',
+                          lineHeight: 1.2,
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        }}>{room.code}</span>
+                        <span style={{
+                          fontSize: 10, color: '#8b95a1',
+                          lineHeight: 1.2,
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        }}>{isVacant ? '공실' : room.loc}</span>
                       </div>
 
                       {/* Bar area */}
