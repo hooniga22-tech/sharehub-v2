@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getSheetWithHeaders, colIdx } from '@/lib/sheets'
 
-// 마감일이 비어 있는 할일(=인벤토리) 목록 조회. 헤더명 기반 파싱.
+// 인벤토리 = 아직 스케줄에 확정되지 않았거나, 일정이 잡혀 있어도 완료되지 않은
+// 모든 '대기 중' 할일. 상태가 '예정'(설정 완료로 일정 탭으로 이동)이나 '완료'인
+// 행은 제외. 헤더명 기반 파싱.
+const EXCLUDED_STATUSES = new Set(['예정', '완료'])
+
 export async function GET() {
   try {
     const { headers, rows } = await getSheetWithHeaders('할일')
@@ -11,7 +15,11 @@ export async function GET() {
     }
     const now = Date.now()
     const data = rows
-      .filter(r => get(r, '할일ID') && !get(r, '마감일').trim())
+      .filter(r => {
+        if (!get(r, '할일ID')) return false
+        const status = get(r, '상태').trim()
+        return !EXCLUDED_STATUSES.has(status)
+      })
       .map(r => {
         const registeredAt = get(r, '등록일')
         const regTime = registeredAt ? new Date(registeredAt).getTime() : now

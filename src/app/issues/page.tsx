@@ -642,7 +642,7 @@ export default function IssuesPage() {
         <div style={{ padding: '14px 16px 0' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <span style={{ fontSize: 12, color: GRAY }}>
-              마감일 미정 · 총 {inventory.length}건
+              대기 중 · 총 {inventory.length}건
             </span>
             <button
               onClick={loadInventory}
@@ -659,7 +659,7 @@ export default function IssuesPage() {
             <div style={{ textAlign: 'center', padding: '60px 0', color: GRAY, fontSize: 13 }}>불러오는 중...</div>
           ) : inventory.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 0', color: GRAY, fontSize: 13 }}>
-              마감일 없는 할일이 없어요
+              대기 중인 할일이 없어요
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
