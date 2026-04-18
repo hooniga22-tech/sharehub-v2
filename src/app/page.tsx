@@ -122,7 +122,9 @@ export default function HomePage() {
       }
     }
     for (const w of workers) {
-      if (w.작업종류 === '정기청소' && w.예정일) events.push({ date: w.예정일.slice(0, 10), type: 'clean', color: CLEAN_COLOR, title: `청소 — ${w.지점명 || ''}`, sub: w.담당자명 || '' });
+      if (w.예정일 && (w.작업종류 || '').includes('청소')) {
+        events.push({ date: w.예정일.slice(0, 10), type: 'clean', color: CLEAN_COLOR, title: `청소 — ${w.지점명 || ''}`, sub: w.담당자명 || '' });
+      }
     }
     return events;
   }, [tenants, issues, workers]);
