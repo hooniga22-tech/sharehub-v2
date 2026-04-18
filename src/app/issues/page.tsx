@@ -19,8 +19,20 @@ type StaffStat = {
   담당자ID: string; 이름: string; count: number; amount: number; 링크토큰: string;
 };
 
-type MainTab = 'schedule' | 'workers' | 'settle';
+type MainTab = 'schedule' | 'workers' | 'settle' | 'inventory';
 type Category = '전체' | '청소' | '수리' | '기타';
+
+type InventoryTask = {
+  id: string;
+  title: string;
+  houseName: string;
+  roomCode: string;
+  assignedTo: string;
+  tags: string[];
+  memo: string;
+  isUrgent: boolean;
+  registeredAt: string;
+};
 
 const BLUE = '#3182F6', GREEN = '#00B493', RED = '#E24B4A', GRAY = '#888888';
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -44,6 +56,27 @@ export default function IssuesPage() {
   const [settleMonth, setSettleMonth] = useState(new Date().getMonth());
   const [filterStaff, setFilterStaff] = useState<string | null>(null);
 
+  // 인벤토리
+  const [inventory, setInventory] = useState<InventoryTask[]>([]);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [scheduleTarget, setScheduleTarget] = useState<InventoryTask | null>(null);
+  const [schedStart, setSchedStart] = useState('');
+  const [schedEnd, setSchedEnd] = useState('');
+  const [schedAmount, setSchedAmount] = useState('');
+  const [schedSaving, setSchedSaving] = useState(false);
+
+  const loadInventory = () => {
+    setInventoryLoading(true);
+    fetch('/api/tasks/inventory', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(d => {
+        if (d?.success && Array.isArray(d.data)) setInventory(d.data);
+        else setInventory([]);
+      })
+      .catch(() => setInventory([]))
+      .finally(() => setInventoryLoading(false));
+  };
+
   useEffect(() => {
     Promise.all([
       fetch('/api/issues').then(r => r.json()),
@@ -60,7 +93,43 @@ export default function IssuesPage() {
       })));
       setLoading(false);
     }).catch(() => setLoading(false));
+    loadInventory();
   }, []);
+
+  const openScheduleModal = (t: InventoryTask) => {
+    const today = new Date().toISOString().slice(0, 10);
+    setScheduleTarget(t);
+    setSchedStart(today);
+    setSchedEnd('');
+    setSchedAmount('');
+  };
+  const closeScheduleModal = () => {
+    if (schedSaving) return;
+    setScheduleTarget(null);
+  };
+  const saveSchedule = async () => {
+    if (!scheduleTarget || !schedStart || !schedEnd) return;
+    setSchedSaving(true);
+    try {
+      const res = await fetch('/api/tasks/schedule', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: scheduleTarget.id,
+          startDate: schedStart,
+          endDate: schedEnd,
+          amount: schedAmount ? Number(schedAmount) : undefined,
+        }),
+      });
+      const d = await res.json();
+      if (!d?.success) { alert(d?.error || '저장 실패'); return; }
+      setScheduleTarget(null);
+      loadInventory();
+      setMainTab('schedule');
+    } finally {
+      setSchedSaving(false);
+    }
+  };
 
   const elapsed = (dateStr: string) => {
     if (!dateStr) return 0;
@@ -215,6 +284,7 @@ export default function IssuesPage() {
     { key: 'schedule', label: '일정' },
     { key: 'workers', label: '담당자' },
     { key: 'settle', label: '정산' },
+    { key: 'inventory', label: '인벤토리' },
   ];
 
   return (
@@ -493,6 +563,203 @@ export default function IssuesPage() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ========== 인벤토리 탭 ========== */}
+      {mainTab === 'inventory' && (
+        <div style={{ padding: '14px 16px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <span style={{ fontSize: 12, color: GRAY }}>
+              마감일 미정 · 총 {inventory.length}건
+            </span>
+            <button
+              onClick={loadInventory}
+              style={{
+                background: 'none', border: 'none', color: BLUE,
+                fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              새로고침
+            </button>
+          </div>
+
+          {inventoryLoading ? (
+            <div style={{ textAlign: 'center', padding: '60px 0', color: GRAY, fontSize: 13 }}>불러오는 중...</div>
+          ) : inventory.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '60px 0', color: GRAY, fontSize: 13 }}>
+              마감일 없는 할일이 없어요
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {inventory.map(t => (
+                <div
+                  key={t.id}
+                  style={{
+                    background: '#fff', borderRadius: 12, padding: '12px 14px',
+                    border: `1px solid ${t.isUrgent ? BLUE : '#EAECEF'}`,
+                    display: 'flex', flexDirection: 'column', gap: 6,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{
+                        fontSize: 14, fontWeight: 600, color: '#191919',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>
+                        {t.title || '제목 없음'}
+                        {t.houseName && (
+                          <span style={{ fontSize: 12, color: GRAY, fontWeight: 400, marginLeft: 6 }}>
+                            ({t.houseName}{t.roomCode ? ` ${t.roomCode}` : ''})
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                      {t.tags.slice(0, 1).map(tag => (
+                        <span key={tag} style={{
+                          fontSize: 10, fontWeight: 600,
+                          padding: '3px 8px', borderRadius: 999,
+                          background: '#F2F4F6', color: '#4E5968',
+                        }}>
+                          #{tag}
+                        </span>
+                      ))}
+                      <button
+                        onClick={() => openScheduleModal(t)}
+                        style={{
+                          padding: '6px 12px', borderRadius: 8, border: 'none',
+                          background: BLUE, color: '#fff',
+                          fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                          fontFamily: 'inherit',
+                        }}
+                      >
+                        설정
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{
+                    fontSize: 11, color: GRAY,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {t.assignedTo || '담당자 미정'}
+                    {t.memo ? ` · ${t.memo}` : ''}
+                    {t.isUrgent && (
+                      <span style={{ color: BLUE, fontWeight: 600, marginLeft: 6 }}>
+                        · 긴급
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 스케줄 설정 모달 */}
+      {scheduleTarget && (
+        <div
+          onClick={closeScheduleModal}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 60,
+            background: 'rgba(0,0,0,0.4)',
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: 430, background: '#fff',
+              borderRadius: '20px 20px 0 0',
+              padding: '18px 18px 22px', boxShadow: '0 -10px 30px rgba(0,0,0,0.12)',
+            }}
+          >
+            <div style={{
+              width: 36, height: 4, background: '#E5E8EC',
+              borderRadius: 2, margin: '0 auto 14px',
+            }} />
+            <p style={{ fontSize: 16, fontWeight: 700, color: '#191919', marginBottom: 4 }}>스케줄 설정</p>
+            <p style={{ fontSize: 12, color: GRAY, marginBottom: 18 }}>
+              {scheduleTarget.title || '제목 없음'}
+              {scheduleTarget.houseName ? ` · ${scheduleTarget.houseName}` : ''}
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 12, color: '#4E5968', fontWeight: 600, marginBottom: 6 }}>시작일 *</div>
+                <input
+                  type="date"
+                  value={schedStart}
+                  onChange={e => setSchedStart(e.target.value)}
+                  style={{
+                    width: '100%', height: 44, boxSizing: 'border-box',
+                    borderRadius: 10, padding: '0 12px',
+                    border: '1px solid #E5E8EB', background: '#fff', color: '#191919',
+                    fontSize: 14, fontFamily: 'inherit', outline: 'none',
+                  }}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: 12, color: '#4E5968', fontWeight: 600, marginBottom: 6 }}>마감일 *</div>
+                <input
+                  type="date"
+                  value={schedEnd}
+                  onChange={e => setSchedEnd(e.target.value)}
+                  style={{
+                    width: '100%', height: 44, boxSizing: 'border-box',
+                    borderRadius: 10, padding: '0 12px',
+                    border: '1px solid #E5E8EB', background: '#fff', color: '#191919',
+                    fontSize: 14, fontFamily: 'inherit', outline: 'none',
+                  }}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: 12, color: '#4E5968', fontWeight: 600, marginBottom: 6 }}>금액</div>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={schedAmount}
+                  onChange={e => setSchedAmount(e.target.value)}
+                  placeholder="미입력 시 기존 값 유지"
+                  style={{
+                    width: '100%', height: 44, boxSizing: 'border-box',
+                    borderRadius: 10, padding: '0 12px',
+                    border: '1px solid #E5E8EB', background: '#fff', color: '#191919',
+                    fontSize: 14, fontFamily: 'inherit', outline: 'none',
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+              <button
+                onClick={closeScheduleModal}
+                disabled={schedSaving}
+                style={{
+                  flex: 1, height: 46, borderRadius: 10, border: '1px solid #E5E8EB',
+                  background: '#fff', color: '#4E5968',
+                  fontSize: 14, fontWeight: 600, cursor: schedSaving ? 'not-allowed' : 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                취소
+              </button>
+              <button
+                onClick={saveSchedule}
+                disabled={!schedStart || !schedEnd || schedSaving}
+                style={{
+                  flex: 1, height: 46, borderRadius: 10, border: 'none',
+                  background: (!schedStart || !schedEnd || schedSaving) ? '#D1D6DB' : BLUE,
+                  color: '#fff', fontSize: 14, fontWeight: 700,
+                  cursor: (!schedStart || !schedEnd || schedSaving) ? 'not-allowed' : 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {schedSaving ? '저장 중...' : '저장'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
