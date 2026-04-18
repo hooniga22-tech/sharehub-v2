@@ -17,7 +17,6 @@ const CARD = '#FFFFFF';
 const TEXT_MAIN = '#191F28';
 const TEXT_SUB = '#4E5968';
 const BLUE = '#3182F6';
-const LINE_THIN = '#E5E8EB';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -56,12 +55,6 @@ const CalArrowRight = () => (
     <path d="M9 6L15 12L9 18" stroke={TEXT_SUB} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
-const CloseIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-    <line x1="18" y1="6" x2="6" y2="18" stroke={TEXT_SUB} strokeWidth="2" strokeLinecap="round" />
-    <line x1="6" y1="6" x2="18" y2="18" stroke={TEXT_SUB} strokeWidth="2" strokeLinecap="round" />
-  </svg>
-);
 
 // ── 페이지 ──────────────────────────────────────────────
 export default function WorkerTokenPage() {
@@ -69,11 +62,9 @@ export default function WorkerTokenPage() {
 
   const [worker, setWorker] = useState<Worker | null>(null);
   const [notFound, setNotFound] = useState(false);
-  const [todaySchedules, setTodaySchedules] = useState<Schedule[]>([]);
   const [monthSchedules, setMonthSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [monthLoading, setMonthLoading] = useState(false);
-  const [sheetId, setSheetId] = useState<string | null>(null);
 
   const now = useMemo(() => new Date(), []);
   const nowYear = now.getFullYear();
@@ -83,35 +74,25 @@ export default function WorkerTokenPage() {
   const [viewYear, setViewYear] = useState<number>(nowYear);
   const [viewMonth, setViewMonth] = useState<number>(nowMonth);
   const isCurrentMonth = viewYear === nowYear && viewMonth === nowMonth;
+  const [selectedDate, setSelectedDate] = useState<string>(todayStr);
 
-  // ── 오늘 월 fetch (1회) ──────────────────────────────
-  useEffect(() => {
-    setLoading(true);
-    fetch(`/api/workers/by-token/${token}?year=${nowYear}&month=${nowMonth}`, { cache: 'no-store' })
-      .then(async r => {
-        if (r.status === 404) { setNotFound(true); setWorker(null); setTodaySchedules([]); return; }
-        const data = await r.json();
-        if (data.error) { setNotFound(true); setWorker(null); setTodaySchedules([]); return; }
-        setNotFound(false);
-        setWorker(data.worker || null);
-        setTodaySchedules(Array.isArray(data.schedules) ? data.schedules : []);
-      })
-      .catch(() => { /* 유지 */ })
-      .finally(() => setLoading(false));
-  }, [token, nowYear, nowMonth]);
-
-  // ── 선택된 월 fetch ──────────────────────────────────
+  // ── 선택된 월 fetch (worker 정보도 같이 set) ──────────
   useEffect(() => {
     setMonthLoading(true);
+    if (loading) {
+      // 첫 fetch 전에는 페이지 로딩 표시
+    }
     fetch(`/api/workers/by-token/${token}?year=${viewYear}&month=${viewMonth}`, { cache: 'no-store' })
       .then(async r => {
-        if (r.status === 404) { setMonthSchedules([]); return; }
+        if (r.status === 404) { setNotFound(true); setWorker(null); setMonthSchedules([]); return; }
         const data = await r.json();
-        if (data.error) { setMonthSchedules([]); return; }
+        if (data.error) { setNotFound(true); setWorker(null); setMonthSchedules([]); return; }
+        setNotFound(false);
+        if (data.worker) setWorker(data.worker);
         setMonthSchedules(Array.isArray(data.schedules) ? data.schedules : []);
       })
       .catch(() => { setMonthSchedules([]); })
-      .finally(() => setMonthLoading(false));
+      .finally(() => { setMonthLoading(false); setLoading(false); });
   }, [token, viewYear, viewMonth]);
 
   // ── 월 이동 핸들러 ───────────────────────────────────
@@ -141,8 +122,6 @@ export default function WorkerTokenPage() {
   }
 
   // ── 파생 데이터 ──────────────────────────────────────
-  // 오늘 카드: 항상 오늘 월 데이터에서 오늘 날짜 건만
-  const todayAll = todaySchedules.filter(s => s.date === todayStr);
   // 합계: 선택된 월 데이터 전체
   const monthTotalAmount = monthSchedules.reduce((sum, s) => sum + s.amount, 0);
 
@@ -171,42 +150,9 @@ export default function WorkerTokenPage() {
     { label: '토', color: TEXT_SUB },
   ];
 
-  // 바텀시트 대상 (캘린더 = 선택된 월에서 조회)
-  const sheetSchedule = sheetId ? monthSchedules.find(s => s.id === sheetId) || null : null;
-
-  // ── 오늘 카드 렌더 ────────────────────────────────────
-  const renderTodayContent = () => {
-    if (todayAll.length === 0) {
-      return (
-        <div style={{ background: CARD, borderRadius: 18, padding: '28px 20px', textAlign: 'center' }}>
-          <div style={{ fontSize: 22, fontWeight: 500, color: TEXT_MAIN, letterSpacing: '-0.3px' }}>
-            오늘은 일정이 없어요
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {todayAll.map(s => (
-          <div key={s.id} style={{
-            background: 'linear-gradient(135deg, #3182F6 0%, #2772E3 100%)',
-            borderRadius: 16, padding: 18, color: '#FFFFFF',
-          }}>
-            <div style={{ fontSize: 12, opacity: 0.85 }}>
-              오늘 · {fmtDay(s.date)}
-            </div>
-            <div style={{ fontSize: 24, fontWeight: 500, letterSpacing: '-0.4px', marginTop: 6 }}>
-              {s.houseName}
-            </div>
-            <div style={{ fontSize: 13, opacity: 0.9, marginTop: 3 }}>
-              {s.type} · {s.amount.toLocaleString()}원
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  };
+  // 인라인 카드 — 선택된 날짜의 첫 작업
+  const selectedSchedule = (schedulesByDate.get(selectedDate) || [])[0] || null;
+  const selectedIsToday = selectedDate === todayStr;
 
   return (
     <div style={{ minHeight: '100vh', background: BG }}>
@@ -219,12 +165,7 @@ export default function WorkerTokenPage() {
           </div>
         </div>
 
-        {/* 2. 오늘 카드 (항상 고정 — 오늘 월 데이터) */}
-        <div style={{ marginBottom: 14 }}>
-          {renderTodayContent()}
-        </div>
-
-        {/* 3. 월 캘린더 (선택된 월 데이터) */}
+        {/* 2. 월 캘린더 (선택된 월 데이터) */}
         <div style={{ background: CARD, padding: '14px 10px', borderRadius: 14, marginBottom: 14 }}>
           {/* 월 헤더 */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px 8px' }}>
@@ -263,6 +204,7 @@ export default function WorkerTokenPage() {
               const dateStr = `${viewYear}-${String(viewMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
               const daySchedules = schedulesByDate.get(dateStr) || [];
               const isToday = isCurrentMonth && dateStr === todayStr;
+              const isSelected = dateStr === selectedDate;
               const hasSchedule = daySchedules.length > 0;
 
               let bg = '#FAFBFC';
@@ -279,14 +221,19 @@ export default function WorkerTokenPage() {
                 dateWeight = 500;
               }
 
-              const border = isToday ? `2px solid ${BLUE}` : 'none';
-              const padding = isToday ? '3px 2px' : '5px 2px';
-              if (isToday) {
+              let border: string = 'none';
+              let padding: string = '5px 2px';
+              if (isSelected) {
                 bg = BLUE;
                 dateColor = '#FFFFFF';
                 houseColor = '#FFFFFF';
                 amountColor = '#FFFFFF';
                 dateWeight = 500;
+                border = `2px solid ${BLUE}`;
+                padding = '3px 2px';
+              } else if (isToday) {
+                border = `1.5px solid ${BLUE}`;
+                padding = '3.5px 2px';
               }
 
               const topSchedule = daySchedules[0];
@@ -295,13 +242,12 @@ export default function WorkerTokenPage() {
 
               return (
                 <button key={dateStr}
-                  onClick={() => hasSchedule && topSchedule && setSheetId(topSchedule.id)}
-                  disabled={!hasSchedule}
+                  onClick={() => setSelectedDate(dateStr)}
                   style={{
                     height: 62, background: bg, borderRadius: 7, padding, border,
                     boxSizing: 'border-box', display: 'flex', flexDirection: 'column',
                     alignItems: 'center', justifyContent: 'flex-start',
-                    cursor: hasSchedule ? 'pointer' : 'default',
+                    cursor: 'pointer',
                     fontFamily: 'inherit', textAlign: 'center',
                   }}>
                   <span style={{ fontSize: 10, fontWeight: dateWeight, color: dateColor, lineHeight: 1.2 }}>{day}</span>
@@ -327,6 +273,58 @@ export default function WorkerTokenPage() {
               );
             })}
           </div>
+        </div>
+
+        {/* 3. 인라인 작업 상세 카드 */}
+        <div style={{ marginBottom: 14 }}>
+          {selectedSchedule ? (
+            <div style={{
+              background: CARD, borderRadius: 12, padding: 16,
+              border: `2px solid ${BLUE}`,
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: BLUE }}>
+                {fmtDay(selectedSchedule.date)}
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: TEXT_MAIN, letterSpacing: '-0.3px', marginTop: 4 }}>
+                {selectedSchedule.houseName}
+              </div>
+              <div style={{ fontSize: 13, color: '#8B95A1', marginTop: 2 }}>
+                {selectedSchedule.type} · {selectedSchedule.amount.toLocaleString()}원
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14 }}>
+                <div style={{ background: '#F2F4F6', borderRadius: 10, padding: '12px 14px' }}>
+                  <div style={{ fontSize: 10, fontWeight: 500, color: '#8B95A1' }}>주소</div>
+                  <div style={{ fontSize: 13, marginTop: 3, lineHeight: 1.4, color: TEXT_MAIN }}>
+                    {selectedSchedule.address || '등록된 정보가 없어요'}
+                  </div>
+                </div>
+
+                <div style={{ background: '#F2F4F6', borderRadius: 10, padding: '12px 14px' }}>
+                  <div style={{ fontSize: 10, fontWeight: 500, color: '#8B95A1' }}>현관 비밀번호</div>
+                  <div style={{ fontSize: 15, fontWeight: 500, marginTop: 3, letterSpacing: '1px', color: TEXT_MAIN }}>
+                    {selectedSchedule.doorCode || '등록된 정보가 없어요'}
+                  </div>
+                </div>
+
+                {selectedSchedule.request && (
+                  <div style={{ background: '#F2F4F6', borderRadius: 10, padding: '12px 14px' }}>
+                    <div style={{ fontSize: 10, fontWeight: 500, color: '#8B95A1' }}>요청사항</div>
+                    <div style={{ fontSize: 13, marginTop: 3, lineHeight: 1.45, color: TEXT_MAIN, whiteSpace: 'pre-wrap' }}>
+                      {selectedSchedule.request}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              background: '#F2F4F6', borderRadius: 12, padding: '24px 16px',
+              textAlign: 'center', fontSize: 14, color: '#8B95A1',
+            }}>
+              {selectedIsToday ? '오늘은 일정이 없어요' : '이 날은 일정이 없어요'}
+            </div>
+          )}
         </div>
 
         {/* 4. 합계 카드 (선택된 월 데이터) */}
@@ -357,91 +355,6 @@ export default function WorkerTokenPage() {
         </div>
       </div>
 
-      {/* 5. 바텀시트 */}
-      {sheetSchedule && (
-        <>
-          <div
-            onClick={() => setSheetId(null)}
-            style={{
-              position: 'fixed', inset: 0, zIndex: 40,
-              background: 'rgba(0,0,0,0.4)',
-            }}
-          />
-          <div style={{
-            position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
-            width: '100%', maxWidth: 430, zIndex: 50,
-            background: CARD,
-            borderTopLeftRadius: 20, borderTopRightRadius: 20,
-            padding: '18px 18px 22px',
-            boxShadow: '0 -10px 30px rgba(0,0,0,0.08)',
-          }}>
-            {/* 드래그 핸들 */}
-            <div style={{
-              width: 36, height: 4, background: LINE_THIN,
-              borderRadius: 2, margin: '0 auto 14px',
-            }} />
-
-            {/* 닫기 버튼 */}
-            <button onClick={() => setSheetId(null)}
-              style={{
-                position: 'absolute', top: 14, right: 14,
-                background: 'none', border: 'none', padding: 6,
-                cursor: 'pointer', display: 'inline-flex', alignItems: 'center',
-              }}>
-              <CloseIcon />
-            </button>
-
-            <div style={{ fontSize: 12, fontWeight: 500, color: BLUE }}>
-              {fmtDay(sheetSchedule.date)}
-            </div>
-            <div style={{ fontSize: 22, fontWeight: 500, color: TEXT_MAIN, letterSpacing: '-0.3px', marginTop: 6 }}>
-              {sheetSchedule.houseName}
-            </div>
-            <div style={{ fontSize: 13, color: TEXT_SUB, marginTop: 2 }}>
-              {sheetSchedule.type} · {sheetSchedule.amount.toLocaleString()}원
-            </div>
-
-            {/* 박스 3개 */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14 }}>
-              {/* 박스 1 - 주소 */}
-              <div style={{ background: '#F7F8FA', borderRadius: 10, padding: '11px 13px' }}>
-                <div style={{ fontSize: 10, fontWeight: 500, color: '#8B95A1' }}>주소</div>
-                <div style={{ fontSize: 13, marginTop: 3, lineHeight: 1.4, color: TEXT_MAIN }}>
-                  {sheetSchedule.address || '등록된 정보가 없어요'}
-                </div>
-              </div>
-
-              {/* 박스 2 - 현관 비밀번호 */}
-              <div style={{ background: '#F7F8FA', borderRadius: 10, padding: '11px 13px' }}>
-                <div style={{ fontSize: 10, fontWeight: 500, color: '#8B95A1' }}>현관 비밀번호</div>
-                <div style={{ fontSize: 15, fontWeight: 500, marginTop: 3, letterSpacing: '1px', color: TEXT_MAIN }}>
-                  {sheetSchedule.doorCode || '등록된 정보가 없어요'}
-                </div>
-              </div>
-
-              {/* 박스 3 - 요청사항 (작업별, 값 없으면 생략) */}
-              {sheetSchedule.request && (
-                <div style={{ background: '#F2F4F6', borderRadius: 10, padding: '11px 13px' }}>
-                  <div style={{ fontSize: 10, fontWeight: 500, color: '#8B95A1' }}>요청사항</div>
-                  <div style={{ fontSize: 13, marginTop: 3, lineHeight: 1.45, color: TEXT_MAIN, whiteSpace: 'pre-wrap' }}>
-                    {sheetSchedule.request}
-                  </div>
-                </div>
-              )}
-
-              {/* 박스 4 - 운영자 요청사항 (지점별, 값 없으면 생략) */}
-              {sheetSchedule.houseMemo && (
-                <div style={{ background: '#E6F0FE', borderRadius: 10, padding: '11px 13px' }}>
-                  <div style={{ fontSize: 10, fontWeight: 500, color: '#1B64DA' }}>운영자 요청사항</div>
-                  <div style={{ fontSize: 13, marginTop: 3, lineHeight: 1.45, color: '#0B4BA3' }}>
-                    {sheetSchedule.houseMemo}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 }
