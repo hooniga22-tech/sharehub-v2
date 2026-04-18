@@ -35,6 +35,13 @@ type InventoryTask = {
 };
 
 const BLUE = '#3182F6', GREEN = '#00B493', RED = '#E24B4A', GRAY = '#888888';
+
+const menuItemStyle = (color: string): React.CSSProperties => ({
+  display: 'block', width: '100%', padding: '12px 14px',
+  background: 'transparent', border: 'none', textAlign: 'left',
+  fontSize: 13, fontWeight: 500, color,
+  cursor: 'pointer', fontFamily: 'inherit',
+});
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 const CATEGORIES: Category[] = ['전체', '청소', '수리', '기타'];
 
@@ -64,6 +71,15 @@ export default function IssuesPage() {
   const [schedEnd, setSchedEnd] = useState('');
   const [schedAmount, setSchedAmount] = useState('');
   const [schedSaving, setSchedSaving] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [editTarget, setEditTarget] = useState<InventoryTask | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editHouse, setEditHouse] = useState('');
+  const [editRoom, setEditRoom] = useState('');
+  const [editAssignee, setEditAssignee] = useState('');
+  const [editTags, setEditTags] = useState('');
+  const [editMemo, setEditMemo] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
 
   const loadInventory = () => {
     setInventoryLoading(true);
@@ -107,6 +123,61 @@ export default function IssuesPage() {
     if (schedSaving) return;
     setScheduleTarget(null);
   };
+  const openEditModal = (t: InventoryTask) => {
+    setOpenMenuId(null);
+    setEditTarget(t);
+    setEditTitle(t.title || '');
+    setEditHouse(t.houseName || '');
+    setEditRoom(t.roomCode || '');
+    setEditAssignee(t.assignedTo || '');
+    setEditTags((t.tags || []).join(', '));
+    setEditMemo(t.memo || '');
+  };
+  const closeEditModal = () => {
+    if (editSaving) return;
+    setEditTarget(null);
+  };
+  const saveEdit = async () => {
+    if (!editTarget || editSaving) return;
+    setEditSaving(true);
+    try {
+      const res = await fetch('/api/tasks/update', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: editTarget.id,
+          title: editTitle,
+          houseName: editHouse,
+          roomCode: editRoom,
+          assignedTo: editAssignee,
+          tags: editTags.split(',').map(s => s.trim()).filter(Boolean),
+          memo: editMemo,
+        }),
+      });
+      const d = await res.json();
+      if (!d?.success) { alert(d?.error || '저장 실패'); return; }
+      setEditTarget(null);
+      loadInventory();
+    } finally {
+      setEditSaving(false);
+    }
+  };
+  const deleteTask = async (t: InventoryTask) => {
+    setOpenMenuId(null);
+    if (!window.confirm('정말 삭제하시겠습니까?')) return;
+    const res = await fetch('/api/tasks/delete', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskId: t.id }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || !d?.success) {
+      alert(d?.error || '삭제 실패');
+      return;
+    }
+    loadInventory();
+  };
+
   const saveSchedule = async () => {
     if (!scheduleTarget || !schedStart || !schedEnd) return;
     setSchedSaving(true);
@@ -615,7 +686,7 @@ export default function IssuesPage() {
                         )}
                       </p>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, position: 'relative' }}>
                       {t.tags.slice(0, 1).map(tag => (
                         <span key={tag} style={{
                           fontSize: 10, fontWeight: 600,
@@ -625,6 +696,57 @@ export default function IssuesPage() {
                           #{tag}
                         </span>
                       ))}
+                      <button
+                        aria-label="메뉴"
+                        onClick={() => setOpenMenuId(openMenuId === t.id ? null : t.id)}
+                        style={{
+                          width: 28, height: 28, borderRadius: 8,
+                          padding: 0, border: 'none', background: 'transparent',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="#8B95A1" aria-hidden>
+                          <circle cx="5" cy="12" r="1.8" />
+                          <circle cx="12" cy="12" r="1.8" />
+                          <circle cx="19" cy="12" r="1.8" />
+                        </svg>
+                      </button>
+                      {openMenuId === t.id && (
+                        <>
+                          <div
+                            onClick={() => setOpenMenuId(null)}
+                            style={{ position: 'fixed', inset: 0, zIndex: 40 }}
+                          />
+                          <div style={{
+                            position: 'absolute', top: 32, right: 0, zIndex: 41,
+                            minWidth: 140, background: '#fff', borderRadius: 10,
+                            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                            overflow: 'hidden',
+                          }}>
+                            <button
+                              onClick={() => openEditModal(t)}
+                              style={menuItemStyle('#191919')}
+                            >
+                              수정하기
+                            </button>
+                            <div style={{ height: 1, background: '#F2F4F6' }} />
+                            <button
+                              onClick={() => deleteTask(t)}
+                              style={menuItemStyle(RED)}
+                            >
+                              삭제하기
+                            </button>
+                            <div style={{ height: 1, background: '#F2F4F6' }} />
+                            <button
+                              onClick={() => setOpenMenuId(null)}
+                              style={menuItemStyle('#8B95A1')}
+                            >
+                              취소
+                            </button>
+                          </div>
+                        </>
+                      )}
                       <button
                         onClick={() => openScheduleModal(t)}
                         style={{
@@ -757,6 +879,103 @@ export default function IssuesPage() {
                 }}
               >
                 {schedSaving ? '저장 중...' : '저장'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 수정 모달 */}
+      {editTarget && (
+        <div
+          onClick={closeEditModal}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 60,
+            background: 'rgba(0,0,0,0.4)',
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: 430, background: '#fff',
+              borderRadius: '20px 20px 0 0',
+              padding: '18px 18px 22px', boxShadow: '0 -10px 30px rgba(0,0,0,0.12)',
+              maxHeight: '85vh', overflowY: 'auto',
+            }}
+          >
+            <div style={{
+              width: 36, height: 4, background: '#E5E8EC',
+              borderRadius: 2, margin: '0 auto 14px',
+            }} />
+            <p style={{ fontSize: 16, fontWeight: 700, color: '#191919', marginBottom: 4 }}>할일 수정</p>
+            <p style={{ fontSize: 11, color: GRAY, marginBottom: 18 }}>ID: {editTarget.id}</p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {[
+                { label: '제목', value: editTitle, onChange: setEditTitle },
+                { label: '하우스', value: editHouse, onChange: setEditHouse },
+                { label: '방코드', value: editRoom, onChange: setEditRoom },
+                { label: '담당자', value: editAssignee, onChange: setEditAssignee },
+                { label: '태그 (쉼표로 구분)', value: editTags, onChange: setEditTags },
+              ].map(f => (
+                <div key={f.label}>
+                  <div style={{ fontSize: 12, color: '#4E5968', fontWeight: 600, marginBottom: 6 }}>{f.label}</div>
+                  <input
+                    type="text"
+                    value={f.value}
+                    onChange={e => f.onChange(e.target.value)}
+                    style={{
+                      width: '100%', height: 44, boxSizing: 'border-box',
+                      borderRadius: 10, padding: '0 12px',
+                      border: '1px solid #E5E8EB', background: '#fff', color: '#191919',
+                      fontSize: 14, fontFamily: 'inherit', outline: 'none',
+                    }}
+                  />
+                </div>
+              ))}
+              <div>
+                <div style={{ fontSize: 12, color: '#4E5968', fontWeight: 600, marginBottom: 6 }}>담당자 메모</div>
+                <textarea
+                  value={editMemo}
+                  onChange={e => setEditMemo(e.target.value)}
+                  placeholder="담당자에게 전달할 내용"
+                  style={{
+                    width: '100%', minHeight: 80, boxSizing: 'border-box',
+                    borderRadius: 10, padding: 10,
+                    border: '1px solid #E5E8EB', background: '#fff', color: '#191919',
+                    fontSize: 14, lineHeight: 1.5, fontFamily: 'inherit',
+                    outline: 'none', resize: 'vertical',
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+              <button
+                onClick={closeEditModal}
+                disabled={editSaving}
+                style={{
+                  flex: 1, height: 46, borderRadius: 10, border: '1px solid #E5E8EB',
+                  background: '#fff', color: '#4E5968',
+                  fontSize: 14, fontWeight: 600, cursor: editSaving ? 'not-allowed' : 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                취소
+              </button>
+              <button
+                onClick={saveEdit}
+                disabled={editSaving}
+                style={{
+                  flex: 1, height: 46, borderRadius: 10, border: 'none',
+                  background: editSaving ? '#D1D6DB' : BLUE,
+                  color: '#fff', fontSize: 14, fontWeight: 700,
+                  cursor: editSaving ? 'not-allowed' : 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {editSaving ? '저장 중...' : '저장'}
               </button>
             </div>
           </div>
