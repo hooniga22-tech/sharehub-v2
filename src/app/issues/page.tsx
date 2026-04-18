@@ -14,9 +14,9 @@ type Work = {
   작업종류: string; 정산금액: string; 메모: string; 완료여부: string;
 };
 
-type StaffInfo = { 이름: string; 링크토큰: string };
+type StaffInfo = { 담당자ID: string; 이름: string; 링크토큰: string };
 type StaffStat = {
-  이름: string; count: number; amount: number; 링크토큰: string;
+  담당자ID: string; 이름: string; count: number; amount: number; 링크토큰: string;
 };
 
 type MainTab = 'schedule' | 'workers' | 'settle';
@@ -53,7 +53,11 @@ export default function IssuesPage() {
       setIssues(issueData.issues || []);
       setWorks(Array.isArray(workData) ? workData : []);
       const sArr = Array.isArray(staffData) ? staffData : [];
-      setStaffInfoList(sArr.map((s: any) => ({ 이름: (s.이름 || '').trim(), 링크토큰: (s.링크토큰 || '').trim() })));
+      setStaffInfoList(sArr.map((s: any) => ({
+        담당자ID: (s.담당자ID || '').trim(),
+        이름: (s.이름 || '').trim(),
+        링크토큰: (s.링크토큰 || '').trim(),
+      })));
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
@@ -196,7 +200,8 @@ export default function IssuesPage() {
       const amount = myWorks.reduce((sum, w) => sum + (parseInt(w.정산금액) || 0), 0);
       const matched = staffInfoList.find(si => si.이름 === name);
       const 링크토큰 = matched?.링크토큰 || '';
-      return { 이름: name, count, amount, 링크토큰 };
+      const 담당자ID = matched?.담당자ID || '';
+      return { 담당자ID, 이름: name, count, amount, 링크토큰 };
     }).sort((a, b) => b.amount - a.amount);
   }, [works, thisMonthPrefix, staffInfoList]);
 
@@ -403,7 +408,16 @@ export default function IssuesPage() {
               <div key={s.이름} style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
-                    <p style={{ fontSize: 13, fontWeight: 600, color: '#191919', marginBottom: 2 }}>{s.이름}</p>
+                    {s.담당자ID ? (
+                      <Link
+                        href={`/management/workers/${s.담당자ID}`}
+                        style={{ textDecoration: 'none', color: 'inherit', display: 'block', marginBottom: 2 }}
+                      >
+                        <p style={{ fontSize: 13, fontWeight: 600, color: '#191919' }}>{s.이름}</p>
+                      </Link>
+                    ) : (
+                      <p style={{ fontSize: 13, fontWeight: 600, color: '#191919', marginBottom: 2 }}>{s.이름}</p>
+                    )}
                     <p style={{ fontSize: 11, color: GRAY }}>
                       이달 {s.count}건 · {s.amount > 0 ? `${s.amount.toLocaleString()}원` : '0원'}
                     </p>
