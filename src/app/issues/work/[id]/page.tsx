@@ -64,6 +64,8 @@ export default function WorkDetailPage() {
   // 요청사항: 자동 저장 (debounced on blur)
   const [request, setRequest] = useState('')
   const lastSavedRequest = useRef('')
+  const [requestSaved, setRequestSaved] = useState(false)
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -152,6 +154,9 @@ export default function WorkDetailPage() {
       lastSavedRequest.current = trimmed
       const updated = await res.json()
       setWork(updated)
+      setRequestSaved(true)
+      if (savedTimer.current) clearTimeout(savedTimer.current)
+      savedTimer.current = setTimeout(() => setRequestSaved(false), 1500)
     }
   }
 
@@ -319,6 +324,11 @@ export default function WorkDetailPage() {
             boxSizing: 'border-box',
           }}
         />
+        <div style={{ minHeight: 16, marginTop: 6, textAlign: 'right' }}>
+          {requestSaved && (
+            <span style={{ fontSize: 11, color: GREEN, fontWeight: 500 }}>저장됨</span>
+          )}
+        </div>
       </div>
 
       {/* 메모 (내부 기록) — 편집 모드에서만 노출 */}

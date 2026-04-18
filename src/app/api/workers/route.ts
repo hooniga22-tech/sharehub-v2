@@ -1,21 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSheetData, appendRow, updateRow, getSheetWithHeaders, colIdx } from '@/lib/sheets'
 
-// 용역 시트 (8열): [0]용역ID [1]예정일 [2]지점명 [3]담당자명 [4]작업종류 [5]정산금액 [6]메모 [7]완료여부
-
-function rowToWork(r: string[], rowIndex: number) {
-  return {
-    _rowIndex: rowIndex,
-    용역ID: r[0] || '',
-    예정일: r[1] || '',
-    지점명: r[2] || '',
-    담당자명: r[3] || '',
-    작업종류: r[4] || '',
-    정산금액: r[5] || '0',
-    메모: r[6] || '',
-    완료여부: r[7] || 'N',
-  }
-}
+// 용역 시트는 헤더명 기반 파싱 (요청사항/완료일 포함)
 
 // GET /api/workers — 전체/필터/토큰 조회
 export async function GET(req: Request) {
@@ -26,8 +12,33 @@ export async function GET(req: Request) {
     const month = searchParams.get('month')
     const staff = searchParams.get('staff')
 
-    const rows = await getSheetData('용역')
-    let works = rows.map((r, i) => rowToWork(r, i))
+    const { headers: wh, rows } = await getSheetWithHeaders('용역')
+    const wcol = (name: string) => colIdx(wh, name)
+    const wIdId = wcol('용역ID')
+    const wIdDate = wcol('예정일')
+    const wIdHouse = wcol('지점명')
+    const wIdWorker = wcol('담당자명')
+    const wIdType = wcol('작업종류')
+    const wIdAmount = wcol('정산금액')
+    const wIdMemo = wcol('메모')
+    const wIdDone = wcol('완료여부')
+    const wIdRequest = wcol('요청사항')
+    const wIdDoneAt = wcol('완료일')
+    const cell = (r: string[], i: number) => (i >= 0 ? (r[i] || '') : '')
+
+    let works = rows.map((r, i) => ({
+      _rowIndex: i,
+      용역ID: cell(r, wIdId),
+      예정일: cell(r, wIdDate),
+      지점명: cell(r, wIdHouse),
+      담당자명: cell(r, wIdWorker),
+      작업종류: cell(r, wIdType),
+      정산금액: cell(r, wIdAmount) || '0',
+      메모: cell(r, wIdMemo),
+      요청사항: cell(r, wIdRequest),
+      완료여부: cell(r, wIdDone) || 'N',
+      완료일: cell(r, wIdDoneAt),
+    }))
 
     if (token) {
       const { headers, rows: staffRows } = await getSheetWithHeaders('용역담당자')

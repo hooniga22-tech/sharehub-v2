@@ -7,7 +7,7 @@ import { useParams } from 'next/navigation';
 type Worker = { name: string; type: string; token: string };
 type Schedule = {
   id: string; date: string; houseName: string; type: string;
-  amount: number; isDone: boolean; memo: string;
+  amount: number; isDone: boolean; memo: string; request: string;
   address: string; doorCode: string; houseMemo: string;
 };
 
@@ -419,7 +419,17 @@ export default function WorkerTokenPage() {
                 </div>
               </div>
 
-              {/* 박스 3 - 운영자 요청사항 (값 없으면 생략) */}
+              {/* 박스 3 - 요청사항 (작업별, 값 없으면 생략) */}
+              {sheetSchedule.request && (
+                <div style={{ background: '#F2F4F6', borderRadius: 10, padding: '11px 13px' }}>
+                  <div style={{ fontSize: 10, fontWeight: 500, color: '#8B95A1' }}>요청사항</div>
+                  <div style={{ fontSize: 13, marginTop: 3, lineHeight: 1.45, color: TEXT_MAIN, whiteSpace: 'pre-wrap' }}>
+                    {sheetSchedule.request}
+                  </div>
+                </div>
+              )}
+
+              {/* 박스 4 - 운영자 요청사항 (지점별, 값 없으면 생략) */}
               {sheetSchedule.houseMemo && (
                 <div style={{ background: '#E6F0FE', borderRadius: 10, padding: '11px 13px' }}>
                   <div style={{ fontSize: 10, fontWeight: 500, color: '#1B64DA' }}>운영자 요청사항</div>

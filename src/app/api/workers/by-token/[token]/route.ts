@@ -31,9 +31,9 @@ export async function GET(
       token: cell('링크토큰'),
     }
 
-    // 2. 용역 + 지점 병렬 조회
-    const [workRows, houseRows] = await Promise.all([
-      getSheetData('용역'),
+    // 2. 용역 + 지점 병렬 조회 (용역도 헤더명 기반)
+    const [workSheet, houseRows] = await Promise.all([
+      getSheetWithHeaders('용역'),
       getSheetData('지점'),
     ])
 
@@ -54,19 +54,33 @@ export async function GET(
     const year = searchParams.get('year')
     const month = searchParams.get('month')
 
-    let schedules = workRows
+    const wh = workSheet.headers
+    const wcol = (name: string) => colIdx(wh, name)
+    const wIdId = wcol('용역ID')
+    const wIdDate = wcol('예정일')
+    const wIdHouse = wcol('지점명')
+    const wIdWorker = wcol('담당자명')
+    const wIdType = wcol('작업종류')
+    const wIdAmount = wcol('정산금액')
+    const wIdMemo = wcol('메모')
+    const wIdDone = wcol('완료여부')
+    const wIdRequest = wcol('요청사항')
+    const wcell = (r: string[], i: number) => (i >= 0 ? (r[i] || '') : '')
+
+    let schedules = workSheet.rows
       .map(r => {
-        const houseName = r[2] || ''
+        const houseName = wcell(r, wIdHouse)
         const hi = houseMap.get(houseName.trim()) || { address: '', doorCode: '', houseMemo: '' }
         return {
-          id: r[0] || '',
-          date: r[1] || '',
+          id: wcell(r, wIdId),
+          date: wcell(r, wIdDate),
           houseName,
-          workerName: r[3] || '',
-          type: r[4] || '',
-          amount: Number(r[5]) || 0,
-          memo: r[6] || '',
-          isDone: r[7] === 'Y',
+          workerName: wcell(r, wIdWorker),
+          type: wcell(r, wIdType),
+          amount: Number(wcell(r, wIdAmount)) || 0,
+          memo: wcell(r, wIdMemo),
+          request: wcell(r, wIdRequest),
+          isDone: wcell(r, wIdDone) === 'Y',
           address: hi.address,
           doorCode: hi.doorCode,
           houseMemo: hi.houseMemo,
