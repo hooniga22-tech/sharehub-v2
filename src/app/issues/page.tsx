@@ -218,7 +218,7 @@ export default function IssuesPage() {
   ];
 
   return (
-    <div style={{ paddingBottom: 70, maxWidth: 430, margin: '0 auto' }}>
+    <div style={{ paddingBottom: 70, maxWidth: 430, margin: '0 auto', position: 'relative' }}>
       {/* 헤더 */}
       <div style={{ position: 'sticky', top: 0, zIndex: 20, background: '#fff' }}>
         <div style={{ padding: '20px 16px 0' }}>
@@ -495,6 +495,25 @@ export default function IssuesPage() {
           )}
         </div>
       )}
+
+      {/* 플로팅 등록 버튼 */}
+      <Link
+        href="/issues/register"
+        aria-label="할일 등록"
+        style={{
+          position: 'fixed', right: 20, bottom: 76, zIndex: 30,
+          width: 56, height: 56, borderRadius: 28,
+          background: BLUE, color: '#fff',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 6px 18px rgba(49,130,246,0.32)',
+          textDecoration: 'none',
+        }}
+      >
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <line x1="12" y1="5" x2="12" y2="19" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" />
+          <line x1="5" y1="12" x2="19" y2="12" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" />
+        </svg>
+      </Link>
     </div>
   );
 }
