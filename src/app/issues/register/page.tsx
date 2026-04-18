@@ -235,7 +235,7 @@ export default function RegisterPage() {
         {step === 2 && <StepHouse form={form} setForm={setForm} houses={houses} />}
         {step === 3 && <StepTags form={form} setForm={setForm} customTag={customTag} setCustomTag={setCustomTag} />}
         {step === 4 && <StepWorker form={form} setForm={setForm} staff={staff} />}
-        {step === 5 && <StepDateAmount form={form} setForm={setForm} />}
+        {step === 5 && <StepDateAmount form={form} setForm={setForm} onSkip={skipSchedule} />}
         {step === 6 && <StepSummary form={form} setForm={setForm} />}
       </div>
 
@@ -253,11 +253,6 @@ export default function RegisterPage() {
           <button onClick={handlePrev} style={btnStyle('ghost')}>
             {step === 1 ? '취소' : '이전'}
           </button>
-          {step === 5 && (
-            <button onClick={skipSchedule} style={btnStyle('muted')}>
-              나중에 일정 잡기
-            </button>
-          )}
           {step < TOTAL ? (
             <button
               onClick={handleNext}
@@ -560,7 +555,10 @@ function StepWorker({ form, setForm, staff }: { form: Form; setForm: (f: Form) =
 }
 
 // ── Step 5: 기간/금액 ──────────────────────────────
-function StepDateAmount({ form, setForm }: { form: Form; setForm: (f: Form) => void }) {
+function StepDateAmount({ form, setForm, onSkip }: {
+  form: Form; setForm: (f: Form) => void
+  onSkip: () => void
+}) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
@@ -580,6 +578,19 @@ function StepDateAmount({ form, setForm }: { form: Form; setForm: (f: Form) => v
           onChange={e => setForm({ ...form, endDate: e.target.value })}
           style={inputStyle()}
         />
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
+          <button
+            type="button"
+            onClick={onSkip}
+            style={{
+              background: 'none', border: 'none', padding: 0,
+              fontSize: 12, color: '#666', textDecoration: 'underline',
+              cursor: 'pointer', fontFamily: 'inherit',
+            }}
+          >
+            나중에 일정 잡기
+          </button>
+        </div>
       </div>
       <div>
         <div style={{ fontSize: 12, color: SUB, fontWeight: 600, marginBottom: 6 }}>금액</div>
