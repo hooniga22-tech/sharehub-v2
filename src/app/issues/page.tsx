@@ -379,8 +379,8 @@ export default function IssuesPage() {
                 const badgeColor = item.type === 'clean' ? GREEN : GRAY;
                 const amount = parseInt(w.정산금액) || 0;
                 return (
-                  <div key={`w-${w.용역ID}-${idx}`}
-                    style={{ background: '#fff', padding: 12, borderRadius: 12, marginBottom: 8 }}>
+                  <Link key={`w-${w.용역ID}-${idx}`} href={`/issues/work/${w.용역ID}`}
+                    style={{ display: 'block', background: '#fff', padding: 12, borderRadius: 12, marginBottom: 8, textDecoration: 'none', color: 'inherit' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                       <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: badgeBg, color: badgeColor }}>{badgeLabel}</span>
                       <div style={{ width: 8, height: 8, borderRadius: '50%', background: dotColor }} />
@@ -390,7 +390,7 @@ export default function IssuesPage() {
                       <span style={{ fontSize: 11, color: GRAY }}>{w.담당자명} · {w.예정일}</span>
                       {amount > 0 && <span style={{ fontSize: 11, fontWeight: 600, color: '#191919' }}>{amount.toLocaleString()}원</span>}
                     </div>
-                  </div>
+                  </Link>
                 );
               }
             })
