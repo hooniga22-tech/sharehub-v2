@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { getSheetWithHeaders, colIdx, appendRow } from '@/lib/sheets'
 
+// Node.js 런타임 명시 (googleapis는 Edge 환경에서 동작 불가)
+export const runtime = 'nodejs'
+
 // 할일 시트로 통합 라우팅. 헤더명 기반.
 const SHEET = '할일'
 
@@ -98,7 +101,27 @@ export async function POST(req: Request) {
     setCell('등록일', ymdKst())
     setCell('완료일', '')
 
-    await appendRow(SHEET, row)
+    try {
+      await appendRow(SHEET, row)
+    } catch (e: any) {
+      // Sheets API 오류를 분류해 더 명확한 상태코드로 반환
+      const code = Number(e?.code || e?.response?.status || 0)
+      const msg = e?.errors?.[0]?.message || e?.message || String(e)
+      console.error('[register] appendRow 실패', { code, msg })
+      if (code === 403) {
+        return NextResponse.json({
+          error: '시트 접근 권한 없음 — 서비스 계정에 편집자 권한이 있는지 확인해 주세요',
+          detail: msg,
+        }, { status: 403 })
+      }
+      if (code === 401) {
+        return NextResponse.json({
+          error: '시트 인증 실패 — GOOGLE_PRIVATE_KEY / GOOGLE_SERVICE_ACCOUNT_EMAIL 환경변수를 확인해 주세요',
+          detail: msg,
+        }, { status: 401 })
+      }
+      return NextResponse.json({ error: `시트 저장 실패: ${msg}` }, { status: 502 })
+    }
 
     return NextResponse.json({
       success: true,
@@ -108,7 +131,7 @@ export async function POST(req: Request) {
       태그: tags,
     })
   } catch (e) {
-    console.error(e)
+    console.error('[register] 처리 중 오류', e)
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }
 }

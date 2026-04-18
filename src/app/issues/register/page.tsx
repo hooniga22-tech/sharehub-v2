@@ -141,12 +141,19 @@ export default function RegisterPage() {
           메모: form.memo,
         }),
       })
-      const data = await res.json()
+      // 서버가 JSON이 아닌 오류 페이지(HTML)를 반환하는 케이스도 수용
+      const text = await res.text()
+      let data: { id?: string; error?: string } = {}
+      try { data = JSON.parse(text) } catch { /* non-JSON response */ }
       if (!res.ok || !data.id) {
-        alert(data.error || '등록에 실패했어요')
+        console.error('register failed', res.status, text.slice(0, 500))
+        alert(`등록 실패 (HTTP ${res.status}): ${data.error || text.slice(0, 200) || '알 수 없는 오류'}`)
         return
       }
       setSubmitted({ id: data.id })
+    } catch (e) {
+      console.error('register error', e)
+      alert(`등록 중 오류: ${String(e)}`)
     } finally {
       setSubmitting(false)
     }
