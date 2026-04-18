@@ -51,13 +51,14 @@ export async function POST(req: Request) {
     if (!body.지점명 || !String(body.지점명).trim()) {
       return NextResponse.json({ error: '지점명 누락' }, { status: 400 })
     }
-    if (!body.시작일 || !String(body.시작일).trim()) {
-      return NextResponse.json({ error: '시작일 누락' }, { status: 400 })
-    }
     const tags = Array.isArray(body.태그) ? body.태그.filter(Boolean) : []
     if (tags.length === 0) {
       return NextResponse.json({ error: '태그 누락' }, { status: 400 })
     }
+    // 시작일/마감일은 선택. 마감일이 없으면 상태='인벤토리'로 저장.
+    const startDate = String(body.시작일 || '').trim()
+    const endDate = String(body.마감일 || '').trim()
+    const status = endDate ? '접수' : '인벤토리'
 
     const { headers, rows } = await getSheetWithHeaders(SHEET)
     const idCol = colIdx(headers, '할일ID')
@@ -89,9 +90,9 @@ export async function POST(req: Request) {
     setCell('제목', title)
     setCell('태그', tags.join(','))
     setCell('담당자명', String(body.담당자명 || ''))
-    setCell('시작일', String(body.시작일))
-    setCell('마감일', String(body.마감일 || ''))
-    setCell('상태', '접수')
+    setCell('시작일', startDate)
+    setCell('마감일', endDate)
+    setCell('상태', status)
     setCell('금액', amountStr)
     setCell('담당자메모', String(body.메모 || ''))
     setCell('등록일', ymdKst())

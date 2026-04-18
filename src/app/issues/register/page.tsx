@@ -118,6 +118,11 @@ export default function RegisterPage() {
     }
     setStep((step - 1) as Step)
   }
+  // Step 5에서 일정을 비워 둔 채 바로 요약으로 이동 (인벤토리로 등록되게)
+  const skipSchedule = () => {
+    setForm({ ...form, startDate: '', endDate: '', amount: '' })
+    setStep(6)
+  }
 
   const submit = async () => {
     if (submitting) return
@@ -248,6 +253,11 @@ export default function RegisterPage() {
           <button onClick={handlePrev} style={btnStyle('ghost')}>
             {step === 1 ? '취소' : '이전'}
           </button>
+          {step === 5 && (
+            <button onClick={skipSchedule} style={btnStyle('muted')}>
+              나중에 일정 잡기
+            </button>
+          )}
           {step < TOTAL ? (
             <button
               onClick={handleNext}
@@ -313,7 +323,7 @@ function inputStyle(): React.CSSProperties {
   }
 }
 
-function btnStyle(variant: 'primary' | 'ghost' | 'disabled'): React.CSSProperties {
+function btnStyle(variant: 'primary' | 'ghost' | 'muted' | 'disabled'): React.CSSProperties {
   const base: React.CSSProperties = {
     flex: 1, height: 48, borderRadius: 12, border: 'none',
     fontSize: 15, fontWeight: 700, cursor: 'pointer',
@@ -321,6 +331,7 @@ function btnStyle(variant: 'primary' | 'ghost' | 'disabled'): React.CSSPropertie
   }
   if (variant === 'primary') return { ...base, background: BLUE, color: '#fff' }
   if (variant === 'ghost') return { ...base, background: '#fff', color: SUB, border: `1px solid ${LINE}` }
+  if (variant === 'muted') return { ...base, background: '#f8f9fa', color: '#666', fontWeight: 600 }
   return { ...base, background: '#D1D6DB', color: '#fff', cursor: 'not-allowed' }
 }
 
