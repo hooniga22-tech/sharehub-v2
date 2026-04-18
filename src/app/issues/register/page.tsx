@@ -16,7 +16,6 @@ const GREEN = '#00B493'
 const RED = '#F04452'
 const ORANGE = '#F59E0B'
 
-const GU_LIST = ['강남구', '관악구', '마포구', '동대문구', '서초구', '기타']
 const PRESET_TAGS = ['청소', '수리', '이슈', '점검', '교체', '설치']
 const AMOUNT_PRESETS = [30000, 40000, 50000, 60000, 70000]
 const DEFAULT_WORKERS = ['이인실', '이미경', '진진수', '담당자미정']
@@ -71,16 +70,23 @@ export default function RegisterPage() {
   const [form, setForm] = useState<Form>({ ...EMPTY, startDate: todayYmd() })
   const [houses, setHouses] = useState<House[]>([])
   const [staff, setStaff] = useState<Staff[]>([])
+  const [districts, setDistricts] = useState<string[]>([])
+  const [districtsLoading, setDistrictsLoading] = useState(true)
   const [customTag, setCustomTag] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState<{ id: string } | null>(null)
 
-  // 담당자 목록은 첫 진입 시 1회 로드
+  // 담당자/구 목록은 첫 진입 시 1회 로드
   useEffect(() => {
     fetch('/api/workers/staff')
       .then(r => r.json())
       .then(d => { if (Array.isArray(d)) setStaff(d) })
       .catch(() => setStaff([]))
+    fetch('/api/houses/districts')
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d)) setDistricts(d) })
+      .catch(() => setDistricts([]))
+      .finally(() => setDistrictsLoading(false))
   }, [])
 
   // 구 변경 시 지점 목록 로드
@@ -220,7 +226,7 @@ export default function RegisterPage() {
 
       {/* 스텝 콘텐츠 */}
       <div style={{ padding: '8px 16px 120px' }}>
-        {step === 1 && <StepGu form={form} setForm={setForm} />}
+        {step === 1 && <StepGu form={form} setForm={setForm} districts={districts} loading={districtsLoading} />}
         {step === 2 && <StepHouse form={form} setForm={setForm} houses={houses} />}
         {step === 3 && <StepTags form={form} setForm={setForm} customTag={customTag} setCustomTag={setCustomTag} />}
         {step === 4 && <StepWorker form={form} setForm={setForm} staff={staff} />}
@@ -319,10 +325,27 @@ function btnStyle(variant: 'primary' | 'ghost' | 'disabled'): React.CSSPropertie
 }
 
 // ── Step 1: 구 ───────────────────────────────────────
-function StepGu({ form, setForm }: { form: Form; setForm: (f: Form) => void }) {
+function StepGu({ form, setForm, districts, loading }: {
+  form: Form; setForm: (f: Form) => void
+  districts: string[]; loading: boolean
+}) {
+  if (loading) {
+    return (
+      <div style={{ padding: '32px 0', textAlign: 'center', color: MUTE, fontSize: 13 }}>
+        불러오는 중…
+      </div>
+    )
+  }
+  if (districts.length === 0) {
+    return (
+      <div style={{ padding: '32px 0', textAlign: 'center', color: MUTE, fontSize: 13 }}>
+        등록된 지점이 없어요
+      </div>
+    )
+  }
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-      {GU_LIST.map(g => {
+      {districts.map(g => {
         const selected = form.gu === g
         return (
           <button
