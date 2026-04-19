@@ -92,18 +92,17 @@ export default function IssuesPage() {
 
   const loadInventory = () => {
     setInventoryLoading(true);
-    fetch('/api/tasks/inventory', { cache: 'no-store' })
-      .then(r => r.json())
-      .then(d => {
-        if (d?.success && Array.isArray(d.data)) {
-          setInventory(d.data);
-          setTasks(d.data);
-        } else {
-          setInventory([]);
-          setTasks([]);
-        }
+    // 인벤토리 탭(strict)과 일정/홈에서 쓰는 active 데이터(예정+인벤토리)를 병렬 로드.
+    Promise.all([
+      fetch('/api/tasks/inventory', { cache: 'no-store' }).then(r => r.json()).catch(() => null),
+      fetch('/api/tasks/active', { cache: 'no-store' }).then(r => r.json()).catch(() => null),
+    ])
+      .then(([invRes, actRes]) => {
+        if (invRes?.success && Array.isArray(invRes.data)) setInventory(invRes.data);
+        else setInventory([]);
+        if (actRes?.success && Array.isArray(actRes.data)) setTasks(actRes.data);
+        else setTasks([]);
       })
-      .catch(() => { setInventory([]); setTasks([]); })
       .finally(() => setInventoryLoading(false));
   };
 

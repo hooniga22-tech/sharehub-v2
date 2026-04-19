@@ -1,0 +1,51 @@
+import { NextResponse } from 'next/server'
+import { getSheetWithHeaders, colIdx } from '@/lib/sheets'
+
+// 일정 탭 / 홈 대시보드용. 상태 != '완료'인 모든 할일을 반환.
+// '예정' + '인벤토리' 모두 포함. 인벤토리 탭(strict)과 분리된 데이터 소스.
+// 응답 필드는 /api/tasks/inventory 와 동일.
+export async function GET() {
+  try {
+    const { headers, rows } = await getSheetWithHeaders('할일')
+    const get = (r: string[], name: string) => {
+      const i = colIdx(headers, name)
+      return i >= 0 ? (r[i] || '') : ''
+    }
+    const now = Date.now()
+    const data = rows
+      .filter(r => {
+        if (!get(r, '할일ID')) return false
+        return get(r, '상태').trim() !== '완료'
+      })
+      .map(r => {
+        const registeredAt = get(r, '등록일')
+        const regTime = registeredAt ? new Date(registeredAt).getTime() : now
+        const daysOld = Number.isFinite(regTime)
+          ? Math.max(0, Math.floor((now - regTime) / (1000 * 60 * 60 * 24)))
+          : 0
+        const isUrgent = daysOld >= 3
+        const tags = get(r, '태그').split(',').map(s => s.trim()).filter(Boolean)
+        const amountRaw = get(r, '금액').replace(/[^\d.-]/g, '')
+        const amount = amountRaw ? Number(amountRaw) : 0
+        return {
+          id: get(r, '할일ID'),
+          title: get(r, '제목'),
+          houseName: get(r, '지점명'),
+          roomCode: get(r, '방코드'),
+          assignedTo: get(r, '담당자명'),
+          tags,
+          memo: get(r, '담당자메모'),
+          isUrgent,
+          registeredAt,
+          startDate: get(r, '시작일'),
+          endDate: get(r, '마감일'),
+          amount: Number.isFinite(amount) ? amount : 0,
+          status: get(r, '상태').trim(),
+        }
+      })
+    return NextResponse.json({ success: true, data })
+  } catch (e) {
+    console.error(e)
+    return NextResponse.json({ success: false, error: String(e) }, { status: 500 })
+  }
+}
