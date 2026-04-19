@@ -89,6 +89,8 @@ export default function IssuesPage() {
   const [editEnd, setEditEnd] = useState('');
   const [editAmount, setEditAmount] = useState('');
   const [editSaving, setEditSaving] = useState(false);
+  const [editConfirmDel, setEditConfirmDel] = useState(false);
+  const [editDeleting, setEditDeleting] = useState(false);
 
   const loadInventory = () => {
     setInventoryLoading(true);
@@ -150,8 +152,27 @@ export default function IssuesPage() {
     setEditAmount(t.amount ? String(t.amount) : '');
   };
   const closeEditModal = () => {
-    if (editSaving) return;
+    if (editSaving || editDeleting) return;
+    setEditConfirmDel(false);
     setEditTarget(null);
+  };
+  const confirmDeleteEdit = async () => {
+    if (!editTarget || editDeleting) return;
+    setEditDeleting(true);
+    try {
+      const res = await fetch('/api/tasks/delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId: editTarget.id }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d?.success) { alert(d?.error || '삭제 실패'); return; }
+      setEditConfirmDel(false);
+      setEditTarget(null);
+      loadInventory();
+    } finally {
+      setEditDeleting(false);
+    }
   };
   const saveEdit = async () => {
     if (!editTarget || editSaving) return;
@@ -1126,14 +1147,27 @@ export default function IssuesPage() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16 }}>
+              <button
+                onClick={() => setEditConfirmDel(true)}
+                disabled={editSaving || editDeleting}
+                style={{
+                  background: 'transparent', border: 'none',
+                  color: RED, fontSize: 14, fontWeight: 600,
+                  padding: '0 4px', cursor: (editSaving || editDeleting) ? 'not-allowed' : 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                삭제
+              </button>
+              <div style={{ flex: 1 }} />
               <button
                 onClick={closeEditModal}
-                disabled={editSaving}
+                disabled={editSaving || editDeleting}
                 style={{
-                  flex: 1, height: 46, borderRadius: 10, border: '1px solid #E5E8EB',
+                  height: 46, padding: '0 22px', borderRadius: 10, border: '1px solid #E5E8EB',
                   background: '#fff', color: '#4E5968',
-                  fontSize: 14, fontWeight: 600, cursor: editSaving ? 'not-allowed' : 'pointer',
+                  fontSize: 14, fontWeight: 600, cursor: (editSaving || editDeleting) ? 'not-allowed' : 'pointer',
                   fontFamily: 'inherit',
                 }}
               >
@@ -1141,16 +1175,71 @@ export default function IssuesPage() {
               </button>
               <button
                 onClick={saveEdit}
-                disabled={editSaving}
+                disabled={editSaving || editDeleting}
                 style={{
-                  flex: 1, height: 46, borderRadius: 10, border: 'none',
-                  background: editSaving ? '#D1D6DB' : BLUE,
+                  height: 46, padding: '0 26px', borderRadius: 10, border: 'none',
+                  background: (editSaving || editDeleting) ? '#D1D6DB' : BLUE,
                   color: '#fff', fontSize: 14, fontWeight: 700,
-                  cursor: editSaving ? 'not-allowed' : 'pointer',
+                  cursor: (editSaving || editDeleting) ? 'not-allowed' : 'pointer',
                   fontFamily: 'inherit',
                 }}
               >
                 {editSaving ? '저장 중...' : '저장'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 수정 모달 - 삭제 확인 다이얼로그 */}
+      {editConfirmDel && editTarget && (
+        <div
+          onClick={() => { if (!editDeleting) setEditConfirmDel(false); }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 80,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 20,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: 320, background: '#fff',
+              borderRadius: 14, padding: '20px 18px',
+              boxShadow: '0 12px 36px rgba(0,0,0,0.18)',
+            }}
+          >
+            <p style={{ fontSize: 16, fontWeight: 700, color: '#191919', marginBottom: 8 }}>
+              정말 삭제할까요?
+            </p>
+            <p style={{ fontSize: 13, color: '#4E5968', marginBottom: 18, lineHeight: 1.5 }}>
+              {editTarget.title || '제목 없음'}을 삭제합니다. 복구할 수 없어요.
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setEditConfirmDel(false)}
+                disabled={editDeleting}
+                style={{
+                  flex: 1, height: 44, borderRadius: 10, border: '1px solid #E5E8EB',
+                  background: '#fff', color: '#4E5968',
+                  fontSize: 14, fontWeight: 600,
+                  cursor: editDeleting ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                }}
+              >
+                취소
+              </button>
+              <button
+                onClick={confirmDeleteEdit}
+                disabled={editDeleting}
+                style={{
+                  flex: 1, height: 44, borderRadius: 10, border: 'none',
+                  background: editDeleting ? '#D1D6DB' : RED,
+                  color: '#fff', fontSize: 14, fontWeight: 700,
+                  cursor: editDeleting ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                }}
+              >
+                {editDeleting ? '삭제 중...' : '삭제'}
               </button>
             </div>
           </div>
