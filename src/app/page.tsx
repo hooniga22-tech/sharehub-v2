@@ -67,6 +67,10 @@ type Issue = { id: string; title: string; category: string; status: string; crea
 type Tenant = Record<string, string>;
 type Payment = { 연월: string; 청구액: string; 상태: string };
 type Worker = { 용역ID: string; 예정일: string; 지점명: string; 담당자명: string; 작업종류: string; 완료여부: string };
+type Task = {
+  id: string; title: string; houseName: string; assignedTo: string;
+  tags: string[]; status: string; startDate: string; endDate: string; registeredAt: string;
+};
 
 type WeekFilter = 'all' | 'move' | 'clean' | 'repair';
 
@@ -76,6 +80,7 @@ export default function HomePage() {
   const [issues, setIssues] = useState<Issue[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [workers, setWorkers] = useState<Worker[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [loadingT, setLoadingT] = useState(true);
   const [loadingI, setLoadingI] = useState(true);
   const [loadingP, setLoadingP] = useState(true);
@@ -93,6 +98,9 @@ export default function HomePage() {
     fetch('/api/issues').then(r => r.json()).then(d => setIssues(d.issues || [])).catch(() => {}).finally(() => setLoadingI(false));
     fetch(`/api/payments?year=${now.getFullYear()}&month=${now.getMonth() + 1}`).then(r => r.json()).then(d => setPayments(Array.isArray(d) ? d : [])).catch(() => {}).finally(() => setLoadingP(false));
     fetch('/api/workers').then(r => r.json()).then(d => setWorkers(Array.isArray(d) ? d : [])).catch(() => {});
+    fetch('/api/tasks/inventory').then(r => r.json()).then(d => {
+      if (d?.success && Array.isArray(d.data)) setTasks(d.data);
+    }).catch(() => {});
   }, []);
 
   // KPIs
@@ -107,7 +115,21 @@ export default function HomePage() {
   const weekStart = useMemo(() => getWeekStart(), []);
   const weeklyCheckouts = useMemo(() => tenants.filter(t => { if (!t['퇴실일']) return false; const d = new Date(t['퇴실일']); return d >= todayDate && d <= weekEnd; }).length, [tenants, weekEnd, todayDate]);
   const unpaidAmount = useMemo(() => payments.filter(p => p.상태 === '미납').reduce((sum, p) => sum + (Number(p.청구액) || 0), 0), [payments]);
-  const todoIssues = useMemo(() => issues.filter(i => i.status === '접수' || i.status === '처리중').slice(0, 4), [issues]);
+  const todoIssues = useMemo(() => {
+    const fromIssues: Issue[] = issues
+      .filter(i => i.status === '접수' || i.status === '처리중');
+    const fromTasks: Issue[] = tasks
+      .filter(t => t.status === '예정')
+      .map(t => ({
+        id: t.id,
+        title: t.title || `${(t.tags && t.tags[0]) || '할일'} · ${t.houseName || ''}`,
+        category: (t.tags && t.tags[0]) || '기타',
+        status: '예정',
+        createdAt: t.startDate || t.registeredAt || '',
+        houseName: t.houseName,
+      }));
+    return [...fromIssues, ...fromTasks].slice(0, 4);
+  }, [issues, tasks]);
 
   // Calendar events
   const calEvents = useMemo(() => {
@@ -126,8 +148,40 @@ export default function HomePage() {
         events.push({ date: w.예정일.slice(0, 10), type: 'clean', color: CLEAN_COLOR, title: `청소 — ${w.지점명 || ''}`, sub: w.담당자명 || '' });
       }
     }
+    // 할일 시트 머지 (status != '완료' && 시작일 있음): 시작일~마감일 모든 날짜에 점
+    const expandRange = (start: string, end: string): string[] => {
+      if (!start) return [];
+      const s = start.slice(0, 10);
+      const e = (end && end.slice(0, 10)) || s;
+      if (e < s) return [s];
+      const out: string[] = [];
+      const d = new Date(s + 'T00:00:00');
+      const stop = new Date(e + 'T00:00:00');
+      while (d <= stop) {
+        out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+        d.setDate(d.getDate() + 1);
+      }
+      return out;
+    };
+    for (const t of tasks) {
+      if (t.status === '완료' || !t.startDate) continue;
+      const cat: 'clean' | 'repair' | 'etc' =
+        t.tags?.some(g => g.includes('청소')) ? 'clean' :
+        t.tags?.some(g => g.includes('수리')) ? 'repair' : 'etc';
+      const color = cat === 'clean' ? CLEAN_COLOR : cat === 'repair' ? REPAIR_COLOR : '#8B95A1';
+      const labelHead = cat === 'clean' ? '청소' : cat === 'repair' ? '수리' : '할일';
+      for (const d of expandRange(t.startDate, t.endDate)) {
+        events.push({
+          date: d,
+          type: cat === 'repair' ? 'repair' : 'clean',
+          color,
+          title: t.title || `${labelHead} — ${t.houseName || ''}`,
+          sub: t.assignedTo || '',
+        });
+      }
+    }
     return events;
-  }, [tenants, issues, workers]);
+  }, [tenants, issues, workers, tasks]);
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, CalEvent[]>();

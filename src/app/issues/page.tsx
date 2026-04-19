@@ -32,6 +32,10 @@ type InventoryTask = {
   memo: string;
   isUrgent: boolean;
   registeredAt: string;
+  startDate: string;
+  endDate: string;
+  amount: number;
+  status: string;
 };
 
 const BLUE = '#3182F6', GREEN = '#00B493', RED = '#E24B4A', GRAY = '#888888';
@@ -53,6 +57,8 @@ export default function IssuesPage() {
   const [works, setWorks] = useState<Work[]>([]);
   const [staffInfoList, setStaffInfoList] = useState<StaffInfo[]>([]);
   const [loading, setLoading] = useState(true);
+  // 할일 시트 = 인벤토리 응답을 그대로 사용 (status != '완료'인 모든 행)
+  const [tasks, setTasks] = useState<InventoryTask[]>([]);
 
   const [mainTab, setMainTab] = useState<MainTab>('schedule');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -79,6 +85,9 @@ export default function IssuesPage() {
   const [editAssignee, setEditAssignee] = useState('');
   const [editTags, setEditTags] = useState('');
   const [editMemo, setEditMemo] = useState('');
+  const [editStart, setEditStart] = useState('');
+  const [editEnd, setEditEnd] = useState('');
+  const [editAmount, setEditAmount] = useState('');
   const [editSaving, setEditSaving] = useState(false);
 
   const loadInventory = () => {
@@ -86,10 +95,15 @@ export default function IssuesPage() {
     fetch('/api/tasks/inventory', { cache: 'no-store' })
       .then(r => r.json())
       .then(d => {
-        if (d?.success && Array.isArray(d.data)) setInventory(d.data);
-        else setInventory([]);
+        if (d?.success && Array.isArray(d.data)) {
+          setInventory(d.data);
+          setTasks(d.data);
+        } else {
+          setInventory([]);
+          setTasks([]);
+        }
       })
-      .catch(() => setInventory([]))
+      .catch(() => { setInventory([]); setTasks([]); })
       .finally(() => setInventoryLoading(false));
   };
 
@@ -132,6 +146,9 @@ export default function IssuesPage() {
     setEditAssignee(t.assignedTo || '');
     setEditTags((t.tags || []).join(', '));
     setEditMemo(t.memo || '');
+    setEditStart((t.startDate || '').slice(0, 10));
+    setEditEnd((t.endDate || '').slice(0, 10));
+    setEditAmount(t.amount ? String(t.amount) : '');
   };
   const closeEditModal = () => {
     if (editSaving) return;
@@ -152,6 +169,9 @@ export default function IssuesPage() {
           assignedTo: editAssignee,
           tags: editTags.split(',').map(s => s.trim()).filter(Boolean),
           memo: editMemo,
+          startDate: editStart,
+          endDate: editEnd,
+          amount: editAmount === '' ? '' : Number(editAmount),
         }),
       });
       const d = await res.json();
@@ -218,23 +238,74 @@ export default function IssuesPage() {
     return issues.filter(i => (i.createdAt || '').startsWith(prefix));
   }, [issues, calYear, calMonth]);
 
-  // 통계 (월 기준)
-  const cleanCount = useMemo(() => worksInMonth.filter(w => w.작업종류.includes('청소')).length, [worksInMonth]);
-  const repairCount = useMemo(() => issuesInMonth.filter(i => i.status !== '완료').length, [issuesInMonth]);
-  const etcCount = useMemo(() => worksInMonth.filter(w => !w.작업종류.includes('청소') && !w.작업종류.includes('수리')).length, [worksInMonth]);
+  // 할일 카테고리 판정 (첫 매칭 태그 우선)
+  const taskCategory = (t: InventoryTask): 'clean' | 'repair' | 'etc' => {
+    const tags = t.tags || [];
+    if (tags.some(g => g.includes('청소'))) return 'clean';
+    if (tags.some(g => g.includes('수리'))) return 'repair';
+    return 'etc';
+  };
+  const dateRangeArr = (start: string, end: string): string[] => {
+    if (!start) return [];
+    const s = start.slice(0, 10);
+    const e = (end && end.slice(0, 10)) || s;
+    if (e < s) return [s];
+    const out: string[] = [];
+    const d = new Date(s + 'T00:00:00');
+    const stop = new Date(e + 'T00:00:00');
+    while (d <= stop) {
+      out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+      d.setDate(d.getDate() + 1);
+    }
+    return out;
+  };
 
-  // 캘린더 점 표시용 (월 기준)
+  // 할일 시트(완료 제외) 중 현재 월과 겹치는 것
+  const tasksInMonth = useMemo(() => {
+    const prefix = monthPrefix(calYear, calMonth + 1);
+    return tasks.filter(t => {
+      if (t.status === '완료') return false;
+      const s = (t.startDate || '').slice(0, 10);
+      if (!s) return false;
+      const e = (t.endDate || '').slice(0, 10) || s;
+      return s.slice(0, 7) <= prefix && e.slice(0, 7) >= prefix;
+    });
+  }, [tasks, calYear, calMonth]);
+
+  // 통계 (월 기준) — 용역/이슈 + 할일 시트 머지
+  const cleanCount = useMemo(() =>
+    worksInMonth.filter(w => w.작업종류.includes('청소')).length
+    + tasksInMonth.filter(t => taskCategory(t) === 'clean').length
+  , [worksInMonth, tasksInMonth]);
+  const repairCount = useMemo(() =>
+    issuesInMonth.filter(i => i.status !== '완료').length
+    + tasksInMonth.filter(t => taskCategory(t) === 'repair').length
+  , [issuesInMonth, tasksInMonth]);
+  const etcCount = useMemo(() =>
+    worksInMonth.filter(w => !w.작업종류.includes('청소') && !w.작업종류.includes('수리')).length
+    + tasksInMonth.filter(t => taskCategory(t) === 'etc').length
+  , [worksInMonth, tasksInMonth]);
+
+  // 캘린더 점 표시용 (월 기준) — 할일은 시작일~마감일 범위 모두 표시
   const cleanDateSet = useMemo(() => {
     const s = new Set<string>();
+    const prefix = monthPrefix(calYear, calMonth + 1);
     worksInMonth.forEach(w => { if (w.예정일 && w.작업종류.includes('청소')) s.add(w.예정일.substring(0, 10)); });
+    tasksInMonth.filter(t => taskCategory(t) === 'clean').forEach(t => {
+      dateRangeArr(t.startDate, t.endDate).forEach(d => { if (d.startsWith(prefix)) s.add(d); });
+    });
     return s;
-  }, [worksInMonth]);
+  }, [worksInMonth, tasksInMonth, calYear, calMonth]);
 
   const issueDateSet = useMemo(() => {
     const s = new Set<string>();
+    const prefix = monthPrefix(calYear, calMonth + 1);
     issuesInMonth.forEach(i => { if (i.createdAt) s.add(i.createdAt.substring(0, 10)); });
+    tasksInMonth.filter(t => taskCategory(t) === 'repair').forEach(t => {
+      dateRangeArr(t.startDate, t.endDate).forEach(d => { if (d.startsWith(prefix)) s.add(d); });
+    });
     return s;
-  }, [issuesInMonth]);
+  }, [issuesInMonth, tasksInMonth, calYear, calMonth]);
 
   // 캘린더 날짜 생성
   const calendarDays = useMemo(() => {
@@ -280,7 +351,9 @@ export default function IssuesPage() {
   };
 
   // 일정 탭 필터링
-  type ListItem = { type: 'clean' | 'repair' | 'etc'; date: string; data: Work | Issue };
+  type ListItem =
+    | { type: 'clean' | 'repair' | 'etc'; date: string; data: Work | Issue }
+    | { type: 'task'; date: string; data: InventoryTask; cat: 'clean' | 'repair' | 'etc' };
 
   const filteredList = useMemo(() => {
     const items: ListItem[] = [];
@@ -297,6 +370,16 @@ export default function IssuesPage() {
       worksInMonth.filter(w => !w.작업종류.includes('청소') && !w.작업종류.includes('수리')).forEach(w =>
         items.push({ type: 'etc', date: w.예정일, data: w }));
     }
+    // 할일 시트 머지: 카테고리 필터 일치 시 추가
+    tasksInMonth.forEach(t => {
+      const cat = taskCategory(t);
+      if (selCat !== '전체') {
+        if (selCat === '청소' && cat !== 'clean') return;
+        if (selCat === '수리' && cat !== 'repair') return;
+        if (selCat === '기타' && cat !== 'etc') return;
+      }
+      items.push({ type: 'task', date: t.startDate, data: t, cat });
+    });
 
     let list = items;
     if (selectedDate) {
@@ -305,12 +388,15 @@ export default function IssuesPage() {
     if (filterStaff) {
       list = list.filter(it => {
         if (it.type === 'repair') return false;
+        if (it.type === 'task') {
+          return ((it.data as InventoryTask).assignedTo || '').trim() === filterStaff.trim();
+        }
         return ((it.data as Work).담당자명 || '').trim() === filterStaff.trim();
       });
     }
     list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     return list;
-  }, [worksInMonth, issuesInMonth, selCat, selectedDate, filterStaff]);
+  }, [worksInMonth, issuesInMonth, tasksInMonth, selCat, selectedDate, filterStaff]);
 
   // 정산 탭 데이터
   const settlePrefix = `${settleYear}-${String(settleMonth + 1).padStart(2, '0')}`;
@@ -492,6 +578,36 @@ export default function IssuesPage() {
             <div style={{ textAlign: 'center', padding: '60px 0', color: GRAY, fontSize: 13 }}>일정이 없어요</div>
           ) : (
             filteredList.map((item, idx) => {
+              if (item.type === 'task') {
+                const t = item.data as InventoryTask;
+                const cat = item.cat;
+                const dotColor = cat === 'clean' ? GREEN : cat === 'repair' ? RED : GRAY;
+                const badgeLabel = cat === 'clean' ? '청소' : cat === 'repair' ? '수리' : '기타';
+                const badgeBg = cat === 'clean' ? '#E6F7F2' : cat === 'repair' ? '#FEF0F0' : '#F5F5F5';
+                const badgeColor = cat === 'clean' ? GREEN : cat === 'repair' ? RED : GRAY;
+                const amount = t.amount || 0;
+                const range = t.endDate && t.endDate !== t.startDate
+                  ? `${(t.startDate||'').slice(5)} ~ ${(t.endDate||'').slice(5)}`
+                  : (t.startDate || '').slice(5);
+                return (
+                  <div key={`t-${t.id}-${idx}`}
+                    style={{ display: 'block', background: '#fff', padding: 12, borderRadius: 12, marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: badgeBg, color: badgeColor }}>{badgeLabel}</span>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: dotColor }} />
+                    </div>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: '#191919', marginBottom: 4 }}>
+                      {t.title || `${badgeLabel} · ${t.houseName || ''}`}
+                    </p>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 11, color: GRAY }}>
+                        {(t.assignedTo || '미배정')} · {range || '-'}
+                      </span>
+                      {amount > 0 && <span style={{ fontSize: 11, fontWeight: 600, color: '#191919' }}>{amount.toLocaleString()}원</span>}
+                    </div>
+                  </div>
+                );
+              }
               if (item.type === 'repair') {
                 const issue = item.data as Issue;
                 const days = elapsed(issue.createdAt);
@@ -934,6 +1050,50 @@ export default function IssuesPage() {
                   />
                 </div>
               ))}
+              <div>
+                <div style={{ fontSize: 12, color: '#4E5968', fontWeight: 600, marginBottom: 6 }}>시작일</div>
+                <input
+                  type="date"
+                  value={editStart}
+                  onChange={e => setEditStart(e.target.value)}
+                  style={{
+                    width: '100%', height: 44, boxSizing: 'border-box',
+                    borderRadius: 10, padding: '0 12px',
+                    border: '1px solid #E5E8EB', background: '#fff', color: '#191919',
+                    fontSize: 14, fontFamily: 'inherit', outline: 'none',
+                  }}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: 12, color: '#4E5968', fontWeight: 600, marginBottom: 6 }}>마감일</div>
+                <input
+                  type="date"
+                  value={editEnd}
+                  onChange={e => setEditEnd(e.target.value)}
+                  style={{
+                    width: '100%', height: 44, boxSizing: 'border-box',
+                    borderRadius: 10, padding: '0 12px',
+                    border: '1px solid #E5E8EB', background: '#fff', color: '#191919',
+                    fontSize: 14, fontFamily: 'inherit', outline: 'none',
+                  }}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: 12, color: '#4E5968', fontWeight: 600, marginBottom: 6 }}>금액 (원)</div>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={editAmount}
+                  onChange={e => setEditAmount(e.target.value)}
+                  placeholder="0"
+                  style={{
+                    width: '100%', height: 44, boxSizing: 'border-box',
+                    borderRadius: 10, padding: '0 12px',
+                    border: '1px solid #E5E8EB', background: '#fff', color: '#191919',
+                    fontSize: 14, fontFamily: 'inherit', outline: 'none',
+                  }}
+                />
+              </div>
               <div>
                 <div style={{ fontSize: 12, color: '#4E5968', fontWeight: 600, marginBottom: 6 }}>담당자 메모</div>
                 <textarea

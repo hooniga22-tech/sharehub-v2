@@ -26,6 +26,8 @@ export async function GET() {
           : 0
         const isUrgent = daysOld >= 3
         const tags = get(r, '태그').split(',').map(s => s.trim()).filter(Boolean)
+        const amountRaw = get(r, '금액').replace(/[^\d.-]/g, '')
+        const amount = amountRaw ? Number(amountRaw) : 0
         return {
           id: get(r, '할일ID'),
           title: get(r, '제목'),
@@ -36,6 +38,10 @@ export async function GET() {
           memo: get(r, '담당자메모'),
           isUrgent,
           registeredAt,
+          startDate: get(r, '시작일'),
+          endDate: get(r, '마감일'),
+          amount: Number.isFinite(amount) ? amount : 0,
+          status: get(r, '상태').trim(),
         }
       })
     return NextResponse.json({ success: true, data })

@@ -12,6 +12,9 @@ type Body = {
   assignedTo?: string
   tags?: string[] | string
   memo?: string
+  startDate?: string
+  endDate?: string
+  amount?: number | string
 }
 
 export async function PUT(req: Request) {
@@ -46,6 +49,16 @@ export async function PUT(req: Request) {
         : String(body.tags).split(',')
       const tags = arr.map(t => String(t).trim()).filter(Boolean)
       setCell('태그', tags.join(','))
+    }
+    if (body.startDate !== undefined) setCell('시작일', String(body.startDate || '').trim())
+    if (body.endDate !== undefined) setCell('마감일', String(body.endDate || '').trim())
+    if (body.amount !== undefined) {
+      const v = body.amount
+      if (v === '' || v === null) setCell('금액', '')
+      else {
+        const n = Number(v)
+        setCell('금액', Number.isFinite(n) ? String(n) : '0')
+      }
     }
 
     await updateRow(SHEET, idx, updated)
