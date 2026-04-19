@@ -91,7 +91,6 @@ export default function IssuesPage() {
   const [editSaving, setEditSaving] = useState(false);
   const [editConfirmDel, setEditConfirmDel] = useState(false);
   const [editDeleting, setEditDeleting] = useState(false);
-  const [editCompleting, setEditCompleting] = useState(false);
 
   const loadInventory = () => {
     setInventoryLoading(true);
@@ -153,26 +152,9 @@ export default function IssuesPage() {
     setEditAmount(t.amount ? String(t.amount) : '');
   };
   const closeEditModal = () => {
-    if (editSaving || editDeleting || editCompleting) return;
+    if (editSaving || editDeleting) return;
     setEditConfirmDel(false);
     setEditTarget(null);
-  };
-  const completeEdit = async () => {
-    if (!editTarget || editCompleting) return;
-    setEditCompleting(true);
-    try {
-      const res = await fetch('/api/tasks/complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId: editTarget.id }),
-      });
-      const d = await res.json().catch(() => ({}));
-      if (!res.ok || !d?.success) { alert(d?.error || '완료 처리 실패'); return; }
-      setEditTarget(null);
-      loadInventory();
-    } finally {
-      setEditCompleting(false);
-    }
   };
   const confirmDeleteEdit = async () => {
     if (!editTarget || editDeleting) return;
@@ -1168,36 +1150,24 @@ export default function IssuesPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16 }}>
               <button
                 onClick={() => setEditConfirmDel(true)}
-                disabled={editSaving || editDeleting || editCompleting}
+                disabled={editSaving || editDeleting}
                 style={{
                   background: 'transparent', border: 'none',
                   color: RED, fontSize: 14, fontWeight: 600,
-                  padding: '0 4px', cursor: (editSaving || editDeleting || editCompleting) ? 'not-allowed' : 'pointer',
+                  padding: '0 4px', cursor: (editSaving || editDeleting) ? 'not-allowed' : 'pointer',
                   fontFamily: 'inherit',
                 }}
               >
                 삭제
               </button>
-              <button
-                onClick={completeEdit}
-                disabled={editSaving || editDeleting || editCompleting}
-                style={{
-                  background: 'transparent', border: 'none',
-                  color: GREEN, fontSize: 14, fontWeight: 600,
-                  padding: '0 4px', cursor: (editSaving || editDeleting || editCompleting) ? 'not-allowed' : 'pointer',
-                  fontFamily: 'inherit',
-                }}
-              >
-                {editCompleting ? '처리 중...' : '완료'}
-              </button>
               <div style={{ flex: 1 }} />
               <button
                 onClick={closeEditModal}
-                disabled={editSaving || editDeleting || editCompleting}
+                disabled={editSaving || editDeleting}
                 style={{
                   height: 46, padding: '0 22px', borderRadius: 10, border: '1px solid #E5E8EB',
                   background: '#fff', color: '#4E5968',
-                  fontSize: 14, fontWeight: 600, cursor: (editSaving || editDeleting || editCompleting) ? 'not-allowed' : 'pointer',
+                  fontSize: 14, fontWeight: 600, cursor: (editSaving || editDeleting) ? 'not-allowed' : 'pointer',
                   fontFamily: 'inherit',
                 }}
               >
@@ -1205,12 +1175,12 @@ export default function IssuesPage() {
               </button>
               <button
                 onClick={saveEdit}
-                disabled={editSaving || editDeleting || editCompleting}
+                disabled={editSaving || editDeleting}
                 style={{
                   height: 46, padding: '0 26px', borderRadius: 10, border: 'none',
-                  background: (editSaving || editDeleting || editCompleting) ? '#D1D6DB' : BLUE,
+                  background: (editSaving || editDeleting) ? '#D1D6DB' : BLUE,
                   color: '#fff', fontSize: 14, fontWeight: 700,
-                  cursor: (editSaving || editDeleting || editCompleting) ? 'not-allowed' : 'pointer',
+                  cursor: (editSaving || editDeleting) ? 'not-allowed' : 'pointer',
                   fontFamily: 'inherit',
                 }}
               >
