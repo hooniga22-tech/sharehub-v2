@@ -75,6 +75,8 @@ export default function WorkerTokenPage() {
   const [viewMonth, setViewMonth] = useState<number>(nowMonth);
   const isCurrentMonth = viewYear === nowYear && viewMonth === nowMonth;
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
+  const [completingId, setCompletingId] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   // ── 선택된 월 fetch (worker 정보도 같이 set) ──────────
   useEffect(() => {
@@ -93,7 +95,27 @@ export default function WorkerTokenPage() {
       })
       .catch(() => { setMonthSchedules([]); })
       .finally(() => { setMonthLoading(false); setLoading(false); });
-  }, [token, viewYear, viewMonth]);
+  }, [token, viewYear, viewMonth, reloadKey]);
+
+  const handleComplete = async (taskId: string) => {
+    if (!taskId || completingId) return;
+    setCompletingId(taskId);
+    try {
+      const res = await fetch('/api/tasks/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d?.success) {
+        alert(d?.error || '완료 처리 실패');
+        return;
+      }
+      setReloadKey(k => k + 1);
+    } finally {
+      setCompletingId(null);
+    }
+  };
 
   // ── 월 이동 핸들러 ───────────────────────────────────
   const handlePrevMonth = () => {
@@ -316,6 +338,28 @@ export default function WorkerTokenPage() {
                   </div>
                 )}
               </div>
+
+              {(() => {
+                const busy = completingId === selectedSchedule.id;
+                return (
+                  <button
+                    onClick={() => handleComplete(selectedSchedule.id)}
+                    disabled={!!completingId}
+                    style={{
+                      width: '100%', padding: '14px',
+                      background: '#3182f6', color: '#ffffff',
+                      border: 'none', borderRadius: 12,
+                      fontSize: 15, fontWeight: 500,
+                      marginTop: 16,
+                      opacity: busy ? 0.6 : 1,
+                      cursor: busy ? 'default' : 'pointer',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    {busy ? '처리 중...' : '완료하기'}
+                  </button>
+                );
+              })()}
             </div>
           ) : (
             <div style={{

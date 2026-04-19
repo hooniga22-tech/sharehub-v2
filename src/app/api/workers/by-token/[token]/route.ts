@@ -67,6 +67,12 @@ export async function GET(
     const wIdRequest = wcol('요청사항')
     const wcell = (r: string[], i: number) => (i >= 0 ? (r[i] || '') : '')
 
+    // 완료 플래그 정규화: 'Y', 'TRUE', 'true' 모두 완료로 인정
+    const doneFlag = (v: string) => {
+      const s = (v || '').trim().toUpperCase()
+      return s === 'Y' || s === 'TRUE'
+    }
+
     let schedules = workSheet.rows
       .map(r => {
         const houseName = wcell(r, wIdHouse)
@@ -80,13 +86,15 @@ export async function GET(
           amount: Number(wcell(r, wIdAmount)) || 0,
           memo: wcell(r, wIdMemo),
           request: wcell(r, wIdRequest),
-          isDone: wcell(r, wIdDone) === 'Y',
+          isDone: doneFlag(wcell(r, wIdDone)),
           address: hi.address,
           doorCode: hi.doorCode,
           houseMemo: hi.houseMemo,
         }
       })
       .filter(s => s.workerName === worker.name)
+      // 완료된 일정은 작업자 개인페이지에 노출하지 않음
+      .filter(s => !s.isDone)
 
     if (year && month) {
       const prefix = `${year}-${String(month).padStart(2, '0')}`
