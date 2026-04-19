@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getSheetWithHeaders, colIdx } from '@/lib/sheets'
 
-// 인벤토리 = 아직 완료되지 않은 모든 할일. '완료' 상태만 명시적으로 제외.
-// '예정'/'인벤토리'/공백/기타 정체불명 상태는 모두 통과시켜 누락 없이 노출.
-const DONE_STATUS = '완료'
-
+// 인벤토리 = 마감일이 비어 있는 할일(즉, '인벤토리' 상태). 일정 탭과 상호 배타.
+// 정체불명 상태(공백/잠수 등)는 마감일 유무로 보정해 인벤토리/일정 자동 분류.
 export async function GET() {
   try {
     const { headers, rows } = await getSheetWithHeaders('할일')
@@ -16,7 +14,12 @@ export async function GET() {
     const data = rows
       .filter(r => {
         if (!get(r, '할일ID')) return false
-        return get(r, '상태').trim() !== DONE_STATUS
+        const status = get(r, '상태').trim()
+        if (status === '완료') return false
+        if (status === '인벤토리') return true
+        if (status === '예정') return false
+        // 정체불명 상태는 마감일 비어있으면 인벤토리로 취급
+        return !get(r, '마감일').trim()
       })
       .map(r => {
         const registeredAt = get(r, '등록일')

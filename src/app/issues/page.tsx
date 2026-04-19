@@ -260,11 +260,12 @@ export default function IssuesPage() {
     return out;
   };
 
-  // 할일 시트(완료 제외) 중 현재 월과 겹치는 것
+  // 할일 시트에서 일정 탭에 표시할 행: 상태='예정' (마감일 채워짐) + 현재 월과 겹침.
+  // 인벤토리(마감일 없음) 행은 제외하여 두 탭 상호 배타 유지.
   const tasksInMonth = useMemo(() => {
     const prefix = monthPrefix(calYear, calMonth + 1);
     return tasks.filter(t => {
-      if (t.status === '완료') return false;
+      if (t.status !== '예정') return false;
       const s = (t.startDate || '').slice(0, 10);
       if (!s) return false;
       const e = (t.endDate || '').slice(0, 10) || s;
@@ -758,7 +759,7 @@ export default function IssuesPage() {
         <div style={{ padding: '14px 16px 0' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <span style={{ fontSize: 12, color: GRAY }}>
-              미완료 · 총 {inventory.length}건
+              마감일 미정 · 총 {inventory.length}건
             </span>
             <button
               onClick={loadInventory}
@@ -775,7 +776,7 @@ export default function IssuesPage() {
             <div style={{ textAlign: 'center', padding: '60px 0', color: GRAY, fontSize: 13 }}>불러오는 중...</div>
           ) : inventory.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 0', color: GRAY, fontSize: 13 }}>
-              미완료 할일이 없어요
+              인벤토리에 할일이 없어요
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

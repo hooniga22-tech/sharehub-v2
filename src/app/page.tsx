@@ -164,7 +164,7 @@ export default function HomePage() {
       return out;
     };
     for (const t of tasks) {
-      if (t.status === '완료' || !t.startDate) continue;
+      if (t.status !== '예정' || !t.startDate) continue;
       const cat: 'clean' | 'repair' | 'etc' =
         t.tags?.some(g => g.includes('청소')) ? 'clean' :
         t.tags?.some(g => g.includes('수리')) ? 'repair' : 'etc';

@@ -51,7 +51,15 @@ export async function PUT(req: Request) {
       setCell('태그', tags.join(','))
     }
     if (body.startDate !== undefined) setCell('시작일', String(body.startDate || '').trim())
-    if (body.endDate !== undefined) setCell('마감일', String(body.endDate || '').trim())
+    if (body.endDate !== undefined) {
+      const newEnd = String(body.endDate || '').trim()
+      setCell('마감일', newEnd)
+      // 마감일 변경 시 상태 자동 보정: 마감일 채워짐 → '예정', 비워짐 → '인벤토리'.
+      // 단 이미 '완료' 처리된 행은 그대로 둔다.
+      const sCol = colIdx(headers, '상태')
+      const cur = sCol >= 0 ? (updated[sCol] || '').trim() : ''
+      if (cur !== '완료') setCell('상태', newEnd ? '예정' : '인벤토리')
+    }
     if (body.amount !== undefined) {
       const v = body.amount
       if (v === '' || v === null) setCell('금액', '')
