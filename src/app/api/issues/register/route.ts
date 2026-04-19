@@ -58,10 +58,10 @@ export async function POST(req: Request) {
     if (tags.length === 0) {
       return NextResponse.json({ error: '태그 누락' }, { status: 400 })
     }
-    // 시작일/마감일은 선택. 마감일이 없으면 상태='인벤토리'로 저장.
+    // 시작일/마감일 선택. 마감일 있으면 '예정', 없으면 '인벤토리'.
     const startDate = String(body.시작일 || '').trim()
     const endDate = String(body.마감일 || '').trim()
-    const status = endDate ? '접수' : '인벤토리'
+    const status = endDate ? '예정' : '인벤토리'
 
     const { headers, rows } = await getSheetWithHeaders(SHEET)
     const idCol = colIdx(headers, '할일ID')

@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
 import { getSheetWithHeaders, colIdx } from '@/lib/sheets'
 
-// 인벤토리 = 아직 스케줄에 확정되지 않았거나, 일정이 잡혀 있어도 완료되지 않은
-// 모든 '대기 중' 할일. 상태가 '예정'(설정 완료로 일정 탭으로 이동)이나 '완료'인
-// 행은 제외. 헤더명 기반 파싱.
-const EXCLUDED_STATUSES = new Set(['예정', '완료'])
+// 인벤토리 = 상태가 '인벤토리'인 할일. '예정'(스케줄 확정), '완료'(종료)는 제외.
+// '잠수' 등 정책에서 벗어난 값이 남아 있는 행은 마감일 유무로 보정해 판단:
+//   · 마감일 없으면 인벤토리로 취급 (표시)
+//   · 마감일 있으면 예정으로 취급 (표시 X)
+const INVENTORY_STATUS = '인벤토리'
+const SCHEDULED_STATUSES = new Set(['예정', '완료'])
 
 export async function GET() {
   try {
@@ -18,7 +20,10 @@ export async function GET() {
       .filter(r => {
         if (!get(r, '할일ID')) return false
         const status = get(r, '상태').trim()
-        return !EXCLUDED_STATUSES.has(status)
+        if (status === INVENTORY_STATUS) return true
+        if (SCHEDULED_STATUSES.has(status)) return false
+        // 정체불명 상태(예: '잠수', 공백): 마감일 없을 때만 인벤토리 노출
+        return !get(r, '마감일').trim()
       })
       .map(r => {
         const registeredAt = get(r, '등록일')
