@@ -383,7 +383,17 @@ export default function IssuesPage() {
 
     let list = items;
     if (selectedDate) {
-      list = list.filter(it => it.date && it.date.substring(0, 10) === selectedDate);
+      list = list.filter(it => {
+        // 할일은 시작일~마감일 범위 내에 선택일 포함되면 통과 (다일 일정)
+        if (it.type === 'task') {
+          const t = it.data as InventoryTask;
+          const s = (t.startDate || '').slice(0, 10);
+          const e = (t.endDate || '').slice(0, 10) || s;
+          if (!s) return false;
+          return s <= selectedDate && selectedDate <= e;
+        }
+        return it.date && it.date.substring(0, 10) === selectedDate;
+      });
     }
     if (filterStaff) {
       list = list.filter(it => {
@@ -590,8 +600,13 @@ export default function IssuesPage() {
                   ? `${(t.startDate||'').slice(5)} ~ ${(t.endDate||'').slice(5)}`
                   : (t.startDate || '').slice(5);
                 return (
-                  <div key={`t-${t.id}-${idx}`}
-                    style={{ display: 'block', background: '#fff', padding: 12, borderRadius: 12, marginBottom: 8 }}>
+                  <button key={`t-${t.id}-${idx}`}
+                    onClick={() => openEditModal(t)}
+                    style={{
+                      display: 'block', width: '100%', textAlign: 'left',
+                      background: '#fff', padding: 12, borderRadius: 12, marginBottom: 8,
+                      border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                    }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                       <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: badgeBg, color: badgeColor }}>{badgeLabel}</span>
                       <div style={{ width: 8, height: 8, borderRadius: '50%', background: dotColor }} />
@@ -605,7 +620,7 @@ export default function IssuesPage() {
                       </span>
                       {amount > 0 && <span style={{ fontSize: 11, fontWeight: 600, color: '#191919' }}>{amount.toLocaleString()}원</span>}
                     </div>
-                  </div>
+                  </button>
                 );
               }
               if (item.type === 'repair') {
