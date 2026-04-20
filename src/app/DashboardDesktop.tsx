@@ -282,7 +282,7 @@ export default function DashboardDesktop() {
 
   /* ─── Render ─── */
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', background: T.bg, overflow: 'hidden', zIndex: 40, fontFamily: '-apple-system, BlinkMacSystemFont, "Pretendard", sans-serif' }}>
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', background: T.bg, overflow: 'hidden', zIndex: 51, fontFamily: '-apple-system, BlinkMacSystemFont, "Pretendard", sans-serif' }}>
       {/* ═══ Sidebar ═══ */}
       <div style={{ width: 240, background: T.card, borderRight: `1px solid ${T.line}`, display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '24px 20px 18px' }}>
