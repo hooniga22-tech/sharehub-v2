@@ -1,7 +1,7 @@
 'use client';
 
-import HousesMobile from './HousesMobile';
+import HousesPcLayout from './HousesPcLayout';
 
 export default function HousesDesktop() {
-  return <HousesMobile />;
+  return <HousesPcLayout />;
 }

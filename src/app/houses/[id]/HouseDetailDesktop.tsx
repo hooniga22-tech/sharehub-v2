@@ -1,7 +1,9 @@
 'use client';
 
-import HouseDetailMobile from './HouseDetailMobile';
+import { useParams } from 'next/navigation';
+import HousesPcLayout from '../HousesPcLayout';
 
 export default function HouseDetailDesktop() {
-  return <HouseDetailMobile />;
+  const params = useParams<{ id: string }>();
+  return <HousesPcLayout selectedHouseId={params.id} />;
 }
