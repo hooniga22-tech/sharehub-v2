@@ -52,7 +52,7 @@ const CATEGORIES: Category[] = ['전체', '청소', '수리', '기타'];
 const monthPrefix = (y: number, m1Indexed: number) =>
   `${y}-${String(m1Indexed).padStart(2, '0')}`;
 
-export default function IssuesMobile() {
+export default function IssuesMobile({ initialTab }: { initialTab?: MainTab } = {}) {
   const [issues, setIssues] = useState<Issue[]>([]);
   const [works, setWorks] = useState<Work[]>([]);
   const [staffInfoList, setStaffInfoList] = useState<StaffInfo[]>([]);
@@ -60,7 +60,7 @@ export default function IssuesMobile() {
   // 할일 시트 = 인벤토리 응답을 그대로 사용 (status != '완료'인 모든 행)
   const [tasks, setTasks] = useState<InventoryTask[]>([]);
 
-  const [mainTab, setMainTab] = useState<MainTab>('schedule');
+  const [mainTab, setMainTab] = useState<MainTab>(initialTab ?? 'schedule');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [calYear, setCalYear] = useState(new Date().getFullYear());
   const [calMonth, setCalMonth] = useState(new Date().getMonth());
