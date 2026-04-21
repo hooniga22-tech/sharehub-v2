@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -10,7 +10,7 @@ type Work = {
   작업종류: string; 정산금액: number; 메모: string; 요청사항: string; 완료여부: 'Y' | 'N'; 완료일: string;
 };
 type Staff = { 이름: string; 연락처: string; 분야: string };
-type House = Record<string, string>;
+type HouseRec = Record<string, string>;
 
 /* ─── Design Tokens ─── */
 const T = {
@@ -21,6 +21,14 @@ const T = {
   orange: '#F9A825', orangeLight: '#FFF4DC', orangeDark: '#B26A00',
   red: '#F04438', redLight: '#FFE5E5', redDark: '#B42318',
   line: '#EAEDF0', divider: '#F2F4F6',
+};
+
+const WORK_TYPES = ['청소', '수리', '점검', '소독', '폐기물', '기타'];
+
+const INPUT_STYLE: React.CSSProperties = {
+  background: '#F9FAFB', border: '1px solid #E5E8EB', borderRadius: 8,
+  padding: '10px 12px', fontSize: 14, color: T.text,
+  fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
 };
 
 /* ─── SVG Icons ─── */
@@ -46,7 +54,7 @@ const MENU = [
 
 /* ─── Helpers ─── */
 function firstLabel(wt: string) { if (wt.includes('청소')) return '청소'; if (wt.includes('수리')) return '수리'; return '기타'; }
-function badgeStyle(wt: string) {
+function badgeStyleFn(wt: string) {
   if (wt.includes('청소')) return { bg: T.greenLight, color: T.greenDark };
   if (wt.includes('수리')) return { bg: T.orangeLight, color: T.orangeDark };
   return { bg: T.divider, color: T.textMute };
@@ -65,19 +73,30 @@ export default function IssueWorkDetailDesktop() {
   const [work, setWork] = useState<Work | null>(null);
   const [loading, setLoading] = useState(true);
   const [staff, setStaff] = useState<Staff | null>(null);
-  const [house, setHouse] = useState<House | null>(null);
+  const [house, setHouse] = useState<HouseRec | null>(null);
+
+  // Edit mode
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<Partial<Work & { 요청사항: string; 메모: string }>>({});
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState('');
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(''), 2200);
+  };
 
   useEffect(() => {
     if (!id) return;
     fetch(`/api/issues/work/${id}`).then(r => r.json()).then(d => {
       if (d.error) { setLoading(false); return; }
       setWork(d);
-      // Fetch staff info
       fetch('/api/workers/staff').then(r => r.json()).then((arr: any[]) => {
         const s = (Array.isArray(arr) ? arr : []).find(s => s.이름 === d.담당자명);
         if (s) setStaff(s);
       }).catch(() => {});
-      // Fetch house info
       fetch('/api/houses').then(r => r.json()).then((arr: any[]) => {
         const h = (Array.isArray(arr) ? arr : []).find(h => h['지점명'] === d.지점명);
         if (h) setHouse(h);
@@ -85,6 +104,49 @@ export default function IssueWorkDetailDesktop() {
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [id]);
+
+  const startEdit = () => {
+    if (!work) return;
+    setDraft({
+      예정일: work.예정일,
+      지점명: work.지점명,
+      담당자명: work.담당자명,
+      작업종류: work.작업종류,
+      정산금액: work.정산금액,
+      요청사항: work.요청사항 || '',
+      메모: work.메모 || '',
+    });
+    setEditing(true);
+  };
+
+  const cancelEdit = () => { setEditing(false); setDraft({}); };
+
+  const saveEdit = async () => {
+    if (!work || saving) return;
+    setSaving(true);
+    try {
+      const body: any = {
+        예정일: draft.예정일,
+        지점명: draft.지점명,
+        담당자명: draft.담당자명,
+        작업종류: draft.작업종류,
+        정산금액: Number(draft.정산금액) || 0,
+        요청사항: draft.요청사항,
+        메모: draft.메모,
+      };
+      const res = await fetch(`/api/issues/work/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) { alert('저장 실패'); return; }
+      const updated = await res.json();
+      setWork(updated);
+      setEditing(false);
+      setDraft({});
+      showToast('저장됐어요!');
+    } finally { setSaving(false); }
+  };
 
   const handleDelete = async () => {
     if (!window.confirm('이 작업을 삭제하시겠습니까?')) return;
@@ -98,6 +160,7 @@ export default function IssueWorkDetailDesktop() {
   const ROW: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: `1px solid ${T.divider}` };
 
   const initials = work?.담당자명 ? work.담당자명.slice(0, 1) : '?';
+  const displayName = editing ? (draft.담당자명 || '') : (work?.담당자명 || '-');
 
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', background: T.bg, overflow: 'hidden', zIndex: 51, fontFamily: '-apple-system, BlinkMacSystemFont, "Pretendard", sans-serif' }}>
@@ -123,8 +186,17 @@ export default function IssueWorkDetailDesktop() {
           </div>
           {work && (
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={handleDelete} style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid ${T.red}`, background: T.card, color: T.red, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>삭제</button>
-              <button onClick={() => router.push(`/issues/work/${id}`)} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: T.blue, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4 }}><IconEdit /> 편집</button>
+              {editing ? (
+                <>
+                  <button onClick={cancelEdit} disabled={saving} style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid ${T.line}`, background: T.card, color: T.textSub, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>취소</button>
+                  <button onClick={saveEdit} disabled={saving} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: T.blue, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: saving ? 0.6 : 1 }}>{saving ? '저장중...' : '저장'}</button>
+                </>
+              ) : (
+                <>
+                  <button onClick={handleDelete} style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid ${T.red}`, background: T.card, color: T.red, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>삭제</button>
+                  <button onClick={startEdit} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: T.blue, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4 }}><IconEdit /> 편집</button>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -142,52 +214,93 @@ export default function IssueWorkDetailDesktop() {
                 {/* Basic info */}
                 <div style={CARD}>
                   <div style={CARD_TITLE}>기본 정보</div>
+
                   <div style={ROW}>
                     <span style={{ fontSize: 13, color: T.textMute }}>예정일</span>
-                    <span style={{ fontSize: 14, fontWeight: 500, color: T.text }}>{fmtDateKr(work.예정일)}</span>
+                    {editing ? (
+                      <input type="date" value={(draft.예정일 || '').slice(0, 10)} onChange={e => setDraft(d => ({ ...d, 예정일: e.target.value }))} style={{ ...INPUT_STYLE, width: 180, textAlign: 'right' }} />
+                    ) : (
+                      <span style={{ fontSize: 14, fontWeight: 500, color: T.text }}>{fmtDateKr(work.예정일)}</span>
+                    )}
                   </div>
+
                   <div style={ROW}>
                     <span style={{ fontSize: 13, color: T.textMute }}>지점</span>
-                    <span style={{ fontSize: 14, fontWeight: 500, color: T.text }}>{work.지점명 || '-'}</span>
+                    {editing ? (
+                      <input type="text" value={draft.지점명 || ''} onChange={e => setDraft(d => ({ ...d, 지점명: e.target.value }))} style={{ ...INPUT_STYLE, width: 180, textAlign: 'right' }} />
+                    ) : (
+                      <span style={{ fontSize: 14, fontWeight: 500, color: T.text }}>{work.지점명 || '-'}</span>
+                    )}
                   </div>
+
                   <div style={ROW}>
                     <span style={{ fontSize: 13, color: T.textMute }}>작업 구분</span>
-                    <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 6, background: badgeStyle(work.작업종류).bg, color: badgeStyle(work.작업종류).color }}>{firstLabel(work.작업종류)}</span>
+                    {editing ? (
+                      <select value={draft.작업종류 || ''} onChange={e => setDraft(d => ({ ...d, 작업종류: e.target.value }))} style={{ ...INPUT_STYLE, width: 180, textAlign: 'right' }}>
+                        {!WORK_TYPES.includes(draft.작업종류 || '') && draft.작업종류 && <option value={draft.작업종류}>{draft.작업종류}</option>}
+                        {WORK_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    ) : (
+                      <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 6, background: badgeStyleFn(work.작업종류).bg, color: badgeStyleFn(work.작업종류).color }}>{firstLabel(work.작업종류)}</span>
+                    )}
                   </div>
+
                   <div style={ROW}>
                     <span style={{ fontSize: 13, color: T.textMute }}>담당자</span>
-                    <span style={{ fontSize: 14, fontWeight: 500, color: T.text }}>{work.담당자명 || '-'}</span>
+                    {editing ? (
+                      <input type="text" value={draft.담당자명 || ''} onChange={e => setDraft(d => ({ ...d, 담당자명: e.target.value }))} style={{ ...INPUT_STYLE, width: 180, textAlign: 'right' }} />
+                    ) : (
+                      <span style={{ fontSize: 14, fontWeight: 500, color: T.text }}>{work.담당자명 || '-'}</span>
+                    )}
                   </div>
+
                   <div style={{ ...ROW, borderBottom: 'none' }}>
                     <span style={{ fontSize: 13, color: T.textMute }}>금액</span>
-                    <span style={{ fontSize: 16, fontWeight: 800, color: T.text }}>{(work.정산금액 || 0).toLocaleString()}원</span>
+                    {editing ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <input type="number" inputMode="numeric" value={String(draft.정산금액 ?? 0)} onChange={e => setDraft(d => ({ ...d, 정산금액: Number(e.target.value) || 0 }))} style={{ ...INPUT_STYLE, width: 140, textAlign: 'right' }} />
+                        <span style={{ fontSize: 14, color: T.textSub }}>원</span>
+                      </div>
+                    ) : (
+                      <span style={{ fontSize: 16, fontWeight: 800, color: T.text }}>{(work.정산금액 || 0).toLocaleString()}원</span>
+                    )}
                   </div>
                 </div>
 
                 {/* Request */}
                 <div style={CARD}>
                   <div style={CARD_TITLE}>요청사항</div>
-                  <div style={{ background: '#F9FAFB', borderRadius: 10, padding: 16, minHeight: 60 }}>
-                    {work.요청사항 ? (
-                      <p style={{ fontSize: 14, color: T.text, lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>{work.요청사항}</p>
-                    ) : (
-                      <p style={{ fontSize: 13, color: T.textMute, fontStyle: 'italic', margin: 0 }}>등록된 요청사항이 없습니다</p>
-                    )}
-                  </div>
+                  {editing ? (
+                    <textarea value={draft.요청사항 ?? ''} onChange={e => setDraft(d => ({ ...d, 요청사항: e.target.value }))} placeholder="입주자 추가 요청이나 특이사항을 적어주세요" rows={5}
+                      style={{ ...INPUT_STYLE, width: '100%', resize: 'vertical', lineHeight: 1.6 }} />
+                  ) : (
+                    <div style={{ background: '#F9FAFB', borderRadius: 10, padding: 16, minHeight: 60 }}>
+                      {work.요청사항 ? (
+                        <p style={{ fontSize: 14, color: T.text, lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>{work.요청사항}</p>
+                      ) : (
+                        <p style={{ fontSize: 13, color: T.textMute, fontStyle: 'italic', margin: 0 }}>등록된 요청사항이 없습니다</p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Memo */}
-                {work.메모 && (
+                {(editing || work.메모) && (
                   <div style={CARD}>
                     <div style={CARD_TITLE}>내부 메모</div>
-                    <div style={{ background: '#F9FAFB', borderRadius: 10, padding: 16 }}>
-                      <p style={{ fontSize: 14, color: T.textSub, lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>{work.메모}</p>
-                    </div>
+                    {editing ? (
+                      <textarea value={draft.메모 ?? ''} onChange={e => setDraft(d => ({ ...d, 메모: e.target.value }))} placeholder="내부 기록용 메모" rows={3}
+                        style={{ ...INPUT_STYLE, width: '100%', resize: 'vertical', lineHeight: 1.6 }} />
+                    ) : (
+                      <div style={{ background: '#F9FAFB', borderRadius: 10, padding: 16 }}>
+                        <p style={{ fontSize: 14, color: T.textSub, lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>{work.메모}</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
 
-              {/* Right column */}
+              {/* Right column (always readonly) */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {/* Staff card */}
                 <div style={CARD}>
@@ -195,7 +308,7 @@ export default function IssueWorkDetailDesktop() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
                     <div style={{ width: 52, height: 52, borderRadius: 14, background: 'linear-gradient(135deg, #3182F6, #00B493)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 700, color: '#fff', flexShrink: 0 }}>{initials}</div>
                     <div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: T.text }}>{work.담당자명 || '-'}</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: T.text }}>{displayName}</div>
                       <div style={{ fontSize: 12, color: T.textMute }}>{staff?.분야 || '담당자'}</div>
                     </div>
                   </div>
@@ -240,6 +353,9 @@ export default function IssueWorkDetailDesktop() {
           )}
         </div>
       </div>
+
+      {/* Toast */}
+      {toast && <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: T.text, color: '#fff', padding: '10px 20px', borderRadius: 10, fontSize: 13, fontWeight: 600, zIndex: 999, whiteSpace: 'nowrap' }}>{toast}</div>}
     </div>
   );
 }
