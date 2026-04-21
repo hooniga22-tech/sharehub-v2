@@ -12,7 +12,7 @@ type Tenant = {
   입주자ID: string; 구: string; 지점명: string; 방코드: string; 방타입: string;
   이름: string; 입주일: string; 퇴실일: string; 상태: string;
   보증금: string; 월세: string; 관리비: string;
-  메모: string; 연락처: string;
+  메모: string; 연락처: string; 링크토큰: string;
 };
 
 type ViewMode = 'gantt' | 'table';
@@ -138,6 +138,7 @@ export default function TenantsDesktop() {
 
   const [view, setView] = useState<ViewMode>('gantt');
   const [selected, setSelected] = useState<Tenant | null>(null);
+  const [copied, setCopied] = useState(false);
   const [search, setSearch] = useState('');
   const [gu, setGu] = useState('전체');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -442,13 +443,36 @@ export default function TenantsDesktop() {
           {/* ═══ Right Detail Panel ═══ */}
           {selected && (
             <div style={{ width: 320, background: T.card, borderLeft: `1px solid ${T.line}`, padding: 20, overflowY: 'auto', flexShrink: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: T.textMute, marginBottom: 4 }}>선택한 입주자</div>
                   <div style={{ fontSize: 24, fontWeight: 700, color: T.text }}>{selected['이름']}</div>
                 </div>
                 <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}><IconClose /></button>
               </div>
+
+              {/* Personal page buttons */}
+              {selected['링크토큰'] ? (
+                <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+                  <button
+                    onClick={() => {
+                      const url = `${window.location.origin}/tenant/${selected['링크토큰']}`;
+                      navigator.clipboard?.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });
+                    }}
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '8px 0', borderRadius: 8, border: `1px solid ${T.line}`, background: T.card, color: T.textSub, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={T.textSub} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                    {copied ? '복사됨!' : '링크 복사'}
+                  </button>
+                  <button
+                    onClick={() => window.open(`/tenant/${selected['링크토큰']}`, '_blank')}
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '8px 0', borderRadius: 8, border: 'none', background: T.blue, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+                    개인 페이지
+                  </button>
+                </div>
+              ) : null}
 
               {/* Section 1: Basic info */}
               <div style={{ background: T.bg, borderRadius: 10, padding: 14, marginBottom: 12 }}>
