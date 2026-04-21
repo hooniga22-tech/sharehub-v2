@@ -65,6 +65,7 @@ export default function UtilitiesDesktop() {
   const [edits, setEdits] = useState<Record<string, Record<Field, number>>>({});
   const [saveStatus, setSaveStatus] = useState<Record<string, 'saving' | 'saved' | 'error'>>({});
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const [focusedCell, setFocusedCell] = useState<string | null>(null); // "houseName__field"
 
   // Previous month data for copy
   const [prevData, setPrevData] = useState<Record<string, Record<Field, number>>>({});
@@ -136,7 +137,11 @@ export default function UtilitiesDesktop() {
 
   const updateField = (houseName: string, field: Field, value: number) => {
     setEdits(p => ({ ...p, [houseName]: { ...(p[houseName] || { 전기: 0, 가스: 0, 수도: 0, 인터넷: 0, 정수기: 0, 기타: 0 }), [field]: value } }));
-    schedSave(houseName);
+  };
+
+  const saveOnBlur = (houseName: string) => {
+    if (saveTimers.current[houseName]) clearTimeout(saveTimers.current[houseName]);
+    saveTimers.current[houseName] = setTimeout(() => doSave(houseName), 100);
   };
 
   const copyPrev = (houseName: string) => {
@@ -145,7 +150,7 @@ export default function UtilitiesDesktop() {
     const hasValues = getSum(houseName) > 0;
     if (hasValues && !window.confirm(`${houseName}에 이미 값이 있습니다. 전월 데이터로 덮어쓸까요?`)) return;
     setEdits(p => ({ ...p, [houseName]: { ...prev } }));
-    schedSave(houseName);
+    saveOnBlur(houseName);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, houseName: string, fieldIdx: number, allHouses: string[]) => {
@@ -253,30 +258,39 @@ export default function UtilitiesDesktop() {
                         }}>
                           <div style={{ padding: '0 10px', fontSize: 11, color: T.textMute, display: 'flex', alignItems: 'center' }}>{dist.name}</div>
                           <div style={{ padding: '0 10px', fontSize: 13, fontWeight: 600, color: T.text, display: 'flex', alignItems: 'center' }}>{name}</div>
-                          {FIELDS.map((f, fi) => (
-                            <div key={f} style={{ padding: '4px 4px' }}>
-                              <input
-                                data-house={name}
-                                data-field={fi}
-                                type="number"
-                                inputMode="numeric"
-                                value={vals[f] || ''}
-                                onChange={e => updateField(name, f, Number(e.target.value) || 0)}
-                                onKeyDown={e => handleKeyDown(e, name, fi, allHouseNames)}
-                                placeholder="0"
-                                style={{
-                                  width: '100%', height: 36, boxSizing: 'border-box',
-                                  padding: '0 8px', border: 'none', borderBottom: `1px solid ${T.divider}`,
-                                  background: 'transparent', fontSize: 13, fontWeight: 500,
-                                  color: T.text, textAlign: 'right', fontFamily: 'inherit', outline: 'none',
-                                }}
-                                onFocus={e => { e.currentTarget.style.background = T.blueLight; e.currentTarget.style.borderBottomColor = T.blue; }}
-                                onBlur={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderBottomColor = T.divider; }}
-                              />
-                            </div>
-                          ))}
+                          {FIELDS.map((f, fi) => {
+                            const cellKey = `${name}__${f}`;
+                            const isFocused = focusedCell === cellKey;
+                            const raw = vals[f] || 0;
+                            const displayVal = isFocused ? (raw > 0 ? String(raw) : '') : (raw > 0 ? raw.toLocaleString('ko-KR') : '');
+                            return (
+                              <div key={f} style={{ padding: '4px 4px' }}>
+                                <input
+                                  data-house={name}
+                                  data-field={fi}
+                                  type="text"
+                                  inputMode="numeric"
+                                  value={displayVal}
+                                  onChange={e => {
+                                    const onlyNums = e.target.value.replace(/[^0-9]/g, '');
+                                    updateField(name, f, onlyNums ? Number(onlyNums) : 0);
+                                  }}
+                                  onKeyDown={e => handleKeyDown(e, name, fi, allHouseNames)}
+                                  placeholder=""
+                                  style={{
+                                    width: '100%', height: 36, boxSizing: 'border-box',
+                                    padding: '0 8px', border: 'none', borderBottom: `1px solid ${isFocused ? T.blue : T.divider}`,
+                                    background: isFocused ? T.blueLight : 'transparent', fontSize: 13, fontWeight: 500,
+                                    color: T.text, textAlign: 'right', fontFamily: 'inherit', outline: 'none',
+                                  }}
+                                  onFocus={() => setFocusedCell(cellKey)}
+                                  onBlur={() => { setFocusedCell(null); saveOnBlur(name); }}
+                                />
+                              </div>
+                            );
+                          })}
                           <div style={{ padding: '0 10px', fontSize: 13, fontWeight: 700, color: T.text, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-                            {sum > 0 ? sum.toLocaleString() : '-'}
+                            {sum > 0 ? sum.toLocaleString('ko-KR') : '\u2014'}
                           </div>
                           <div style={{ padding: '0 6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             {status === 'saving' ? (
