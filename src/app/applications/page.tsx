@@ -1,18 +1,23 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { PageHeader } from '@/components/ui/PageHeader'
-import { Card } from '@/components/ui/Card'
-import { Chip } from '@/components/ui/Chip'
-import { Copy, Check, ChevronDown } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+
+const BLUE = '#3182F6', GREEN = '#00B493', RED = '#E24B4A', GRAY = '#8b95a1', AMBER = '#F59E0B';
 
 interface AppItem {
   id: string; name: string; phone: string; status: string; createdAt: string;
   [key: string]: string | number | boolean | undefined;
 }
 
-const statusVariant: Record<string, 'blue' | 'green' | 'gray' | 'red' | 'amber'> = {
-  '신청접수': 'blue', '입금완료': 'green', '투어완료': 'gray', '처리중': 'amber', '완료': 'green', '처리완료': 'green', '취소': 'red',
+const STATUS_BADGE: Record<string, { bg: string; color: string }> = {
+  '신청접수': { bg: '#E6F0FE', color: BLUE },
+  '입금완료': { bg: '#D1F5EB', color: GREEN },
+  '투어완료': { bg: '#F2F4F6', color: '#555' },
+  '처리중': { bg: '#FFF4DC', color: AMBER },
+  '완료': { bg: '#D1F5EB', color: GREEN },
+  '처리완료': { bg: '#D1F5EB', color: GREEN },
+  '취소': { bg: '#FFE5E5', color: RED },
 }
 
 const TABS = [
@@ -24,6 +29,7 @@ const TABS = [
 ]
 
 export default function ApplicationsPage() {
+  const router = useRouter()
   const [items, setItems] = useState<AppItem[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -92,90 +98,107 @@ export default function ApplicationsPage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <PageHeader title="신청서 관리" />
+    <div style={{ minHeight: '100vh', background: '#F7F8FA', maxWidth: 430, margin: '0 auto' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', background: '#fff', borderBottom: '1px solid #F0F0F0', position: 'sticky', top: 0, zIndex: 10 }}>
+        <button onClick={() => router.back()} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#191919" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <span style={{ fontSize: 17, fontWeight: 700, color: '#191F28' }}>신청서 관리</span>
+      </div>
 
-      <div className="flex-1 overflow-y-auto px-5 pb-8">
+      <div style={{ padding: '0 16px 24px' }}>
         {/* Tabs */}
-        <div className="flex gap-2 mt-3 overflow-x-auto no-scrollbar">
+        <div style={{ display: 'flex', gap: 6, marginTop: 12, overflowX: 'auto' }}>
           {TABS.map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key)}
-              className={`shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-medium transition-colors ${
-                activeTab === t.key ? 'bg-[var(--blue)] text-white' : 'bg-[var(--card)] text-[var(--sub)] border border-[var(--border)]'
-              }`}>{t.label}</button>
+              style={{
+                padding: '6px 14px', borderRadius: 100, fontSize: 13, fontWeight: activeTab === t.key ? 600 : 400,
+                background: activeTab === t.key ? BLUE : '#fff', color: activeTab === t.key ? '#fff' : '#4e5968',
+                border: activeTab === t.key ? 'none' : '1px solid #e5e8eb',
+                cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', flexShrink: 0,
+              }}>{t.label}</button>
           ))}
         </div>
 
         {/* Summary */}
-        <div className="flex gap-2.5 mt-4">
-          <div className="flex-1 rounded-xl bg-[var(--blue-light)] p-3 text-center">
-            <p className="text-[10px] text-[var(--blue)]">신규 신청</p>
-            <p className="text-[18px] font-bold text-[var(--blue)]">{newCount}</p>
+        <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+          <div style={{ flex: 1, borderRadius: 12, background: '#E6F0FE', padding: 12, textAlign: 'center' }}>
+            <div style={{ fontSize: 10, color: BLUE }}>신규 신청</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: BLUE }}>{newCount}</div>
           </div>
-          <div className="flex-1 rounded-xl bg-[var(--green-light)] p-3 text-center">
-            <p className="text-[10px] text-[var(--green)]">전체</p>
-            <p className="text-[18px] font-bold text-[var(--green)]">{items.length}</p>
+          <div style={{ flex: 1, borderRadius: 12, background: '#D1F5EB', padding: 12, textAlign: 'center' }}>
+            <div style={{ fontSize: 10, color: GREEN }}>전체</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: GREEN }}>{items.length}</div>
           </div>
         </div>
 
         {/* Public Link */}
-        <Card className="mt-4 px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[11px] text-[var(--sub)]">공개 신청 링크</p>
-              <p className="text-[12px] font-medium break-all">sharehub-v2.vercel.app{currentTab.link}</p>
+        {currentTab.link && (
+          <div style={{ marginTop: 14, background: '#fff', borderRadius: 12, padding: '12px 16px', border: '1px solid #f2f3f5' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontSize: 11, color: GRAY }}>공개 신청 링크</div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: '#191F28', wordBreak: 'break-all', marginTop: 2 }}>sharehub-v2.vercel.app{currentTab.link}</div>
+              </div>
+              <button onClick={() => {
+                navigator.clipboard.writeText(`https://sharehub-v2.vercel.app${currentTab.link}`)
+                setCopied(activeTab); setTimeout(() => setCopied(''), 1500)
+              }} style={{
+                padding: '6px 12px', borderRadius: 8, border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                background: copied === activeTab ? '#D1F5EB' : '#E6F0FE', color: copied === activeTab ? GREEN : BLUE,
+              }}>
+                {copied === activeTab ? '복사됨' : '복사'}
+              </button>
             </div>
-            <button onClick={() => {
-              navigator.clipboard.writeText(`https://sharehub-v2.vercel.app${currentTab.link}`)
-              setCopied(activeTab); setTimeout(() => setCopied(''), 1500)
-            }}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold ${copied === activeTab ? 'bg-green-50 text-green-600' : 'bg-[var(--blue-light)] text-[var(--blue)]'}`}>
-              {copied === activeTab ? <><Check size={11} className="inline mr-1" />복사됨</> : <><Copy size={11} className="inline mr-1" />복사</>}
-            </button>
           </div>
-        </Card>
+        )}
 
         {/* List */}
         {loading ? (
-          <p className="text-[13px] text-[var(--sub)] py-8 text-center">불러오는 중...</p>
+          <div style={{ textAlign: 'center', padding: '40px 0', color: GRAY, fontSize: 13 }}>불러오는 중...</div>
         ) : items.length === 0 ? (
-          <p className="text-[13px] text-[var(--sub)] py-8 text-center">신청 내역이 없습니다</p>
+          <div style={{ textAlign: 'center', padding: '40px 0', color: GRAY, fontSize: 13 }}>신청 내역이 없습니다</div>
         ) : (
-          <div className="mt-4 flex flex-col gap-2.5">
+          <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
             {items.map(a => {
               const isExpanded = expandedId === a.id
+              const badge = STATUS_BADGE[a.status] || { bg: '#F2F4F6', color: '#555' }
+              const displayName = a.name || String(a.tenantName || '')
               return (
-                <Card key={a.id} className="px-4 py-3.5">
-                  <button onClick={() => setExpandedId(isExpanded ? null : a.id)} className="w-full text-left">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-[var(--blue-light)] flex items-center justify-center shrink-0">
-                        <span className="text-[14px] font-bold text-[var(--blue)]">{(a.name || String(a.tenantName || ''))?.[0]}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[14px] font-semibold">{a.name || String(a.tenantName || '')}</span>
-                          <Chip label={a.status} variant={statusVariant[a.status] || 'gray'} />
-                        </div>
-                        <p className="text-[11px] text-[var(--sub)] mt-0.5 truncate">{getSummary(a)}</p>
-                        <p className="text-[11px] text-[var(--sub)]">{a.phone}</p>
-                      </div>
-                      <ChevronDown size={14} className={`text-[var(--sub)] transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                <div key={a.id} style={{ background: '#fff', borderRadius: 14, overflow: 'hidden', border: '1px solid #f2f3f5' }}>
+                  <button onClick={() => setExpandedId(isExpanded ? null : a.id)}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#E6F0FE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: BLUE }}>{displayName?.[0] || '?'}</span>
                     </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: '#191F28' }}>{displayName}</span>
+                        <span style={{ padding: '2px 7px', borderRadius: 5, fontSize: 10, fontWeight: 600, background: badge.bg, color: badge.color }}>{a.status}</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: GRAY, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getSummary(a)}</div>
+                      <div style={{ fontSize: 11, color: GRAY }}>{a.phone}</div>
+                    </div>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={GRAY} strokeWidth="2" strokeLinecap="round"
+                      style={{ transform: isExpanded ? 'rotate(180deg)' : '', transition: 'transform 0.2s', flexShrink: 0 }}>
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
                   </button>
 
                   {isExpanded && (
-                    <div className="mt-3 pt-3 border-t border-[var(--border)]">
-                      <div className="grid grid-cols-2 gap-1.5 text-[11px] mb-3">
+                    <div style={{ padding: '0 16px 14px', borderTop: '1px solid #f2f4f6' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px', marginTop: 12, fontSize: 11 }}>
                         {getDetailFields(a).map(f => (
-                          <span key={f.label} className="contents">
-                            <span className="text-[var(--sub)]">{f.label}</span>
-                            <span className="text-right font-medium">{f.value}</span>
-                          </span>
+                          <div key={f.label} style={{ display: 'contents' }}>
+                            <span style={{ color: GRAY }}>{f.label}</span>
+                            <span style={{ textAlign: 'right', fontWeight: 500, color: '#191F28' }}>{f.value}</span>
+                          </div>
                         ))}
                       </div>
                     </div>
                   )}
-                </Card>
+                </div>
               )
             })}
           </div>
