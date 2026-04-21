@@ -100,7 +100,7 @@ export default function ManageMobile() {
         <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden' }}>
           {[
             { title: '지점 관리', sub: '지점별 정보 및 방 현황', href: '/houses' },
-            { title: '입주 신청', sub: '입주 신청서 관리', href: '/apply' },
+            { title: '신청서 관리', sub: '5종 신청서 처리', href: '/applications' },
             { title: '수납 관리', sub: '월세 수납 현황', href: '/payments' },
             { title: '공실 관리', sub: '공실 현황 및 모집', href: '/vacancy' },
             { title: '청소·수리', sub: '청소·수리 일정', href: '/issues' },

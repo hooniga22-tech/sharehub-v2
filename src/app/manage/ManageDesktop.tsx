@@ -40,6 +40,8 @@ const IconWrench = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="n
 const IconUserCheck = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="8.5" cy="7" r="4" /><polyline points="17 11 19 13 23 9" /></svg>;
 const IconBriefcase = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" /></svg>;
 const IconLogOut = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>;
+const IconBuildingSm = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" /><line x1="9" y1="6" x2="9" y2="6.01" /><line x1="15" y1="6" x2="15" y2="6.01" /><line x1="9" y1="10" x2="9" y2="10.01" /><line x1="15" y1="10" x2="15" y2="10.01" /><line x1="9" y1="18" x2="15" y2="18" /></svg>;
+const IconCoin = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>;
 
 const MENU = [
   { label: '대시보드', href: '/', icon: IconHome },
@@ -62,6 +64,16 @@ export default function ManageDesktop() {
   const [workers, setWorkers] = useState<any[]>([]);
   const [investors, setInvestors] = useState<any[]>([]);
   const [expenses, setExpenses] = useState<any[]>([]);
+  const [appCount, setAppCount] = useState(0);
+
+  useEffect(() => {
+    // Fetch application counts from 5 endpoints
+    Promise.all(
+      ['tour', 'cleaning', 'aircon', 'checkout', 'supplies'].map(t =>
+        fetch(`/api/apply/${t}`).then(r => r.json()).then(d => (Array.isArray(d) ? d : []).length).catch(() => 0)
+      )
+    ).then(counts => setAppCount(counts.reduce((s, c) => s + c, 0)));
+  }, []);
 
   useEffect(() => {
     fetch(`/api/payments?year=${y}&month=${String(m).padStart(2, '0')}`).then(r => r.json()).then(d => setPaySummary(d.summary || null)).catch(() => {});
@@ -144,10 +156,10 @@ export default function ManageDesktop() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {[
                   { n: 1, label: '공과금 관리', sub: '고지서 납부', href: '/utilities', value: null, color: T.text },
-                  { n: 2, label: '지출 관리', sub: `이번 달 ${totalExpense > 0 ? Math.round(totalExpense / 10000) + '만원' : '-'}`, href: '/expenses', value: totalExpense > 0 ? `${Math.round(totalExpense / 10000)}만` : null, color: T.text },
+                  { n: 2, label: '지출 관리', sub: `이번 달 ${expenses.length}건`, href: '/expenses', value: totalExpense > 0 ? `${Math.round(totalExpense / 10000)}만` : null, color: T.text },
                   { n: 3, label: '공실 관리', sub: '모집 및 현황', href: '/vacancy', value: vacantCount > 0 ? `${vacantCount}실` : null, color: vacantCount > 0 ? T.red : T.text },
-                  { n: 4, label: '당번 관리', sub: '청소 당번표', href: '/duty', value: null, color: T.text },
-                  { n: 5, label: '담당자 관리', sub: `활성 ${workerCount}명`, href: '/management/workers', value: workerCount > 0 ? `${workerCount}명` : null, color: T.text },
+                  { n: 4, label: '신청서 관리', sub: appCount > 0 ? `신규 신청 ${appCount}건` : '관리', href: '/applications', value: appCount > 0 ? `${appCount}건` : null, color: appCount > 0 ? T.blue : T.text },
+                  { n: 5, label: '당번 관리', sub: '청소 당번표', href: '/duty', value: null, color: T.text },
                 ].map(row => (
                   <div key={row.n} onClick={() => router.push(row.href)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 10, background: '#F9FAFB', cursor: 'pointer' }}>
                     <div style={{ width: 26, height: 26, borderRadius: 7, background: T.blue, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0 }}>{row.n}</div>
@@ -189,6 +201,8 @@ export default function ManageDesktop() {
             <div style={{ fontSize: 14, fontWeight: 700, color: T.textMute, marginBottom: 12 }}>전체 부가 메뉴</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
               {[
+                { label: '지점 관리', sub: `${houses.length}개 지점`, href: '/houses', icon: IconBuildingSm },
+                { label: '수납 관리', sub: '월세 수납 현황', href: '/payments', icon: IconCoin },
                 { label: '수익 현황', sub: '지점 랭킹 / 손익', href: '/revenue', icon: IconTrend },
                 { label: '플랫폼 이체', sub: '이체 현황 관리', href: '/payments/platform', icon: IconSend },
                 { label: '청소/수리', sub: repairCount > 0 ? `대기 ${repairCount}건` : '일정/이슈', href: '/issues', icon: IconWrench },

@@ -93,7 +93,7 @@ export default function ApplicationsPage() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <PageHeader title="신청 관리" />
+      <PageHeader title="신청서 관리" />
 
       <div className="flex-1 overflow-y-auto px-5 pb-8">
         {/* Tabs */}
