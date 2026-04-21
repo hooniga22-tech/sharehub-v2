@@ -45,7 +45,7 @@ const MENU = [
   { label: '지점', href: '/houses', icon: IconBuilding, active: true },
   { label: '일정/이슈', href: '/issues', icon: IconCalendar },
   { label: '수납/정산', href: '/payments', icon: IconMoney },
-  { label: '설정', href: '#', icon: IconSettings },
+  { label: '관리', href: '/manage', icon: IconSettings },
 ];
 
 const UTIL_ICONS: Record<string, () => React.ReactElement> = { '전기': IconZap, '가스': IconFlame, '수도': IconDroplet, '인터넷': IconGlobe, '정수기': IconCup };
