@@ -144,6 +144,7 @@ export default function WorkerDetailPage() {
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState<Worker | null>(null)
   const [saving, setSaving] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -267,21 +268,56 @@ export default function WorkerDetailPage() {
           </button>
           <div style={{ flex: 1, fontSize: 17, fontWeight: 700, color: GRAY900 }}>{data.name}</div>
           {editing ? null : (
-            <button
-              onClick={startEdit}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: PRIMARY,
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                padding: '6px 8px',
-              }}
-            >
-              편집
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {data.token ? (
+                <>
+                  <button
+                    onClick={() => {
+                      const url = `${window.location.origin}/worker/${data.token}`;
+                      navigator.clipboard?.writeText(url).then(() => {
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 1500);
+                      });
+                    }}
+                    style={{
+                      background: 'none', border: `1px solid ${LINE}`,
+                      borderRadius: 8, padding: '6px 10px',
+                      color: GRAY600, fontSize: 12, fontWeight: 600,
+                      cursor: 'pointer', fontFamily: 'inherit',
+                      display: 'flex', alignItems: 'center', gap: 4,
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={GRAY600} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                    {copied ? '복사됨!' : '링크 복사'}
+                  </button>
+                  <button
+                    onClick={() => window.open(`/worker/${data.token}`, '_blank')}
+                    style={{
+                      background: PRIMARY, border: 'none',
+                      borderRadius: 8, padding: '6px 10px',
+                      color: '#fff', fontSize: 12, fontWeight: 700,
+                      cursor: 'pointer', fontFamily: 'inherit',
+                      display: 'flex', alignItems: 'center', gap: 4,
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+                    개인 페이지
+                  </button>
+                </>
+              ) : (
+                <span style={{ fontSize: 11, color: GRAY400 }}>링크 미생성</span>
+              )}
+              <button
+                onClick={startEdit}
+                style={{
+                  background: 'none', border: 'none',
+                  color: PRIMARY, fontSize: 14, fontWeight: 600,
+                  cursor: 'pointer', fontFamily: 'inherit', padding: '6px 8px',
+                }}
+              >
+                편집
+              </button>
+            </div>
           )}
         </div>
 
