@@ -34,7 +34,7 @@ const MENU = [
   { label: '관리', href: '/manage', icon: IconGrid, active: true },
 ];
 
-type StatusTab = 'all' | 'vacant' | 'soon';
+type StatusTab = 'all' | 'available' | 'vacant' | 'soon';
 
 /* ─── Helpers ─── */
 function getDday(dateStr: string) {
@@ -55,6 +55,7 @@ export default function VacancyDesktop() {
   const [gu, setGu] = useState('전체');
   const [search, setSearch] = useState('');
   const [statusTab, setStatusTab] = useState<StatusTab>('all');
+  const [roomType, setRoomType] = useState('전체');
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -92,12 +93,27 @@ export default function VacancyDesktop() {
     return groups;
   }, [filtered]);
 
-  // Filter by status tab
+  // Room types
+  const roomTypes = useMemo(() => {
+    const set = new Set<string>();
+    filtered.forEach(t => { const rt = t['방타입']; if (rt) set.add(rt); });
+    return [...set].sort();
+  }, [filtered]);
+
+  // Filter by status tab + room type
   const visibleGroups = useMemo(() => {
-    if (statusTab === 'all') return houseGroups;
-    if (statusTab === 'vacant') return houseGroups.filter(g => g.vacant > 0);
-    return houseGroups.filter(g => g.soon > 0);
-  }, [houseGroups, statusTab]);
+    return houseGroups.map(g => {
+      let rooms = g.rooms;
+      // Room type filter
+      if (roomType !== '전체') rooms = rooms.filter(r => r['방타입'] === roomType);
+      // Status filter
+      if (statusTab === 'vacant') rooms = rooms.filter(r => r['상태'] === '공실');
+      else if (statusTab === 'soon') rooms = rooms.filter(r => r['상태'] === '공실예정');
+      else if (statusTab === 'available') rooms = rooms.filter(r => r['상태'] === '공실' || r['상태'] === '공실예정');
+      if (rooms.length === 0) return null;
+      return { ...g, rooms, vacant: rooms.filter(r => r['상태'] === '공실').length, soon: rooms.filter(r => r['상태'] === '공실예정').length };
+    }).filter(Boolean) as HouseGroup[];
+  }, [houseGroups, statusTab, roomType]);
 
   // Gu counts for sidebar
   const guCounts = useMemo(() => {
@@ -154,31 +170,47 @@ export default function VacancyDesktop() {
             {/* KPI */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
               {[
-                { label: '전체 방', value: totalRooms, color: T.text },
-                { label: '입주중', value: occupiedCount, color: T.green },
-                { label: '즉시공실', value: vacantCount, color: T.red },
-                { label: '공실예정', value: soonCount, color: T.orange },
+                { label: '전체 방', value: totalRooms, color: T.text, tab: 'all' as StatusTab },
+                { label: '입주중', value: occupiedCount, color: T.green, tab: 'all' as StatusTab },
+                { label: '즉시공실', value: vacantCount, color: T.red, tab: 'vacant' as StatusTab },
+                { label: '공실예정', value: soonCount, color: T.orange, tab: 'soon' as StatusTab },
               ].map(k => (
-                <div key={k.label} style={{ background: T.card, borderRadius: 12, padding: '16px 18px', border: `1px solid ${T.divider}` }}>
+                <div key={k.label} onClick={() => setStatusTab(k.tab)} style={{ background: T.card, borderRadius: 12, padding: '16px 18px', border: `1px solid ${T.divider}`, cursor: 'pointer', transition: 'transform 0.15s ease, box-shadow 0.15s ease' }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.06)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}>
                   <div style={{ fontSize: 11, color: T.textMute, marginBottom: 4 }}>{k.label}</div>
                   <div style={{ fontSize: 24, fontWeight: 800, color: k.color }}>{k.value}</div>
                 </div>
               ))}
             </div>
 
-            {/* Status tabs */}
-            <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-              {([
-                { key: 'all' as const, label: '전체현황' },
-                { key: 'vacant' as const, label: '즉시공실' },
-                { key: 'soon' as const, label: '공실예정' },
-              ]).map(t => (
-                <button key={t.key} onClick={() => setStatusTab(t.key)} style={{
-                  padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
-                  background: statusTab === t.key ? T.text : T.card, color: statusTab === t.key ? '#fff' : T.textSub,
-                  border: statusTab === t.key ? 'none' : `1px solid ${T.line}`,
-                }}>{t.label}</button>
-              ))}
+            {/* Status tabs + room type filter */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {([
+                  { key: 'all' as const, label: '전체현황' },
+                  { key: 'available' as const, label: '입주가능' },
+                  { key: 'vacant' as const, label: '즉시공실' },
+                  { key: 'soon' as const, label: '공실예정' },
+                ]).map(t => (
+                  <button key={t.key} onClick={() => setStatusTab(t.key)} style={{
+                    padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
+                    background: statusTab === t.key ? T.text : T.card, color: statusTab === t.key ? '#fff' : T.textSub,
+                    border: statusTab === t.key ? 'none' : `1px solid ${T.line}`,
+                  }}>{t.label}</button>
+                ))}
+              </div>
+              {roomTypes.length > 1 && (
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {['전체', ...roomTypes].map(rt => (
+                    <button key={rt} onClick={() => setRoomType(rt)} style={{
+                      padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
+                      background: roomType === rt ? T.blueDark : T.card, color: roomType === rt ? '#fff' : T.textMute,
+                      border: roomType === rt ? 'none' : `1px solid ${T.line}`,
+                    }}>{rt}</button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* House cards */}
@@ -195,11 +227,18 @@ export default function VacancyDesktop() {
                     <div key={g.name} style={{ background: T.card, borderRadius: 14, border: `1px solid ${T.line}`, overflow: 'hidden' }}>
                       {/* Card header */}
                       <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ fontSize: 15, fontWeight: 800, color: T.text }}>{g.name}</span>
-                          <span style={{ fontSize: 12, color: T.textMute, marginLeft: 8 }}>{g.gu}</span>
+                          <span style={{ fontSize: 12, color: T.textMute }}>{g.gu}</span>
+                          {(() => {
+                            const typeCounts: Record<string, number> = {};
+                            g.rooms.forEach(r => { const rt = r['방타입']; if (rt) typeCounts[rt] = (typeCounts[rt] || 0) + 1; });
+                            const entries = Object.entries(typeCounts).sort((a, b) => a[0].localeCompare(b[0]));
+                            if (entries.length === 0) return null;
+                            return <span style={{ fontSize: 11, color: T.textMute }}>{entries.map(([k, v]) => `${k} ${v}`).join(' · ')}</span>;
+                          })()}
                         </div>
-                        <div style={{ display: 'flex', gap: 4 }}>
+                        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                           {g.vacant > 0 && <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 4, background: T.redLight, color: T.redDark }}>공실 {g.vacant}</span>}
                           {g.soon > 0 && <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 4, background: T.orangeLight, color: T.orangeDark }}>예정 {g.soon}</span>}
                           <span style={{ fontSize: 10, color: T.textMute }}>/{g.rooms.length}</span>
