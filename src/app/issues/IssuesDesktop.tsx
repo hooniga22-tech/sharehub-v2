@@ -549,7 +549,7 @@ export default function IssuesDesktop() {
         /* ═══ Workers / Settle tab: embed IssuesMobile ═══ */
         <div style={{ flex: 1, overflowY: 'auto', background: T.bg }}>
           <div style={{ maxWidth: 500, margin: '40px auto', padding: '24px 0', background: T.card, borderRadius: 12, border: `1px solid ${T.line}`, overflow: 'hidden' }}>
-            <IssuesMobile key={tab} initialTab={tab} />
+            <IssuesMobile key={tab} initialTab={tab} hideChrome />
           </div>
         </div>
       )}

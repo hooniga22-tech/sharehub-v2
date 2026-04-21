@@ -52,7 +52,7 @@ const CATEGORIES: Category[] = ['전체', '청소', '수리', '기타'];
 const monthPrefix = (y: number, m1Indexed: number) =>
   `${y}-${String(m1Indexed).padStart(2, '0')}`;
 
-export default function IssuesMobile({ initialTab }: { initialTab?: MainTab } = {}) {
+export default function IssuesMobile({ initialTab, hideChrome }: { initialTab?: MainTab; hideChrome?: boolean } = {}) {
   const [issues, setIssues] = useState<Issue[]>([]);
   const [works, setWorks] = useState<Work[]>([]);
   const [staffInfoList, setStaffInfoList] = useState<StaffInfo[]>([]);
@@ -475,8 +475,9 @@ export default function IssuesMobile({ initialTab }: { initialTab?: MainTab } = 
   ];
 
   return (
-    <div style={{ paddingBottom: 70, maxWidth: 430, margin: '0 auto', position: 'relative' }}>
+    <div style={{ paddingBottom: hideChrome ? 0 : 70, maxWidth: hideChrome ? undefined : 430, margin: '0 auto', position: 'relative' }}>
       {/* 헤더 */}
+      {!hideChrome && (
       <div style={{ position: 'sticky', top: 0, zIndex: 20, background: '#fff' }}>
         <div style={{ padding: '20px 16px 0' }}>
           <h1 style={{ fontSize: 20, fontWeight: 700, letterSpacing: -0.5, margin: '0 0 16px' }}>청소 · 수리</h1>
@@ -500,6 +501,7 @@ export default function IssuesMobile({ initialTab }: { initialTab?: MainTab } = 
           ))}
         </div>
       </div>
+      )}
 
       {/* ========== 일정 탭 ========== */}
       {mainTab === 'schedule' && (
