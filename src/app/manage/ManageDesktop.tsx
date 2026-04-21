@@ -21,6 +21,7 @@ function kstYM() {
   const [y, m] = s.replace(/\./g, '').trim().split(/\s+/).map(Number);
   return { y, m };
 }
+const fmt = (n: number) => n.toLocaleString();
 
 /* ─── SVG Icons ─── */
 const IconSearch = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={T.textMute} strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>;
@@ -29,8 +30,16 @@ const IconUsers = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="no
 const IconBuilding = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" /><line x1="9" y1="6" x2="9" y2="6.01" /><line x1="15" y1="6" x2="15" y2="6.01" /><line x1="9" y1="10" x2="9" y2="10.01" /><line x1="15" y1="10" x2="15" y2="10.01" /><line x1="9" y1="14" x2="9" y2="14.01" /><line x1="15" y1="14" x2="15" y2="14.01" /><line x1="9" y1="18" x2="15" y2="18" /></svg>;
 const IconCalendar = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>;
 const IconMoney = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>;
-const IconSettings = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>;
 const IconGrid = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>;
+const IconChevronRight = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.textMute} strokeWidth="2" strokeLinecap="round"><polyline points="9 18 15 12 9 6" /></svg>;
+
+/* Small icons for bottom grid */
+const IconTrend = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></svg>;
+const IconSend = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>;
+const IconWrench = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg>;
+const IconUserCheck = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="8.5" cy="7" r="4" /><polyline points="17 11 19 13 23 9" /></svg>;
+const IconBriefcase = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" /></svg>;
+const IconLogOut = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>;
 
 const MENU = [
   { label: '대시보드', href: '/', icon: IconHome },
@@ -46,97 +55,47 @@ export default function ManageDesktop() {
   const router = useRouter();
   const { y, m } = kstYM();
 
-  // Data
   const [paySummary, setPaySummary] = useState<{ paid: number; unpaid: number; partial: number; paidAmount: number; unpaidAmount: number } | null>(null);
   const [tenants, setTenants] = useState<any[]>([]);
   const [houses, setHouses] = useState<any[]>([]);
   const [issues, setIssues] = useState<any[]>([]);
   const [workers, setWorkers] = useState<any[]>([]);
   const [investors, setInvestors] = useState<any[]>([]);
+  const [expenses, setExpenses] = useState<any[]>([]);
 
   useEffect(() => {
-    fetch(`/api/payments?year=${y}&month=${String(m).padStart(2, '0')}`)
-      .then(r => r.json()).then(d => setPaySummary(d.summary || null)).catch(() => {});
+    fetch(`/api/payments?year=${y}&month=${String(m).padStart(2, '0')}`).then(r => r.json()).then(d => setPaySummary(d.summary || null)).catch(() => {});
     fetch('/api/tenants').then(r => r.json()).then(d => setTenants(Array.isArray(d) ? d : [])).catch(() => {});
     fetch('/api/houses').then(r => r.json()).then(d => setHouses(Array.isArray(d) ? d : [])).catch(() => {});
     fetch('/api/issues').then(r => r.json()).then(d => setIssues(d.issues || [])).catch(() => {});
     fetch('/api/workers').then(r => r.json()).then(d => setWorkers(Array.isArray(d) ? d : [])).catch(() => {});
     fetch('/api/investors').then(r => r.json()).then(d => setInvestors(Array.isArray(d) ? d : [])).catch(() => {});
+    fetch(`/api/expenses?year=${y}&month=${m}`).then(r => r.json()).then(d => setExpenses(Array.isArray(d) ? d : [])).catch(() => {});
   }, [y, m]);
 
-  // Computed KPIs
   const vacantCount = useMemo(() => tenants.filter(t => t['상태'] === '공실').length, [tenants]);
-  const unpaidCount = paySummary ? (paySummary.unpaid + paySummary.partial) : null;
-  const paidAmount = paySummary?.paidAmount ?? null;
+  const unpaidCount = paySummary ? (paySummary.unpaid + paySummary.partial) : 0;
+  const paidAmount = paySummary?.paidAmount ?? 0;
+  const unpaidAmount = paySummary?.unpaidAmount ?? 0;
+  const totalExpense = useMemo(() => expenses.reduce((s, e) => s + (e.amount || 0), 0), [expenses]);
   const repairCount = useMemo(() => issues.filter(i => i.status === '접수' || i.status === '처리중').length, [issues]);
-  const workerCount = useMemo(() => {
-    const names = new Set(workers.map(w => (w.담당자명 || '').trim()).filter(Boolean));
-    return names.size;
-  }, [workers]);
-  const investorCount = useMemo(() => investors.length, [investors]);
-  const investorHouses = useMemo(() => {
+  const workerCount = useMemo(() => new Set(workers.map(w => (w.담당자명 || '').trim()).filter(Boolean)).size, [workers]);
+  const investorCount = investors.length;
+  const investorHouseCount = useMemo(() => {
     const set = new Set<string>();
-    investors.forEach((inv: any) => { if (inv.houses) inv.houses.forEach((h: any) => set.add(h.houseName || h['지점명'] || '')); });
+    investors.forEach((inv: any) => { if (inv.houses) inv.houses.forEach((h: any) => set.add(h.houseName || '')); });
     return set.size;
   }, [investors]);
+  const leavingCount = useMemo(() => tenants.filter(t => t['상태'] === '퇴실예정' || t['상태'] === '퇴실확정').length, [tenants]);
 
-  const fmt = (n: number) => n.toLocaleString();
-
-  type SubMenu = { label: string; href: string; badge?: number | null };
-
-  const boxes: { title: string; tag: string; tagBg: string; tagColor: string; kpis: { label: string; value: string | null; color: string }[]; todo?: string; menus: SubMenu[] }[] = [
-    {
-      title: '재무', tag: 'FINANCE', tagBg: T.blueLight, tagColor: T.blueDark,
-      kpis: [
-        { label: '이번 달 수납', value: paidAmount !== null ? `${fmt(paidAmount)}원` : null, color: T.blue },
-        { label: '미납 건수', value: unpaidCount !== null ? `${unpaidCount}건` : null, color: T.red },
-      ],
-      todo: unpaidCount && unpaidCount > 0 ? `미납 독촉 ${unpaidCount}건 대기` : undefined,
-      menus: [
-        { label: '수납 관리', href: '/payments', badge: unpaidCount && unpaidCount > 0 ? unpaidCount : null },
-        { label: '공과금 관리', href: '/utilities' },
-        { label: '지출 관리', href: '/expenses' },
-        { label: '수익 현황', href: '/revenue' },
-        { label: '플랫폼 이체', href: '/payments/platform' },
-      ],
-    },
-    {
-      title: '공간', tag: 'SPACE', tagBg: T.greenLight, tagColor: T.greenDark,
-      kpis: [
-        { label: '지점 수', value: houses.length > 0 ? `${houses.length}개` : null, color: T.text },
-        { label: '공실 수', value: `${vacantCount}실`, color: vacantCount > 0 ? T.red : T.text },
-      ],
-      todo: undefined,
-      menus: [
-        { label: '지점 관리', href: '/houses' },
-        { label: '공실 관리', href: '/vacancy', badge: vacantCount > 0 ? vacantCount : null },
-        { label: '퇴실자 관리', href: '/checkout' },
-      ],
-    },
-    {
-      title: '운영', tag: 'OPERATIONS', tagBg: T.orangeLight, tagColor: T.orangeDark,
-      kpis: [
-        { label: '수리 대기', value: repairCount > 0 ? `${repairCount}건` : '0건', color: repairCount > 0 ? T.orange : T.text },
-        { label: '담당자 수', value: workerCount > 0 ? `${workerCount}명` : null, color: T.text },
-      ],
-      todo: repairCount > 0 ? `수리 배정 ${repairCount}건 대기` : undefined,
-      menus: [
-        { label: '청소/수리', href: '/issues', badge: repairCount > 0 ? repairCount : null },
-        { label: '담당자 관리', href: '/management/workers' },
-        { label: '당번 관리', href: '/duty' },
-      ],
-    },
-    {
-      title: '투자자', tag: 'INVESTOR', tagBg: T.blueLight, tagColor: T.blueDark,
-      kpis: [
-        { label: '활성 투자자', value: investorCount > 0 ? `${investorCount}명` : '0명', color: T.text },
-        { label: '보유 지점', value: investorHouses > 0 ? `${investorHouses}개` : '0개', color: T.text },
-      ],
-      menus: [
-        { label: '투자자 관리', href: '/investors' },
-      ],
-    },
-  ];
+  /* ─── Todo items (0건이면 렌더링 안 함) ─── */
+  const todos = useMemo(() => {
+    const items: { label: string; count: number; color: string; href: string }[] = [];
+    if (unpaidCount > 0) items.push({ label: '미납 독촉 발송', count: unpaidCount, color: T.red, href: '/payments' });
+    if (repairCount > 0) items.push({ label: '수리 배정 대기', count: repairCount, color: T.orange, href: '/issues' });
+    if (vacantCount > 0) items.push({ label: '공실 모집 관리', count: vacantCount, color: T.blue, href: '/vacancy' });
+    return items;
+  }, [unpaidCount, repairCount, vacantCount]);
 
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', background: T.bg, overflow: 'hidden', zIndex: 51, fontFamily: '-apple-system, BlinkMacSystemFont, "Pretendard", sans-serif' }}>
@@ -155,58 +114,95 @@ export default function ManageDesktop() {
 
       {/* Main */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        {/* Header */}
         <div style={{ padding: '28px 32px 20px', background: T.card, borderBottom: `1px solid ${T.line}`, flexShrink: 0 }}>
           <div style={{ fontSize: 28, fontWeight: 800, color: T.text }}>관리</div>
-          <div style={{ fontSize: 14, color: T.textMute, marginTop: 4 }}>운영 영역별 현황을 확인하고 세부 메뉴로 이동하세요</div>
+          <div style={{ fontSize: 14, color: T.textMute, marginTop: 4 }}>운영 현황 확인과 세부 메뉴 이동</div>
         </div>
 
-        {/* Bento Grid */}
         <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            {boxes.map(box => (
-              <div key={box.title} style={{ background: T.card, borderRadius: 16, border: `1px solid ${T.divider}`, padding: 22 }}>
-                {/* Box header */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                  <span style={{ fontSize: 15, fontWeight: 800, color: T.text }}>{box.title}</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: box.tagBg, color: box.tagColor }}>{box.tag}</span>
-                </div>
+          {/* Section 1: KPI 4 */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+            {[
+              { label: '미납', value: `${unpaidCount}건`, sub: unpaidAmount > 0 ? `${fmt(unpaidAmount)}원` : '', color: unpaidCount > 0 ? T.red : T.text, href: '/payments' },
+              { label: '이번 달 수납', value: `${fmt(paidAmount)}원`, sub: '', color: T.text, href: '/payments' },
+              { label: '이번 달 지출', value: `${fmt(totalExpense)}원`, sub: '', color: T.text, href: '/expenses' },
+              { label: '공실', value: `${vacantCount}실`, sub: `총 ${houses.length}개 지점`, color: vacantCount > 0 ? T.green : T.text, href: '/vacancy' },
+            ].map(kpi => (
+              <div key={kpi.label} onClick={() => router.push(kpi.href)} style={{ background: T.card, borderRadius: 14, padding: '20px 22px', border: `1px solid ${T.divider}`, cursor: 'pointer' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: T.textMute, marginBottom: 6 }}>{kpi.label}</div>
+                <div style={{ fontSize: 24, fontWeight: 800, color: kpi.color }}>{kpi.value}</div>
+                {kpi.sub && <div style={{ fontSize: 11, color: T.textMute, marginTop: 2 }}>{kpi.sub}</div>}
+              </div>
+            ))}
+          </div>
 
-                {/* KPIs */}
-                <div style={{ display: 'flex', gap: 20, paddingBottom: 14, borderBottom: `1px solid ${T.divider}`, marginBottom: 12 }}>
-                  {box.kpis.filter(k => k.value !== null).map(kpi => (
-                    <div key={kpi.label}>
-                      <div style={{ fontSize: 11, color: T.textMute, marginBottom: 4 }}>{kpi.label}</div>
-                      <div style={{ fontSize: 22, fontWeight: 800, color: kpi.color }}>{kpi.value}</div>
+          {/* Section 2: Two columns */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+            {/* Left: 자주 쓰는 메뉴 */}
+            <div style={{ background: T.card, borderRadius: 14, padding: '22px 24px', border: `1px solid ${T.divider}` }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: T.text, marginBottom: 16 }}>자주 쓰는 메뉴</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {[
+                  { n: 1, label: '공과금 관리', sub: '고지서 납부', href: '/utilities', value: null, color: T.text },
+                  { n: 2, label: '지출 관리', sub: `이번 달 ${totalExpense > 0 ? Math.round(totalExpense / 10000) + '만원' : '-'}`, href: '/expenses', value: totalExpense > 0 ? `${Math.round(totalExpense / 10000)}만` : null, color: T.text },
+                  { n: 3, label: '공실 관리', sub: '모집 및 현황', href: '/vacancy', value: vacantCount > 0 ? `${vacantCount}실` : null, color: vacantCount > 0 ? T.red : T.text },
+                  { n: 4, label: '당번 관리', sub: '청소 당번표', href: '/duty', value: null, color: T.text },
+                  { n: 5, label: '담당자 관리', sub: `활성 ${workerCount}명`, href: '/management/workers', value: workerCount > 0 ? `${workerCount}명` : null, color: T.text },
+                ].map(row => (
+                  <div key={row.n} onClick={() => router.push(row.href)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 10, background: '#F9FAFB', cursor: 'pointer' }}>
+                    <div style={{ width: 26, height: 26, borderRadius: 7, background: T.blue, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0 }}>{row.n}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{row.label}</div>
+                      <div style={{ fontSize: 11, color: T.textMute }}>{row.sub}</div>
+                    </div>
+                    {row.value && <span style={{ fontSize: 13, fontWeight: 700, color: row.color, flexShrink: 0 }}>{row.value}</span>}
+                    <IconChevronRight />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Right: 오늘 할 일 */}
+            <div style={{ background: T.card, borderRadius: 14, padding: '22px 24px', border: `1px solid ${T.divider}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                <span style={{ fontSize: 15, fontWeight: 800, color: T.text }}>오늘 할 일</span>
+                {todos.length > 0 && <span style={{ fontSize: 12, fontWeight: 700, color: T.blue }}>{todos.reduce((s, t) => s + t.count, 0)}</span>}
+              </div>
+              {todos.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 0', color: T.textMute, fontSize: 13 }}>오늘 처리할 일이 없어요</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {todos.map(todo => (
+                    <div key={todo.label} onClick={() => router.push(todo.href)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 10, background: '#F9FAFB', cursor: 'pointer' }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: todo.color, flexShrink: 0 }} />
+                      <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: T.text }}>{todo.label}</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: todo.color }}>{todo.count}건</span>
                     </div>
                   ))}
                 </div>
+              )}
+            </div>
+          </div>
 
-                {/* Todo line */}
-                {box.todo && (
-                  <div style={{ background: '#FEF4E6', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 12, fontWeight: 600, color: T.orangeDark, cursor: 'pointer' }}>
-                    {box.todo}
-                  </div>
-                )}
-
-                {/* Sub menus */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {box.menus.map(menu => (
-                    <button key={menu.label} onClick={() => router.push(menu.href)} style={{
-                      display: 'flex', alignItems: 'center', gap: 4,
-                      padding: '8px 12px', borderRadius: 8, border: 'none',
-                      background: '#F9FAFB', color: T.textSub,
-                      fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
-                    }}>
-                      {menu.label}
-                      {menu.badge && menu.badge > 0 && (
-                        <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 10, background: T.redLight, color: T.red, minWidth: 16, textAlign: 'center' }}>{menu.badge}</span>
-                      )}
-                    </button>
-                  ))}
+          {/* Section 3: 전체 부가 메뉴 */}
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.textMute, marginBottom: 12 }}>전체 부가 메뉴</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+              {[
+                { label: '수익 현황', sub: '지점 랭킹 / 손익', href: '/revenue', icon: IconTrend },
+                { label: '플랫폼 이체', sub: '이체 현황 관리', href: '/payments/platform', icon: IconSend },
+                { label: '청소/수리', sub: repairCount > 0 ? `대기 ${repairCount}건` : '일정/이슈', href: '/issues', icon: IconWrench },
+                { label: '담당자 관리', sub: workerCount > 0 ? `활성 ${workerCount}명` : '용역 담당자', href: '/management/workers', icon: IconUserCheck },
+                { label: '투자자 관리', sub: investorCount > 0 ? `${investorCount}명 · ${investorHouseCount}개 지점` : '투자자 현황', href: '/investors', icon: IconBriefcase },
+                { label: '퇴실자 관리', sub: leavingCount > 0 ? `이달 ${leavingCount}명` : '퇴실 이력', href: '/checkout', icon: IconLogOut },
+              ].map(card => (
+                <div key={card.label} onClick={() => router.push(card.href)} style={{ background: T.card, borderRadius: 14, padding: '18px 16px', border: `1px solid ${T.divider}`, cursor: 'pointer' }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 9, background: T.blue, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}><card.icon /></div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: T.text, marginBottom: 3 }}>{card.label}</div>
+                  <div style={{ fontSize: 12, color: T.textMute }}>{card.sub}</div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </div>
