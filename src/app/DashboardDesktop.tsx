@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 /* ─── Types (from DashboardMobile) ─── */
@@ -133,7 +134,32 @@ const MENU = [
 ];
 
 /* ─── Main Component ─── */
+type AppItem = { id: string; name: string; phone: string; status: string; createdAt: string; _type: string; houseName?: string; roomCode?: string };
+
+const APP_BADGE: Record<string, { bg: string; color: string; label: string }> = {
+  tour: { bg: '#E6F0FE', color: '#1B64DA', label: '투어' },
+  cleaning: { bg: '#DBF5EA', color: '#009A6F', label: '청소' },
+  aircon: { bg: '#E0F2FE', color: '#0284C7', label: '에어컨' },
+  checkout: { bg: '#FEE2E2', color: '#DC2626', label: '퇴실' },
+  supplies: { bg: '#FFEDD5', color: '#C2410C', label: '물품' },
+};
+
+function timeAgo(dateStr: string): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  const now = Date.now();
+  const diff = now - d.getTime();
+  if (diff < 60000) return '방금';
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}분 전`;
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}시간 전`;
+  const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return '어제';
+  if (diff < 604800000) return `${Math.floor(diff / 86400000)}일 전`;
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
 export default function DashboardDesktop() {
+  const router = useRouter();
   /* ─── Data (same as DashboardMobile) ─── */
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
@@ -157,6 +183,26 @@ export default function DashboardDesktop() {
       setWorkers(Array.isArray(workerData) ? workerData : []);
       if (taskData?.success && Array.isArray(taskData.data)) setTasks(taskData.data);
       setLoading(false);
+    });
+  }, []);
+
+  /* ─── Applications ─── */
+  const [apps, setApps] = useState<AppItem[]>([]);
+  useEffect(() => {
+    const TYPES = ['tour', 'cleaning', 'aircon', 'checkout', 'supplies'];
+    Promise.all(TYPES.map(t =>
+      fetch(`/api/apply/${t}`).then(r => r.json())
+        .then((d: any[]) => (Array.isArray(d) ? d : []).map(item => ({
+          id: item.id || '', name: item.name || item.tenantName || '', phone: item.phone || '',
+          status: item.status || '', createdAt: item.createdAt || '',
+          _type: t, houseName: item.houseName || '', roomCode: item.roomCode || '',
+        })))
+        .catch(() => [])
+    )).then(results => {
+      const pending = results.flat()
+        .filter(a => a.status === '신청접수' || a.status === '처리중')
+        .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      setApps(pending);
     });
   }, []);
 
@@ -458,6 +504,47 @@ export default function DashboardDesktop() {
               <div style={{ fontSize: 14, fontWeight: 700, color: T.text, marginTop: 4 }}>
                 {loading ? '' : `${unpaidAmount.toLocaleString()}원`}
               </div>
+            </div>
+
+            {/* Card 4: 미처리 신청 */}
+            <div style={{ background: T.card, borderRadius: 12, padding: 16, border: `1px solid ${T.line}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: T.text }}>미처리 신청</span>
+                  {apps.length > 0 && <span style={{ fontSize: 13, fontWeight: 700, color: '#FF6B6B' }}>{apps.length}건</span>}
+                </div>
+                <button onClick={() => router.push('/applications')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: T.textSub, fontFamily: 'inherit' }}>전체보기 &rsaquo;</button>
+              </div>
+              {apps.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 24, fontSize: 13, color: T.textMute }}>새로운 신청이 없어요</div>
+              ) : (
+                <div>
+                  {apps.slice(0, 5).map((a, i) => {
+                    const badge = APP_BADGE[a._type] || APP_BADGE.tour;
+                    const stBadge = a.status === '신청접수'
+                      ? { label: '신규', bg: '#FEF3C7', color: '#92400E' }
+                      : { label: '처리중', bg: '#DBEAFE', color: '#1E40AF' };
+                    const sub = [a.houseName, a.roomCode].filter(Boolean).join(' ');
+                    const timePart = timeAgo(a.createdAt);
+                    const subLine = sub ? `${sub} · ${timePart}` : timePart;
+                    return (
+                      <div key={`${a._type}-${a.id}`}
+                        onClick={() => router.push('/applications')}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', cursor: 'pointer',
+                          borderTop: i > 0 ? `1px solid ${T.divider}` : 'none',
+                        }}>
+                        <div style={{ width: 44, height: 44, borderRadius: 10, background: badge.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: badge.color, flexShrink: 0 }}>{badge.label}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: T.text }}>{a.name || '(이름 없음)'}</div>
+                          <div style={{ fontSize: 11, color: T.textMute, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subLine}</div>
+                        </div>
+                        <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, background: stBadge.bg, color: stBadge.color, fontWeight: 600, flexShrink: 0 }}>{stBadge.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>
