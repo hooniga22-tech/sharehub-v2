@@ -337,53 +337,55 @@ export default function IssuesDesktop() {
           ))}
         </nav>
 
-        {/* Sub-tab section */}
-        <div style={{ borderTop: `1px solid ${T.divider}`, padding: '14px 16px 20px' }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: T.textMute, marginBottom: 10 }}>일정/이슈 세부</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      </div>
+
+      {/* ═══ Right Main ═══ */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Page header */}
+        <div style={{ background: T.card, borderBottom: `1px solid ${T.line}`, flexShrink: 0 }}>
+          <div style={{ height: 70, padding: '0 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: T.text }}>
+                {tab === 'schedule' ? '일정 관리' : tab === 'workers' ? '담당자' : '정산'}
+              </div>
+              <div style={{ fontSize: 13, color: T.textMute }}>
+                {tab === 'schedule' ? `${calYear}년 ${calMonth + 1}월 · 전체 일정 파악` : tab === 'workers' ? '담당자 현황 및 일정' : '월별 정산 내역'}
+              </div>
+            </div>
+            {tab === 'schedule' && (
+              <Link href="/issues/register" style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '9px 16px', borderRadius: 8, border: 'none',
+                background: T.blue, color: '#fff',
+                fontSize: 13, fontWeight: 600, textDecoration: 'none', cursor: 'pointer',
+              }}>
+                <IconPlus />
+                새 일정
+              </Link>
+            )}
+          </div>
+          {/* Tab bar */}
+          <div style={{ display: 'flex', padding: '0 24px' }}>
             {([
               { key: 'schedule' as const, label: '일정' },
               { key: 'workers' as const, label: '담당자' },
               { key: 'settle' as const, label: '정산' },
-            ]).map(s => (
-              <button key={s.key} onClick={() => setTab(s.key)} style={{
-                display: 'block', width: '100%', textAlign: 'left',
-                padding: '8px 12px', borderRadius: 6,
-                background: tab === s.key ? T.blueLight : 'transparent',
-                color: tab === s.key ? T.blueDark : T.textSub,
-                fontWeight: tab === s.key ? 600 : 400,
-                fontSize: 13, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+            ]).map(t => (
+              <button key={t.key} onClick={() => setTab(t.key)} style={{
+                padding: '10px 16px', background: 'none', border: 'none',
+                borderBottom: tab === t.key ? `2px solid ${T.blue}` : '2px solid transparent',
+                color: tab === t.key ? T.blue : T.textMute,
+                fontWeight: tab === t.key ? 600 : 400,
+                fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
               }}>
-                {s.label}
+                {t.label}
               </button>
             ))}
           </div>
         </div>
-      </div>
 
-      {/* ═══ Right Main ═══ */}
       {tab === 'schedule' ? (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          {/* Page header */}
-          <div style={{
-            height: 70, padding: '0 28px', background: T.card,
-            borderBottom: `1px solid ${T.line}`,
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0,
-          }}>
-            <div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: T.text }}>일정 관리</div>
-              <div style={{ fontSize: 13, color: T.textMute }}>{calYear}년 {calMonth + 1}월 · 전체 일정 파악</div>
-            </div>
-            <Link href="/issues/register" style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '9px 16px', borderRadius: 8, border: 'none',
-              background: T.blue, color: '#fff',
-              fontSize: 13, fontWeight: 600, textDecoration: 'none', cursor: 'pointer',
-            }}>
-              <IconPlus />
-              새 일정
-            </Link>
-          </div>
 
           {/* Body: calendar + panel */}
           <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
@@ -546,14 +548,12 @@ export default function IssuesDesktop() {
       ) : (
         /* ═══ Workers / Settle tab: embed IssuesMobile ═══ */
         <div style={{ flex: 1, overflowY: 'auto', background: T.bg }}>
-          <div style={{ padding: '24px 28px 0' }}>
-            <div style={{ fontSize: 20, fontWeight: 700, color: T.text }}>{tab === 'workers' ? '담당자' : '정산'}</div>
-          </div>
-          <div style={{ maxWidth: 500, margin: '40px auto', background: T.card, borderRadius: 12, border: `1px solid ${T.line}`, overflow: 'hidden' }}>
-            <IssuesMobile initialTab={tab} />
+          <div style={{ maxWidth: 500, margin: '40px auto', padding: '24px 0', background: T.card, borderRadius: 12, border: `1px solid ${T.line}`, overflow: 'hidden' }}>
+            <IssuesMobile key={tab} initialTab={tab} />
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

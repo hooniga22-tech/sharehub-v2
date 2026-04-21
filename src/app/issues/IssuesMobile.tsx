@@ -19,7 +19,7 @@ type StaffStat = {
   담당자ID: string; 이름: string; count: number; amount: number; 링크토큰: string;
 };
 
-type MainTab = 'schedule' | 'workers' | 'settle' | 'inventory';
+type MainTab = 'schedule' | 'workers' | 'settle';
 type Category = '전체' | '청소' | '수리' | '기타';
 
 type InventoryTask = {
@@ -472,7 +472,6 @@ export default function IssuesMobile({ initialTab }: { initialTab?: MainTab } = 
     { key: 'schedule', label: '일정' },
     { key: 'workers', label: '담당자' },
     { key: 'settle', label: '정산' },
-    { key: 'inventory', label: '인벤토리' },
   ];
 
   return (
@@ -781,148 +780,6 @@ export default function IssuesMobile({ initialTab }: { initialTab?: MainTab } = 
                       <p style={{ fontSize: 11, color: GRAY }}>{info.count}건 완료</p>
                     </div>
                     <p style={{ fontSize: 14, fontWeight: 700, color: '#191919' }}>{info.amount.toLocaleString()}원</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ========== 인벤토리 탭 ========== */}
-      {mainTab === 'inventory' && (
-        <div style={{ padding: '14px 16px 0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <span style={{ fontSize: 12, color: GRAY }}>
-              마감일 미정 · 총 {inventory.length}건
-            </span>
-            <button
-              onClick={loadInventory}
-              style={{
-                background: 'none', border: 'none', color: BLUE,
-                fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
-              }}
-            >
-              새로고침
-            </button>
-          </div>
-
-          {inventoryLoading ? (
-            <div style={{ textAlign: 'center', padding: '60px 0', color: GRAY, fontSize: 13 }}>불러오는 중...</div>
-          ) : inventory.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px 0', color: GRAY, fontSize: 13 }}>
-              인벤토리에 할일이 없어요
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {inventory.map(t => (
-                <div
-                  key={t.id}
-                  style={{
-                    background: '#fff', borderRadius: 12, padding: '12px 14px',
-                    border: `1px solid ${t.isUrgent ? BLUE : '#EAECEF'}`,
-                    display: 'flex', flexDirection: 'column', gap: 6,
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{
-                        fontSize: 14, fontWeight: 600, color: '#191919',
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      }}>
-                        {t.title || '제목 없음'}
-                        {t.houseName && (
-                          <span style={{ fontSize: 12, color: GRAY, fontWeight: 400, marginLeft: 6 }}>
-                            ({t.houseName}{t.roomCode ? ` ${t.roomCode}` : ''})
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, position: 'relative' }}>
-                      {t.tags.slice(0, 1).map(tag => (
-                        <span key={tag} style={{
-                          fontSize: 10, fontWeight: 600,
-                          padding: '3px 8px', borderRadius: 999,
-                          background: '#F2F4F6', color: '#4E5968',
-                        }}>
-                          #{tag}
-                        </span>
-                      ))}
-                      <button
-                        aria-label="메뉴"
-                        onClick={() => setOpenMenuId(openMenuId === t.id ? null : t.id)}
-                        style={{
-                          width: 28, height: 28, borderRadius: 8,
-                          padding: 0, border: 'none', background: 'transparent',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="#8B95A1" aria-hidden>
-                          <circle cx="5" cy="12" r="1.8" />
-                          <circle cx="12" cy="12" r="1.8" />
-                          <circle cx="19" cy="12" r="1.8" />
-                        </svg>
-                      </button>
-                      {openMenuId === t.id && (
-                        <>
-                          <div
-                            onClick={() => setOpenMenuId(null)}
-                            style={{ position: 'fixed', inset: 0, zIndex: 40 }}
-                          />
-                          <div style={{
-                            position: 'absolute', top: 32, right: 0, zIndex: 41,
-                            minWidth: 140, background: '#fff', borderRadius: 10,
-                            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                            overflow: 'hidden',
-                          }}>
-                            <button
-                              onClick={() => openEditModal(t)}
-                              style={menuItemStyle('#191919')}
-                            >
-                              수정하기
-                            </button>
-                            <div style={{ height: 1, background: '#F2F4F6' }} />
-                            <button
-                              onClick={() => deleteTask(t)}
-                              style={menuItemStyle(RED)}
-                            >
-                              삭제하기
-                            </button>
-                            <div style={{ height: 1, background: '#F2F4F6' }} />
-                            <button
-                              onClick={() => setOpenMenuId(null)}
-                              style={menuItemStyle('#8B95A1')}
-                            >
-                              취소
-                            </button>
-                          </div>
-                        </>
-                      )}
-                      <button
-                        onClick={() => openScheduleModal(t)}
-                        style={{
-                          padding: '6px 12px', borderRadius: 8, border: 'none',
-                          background: BLUE, color: '#fff',
-                          fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                          fontFamily: 'inherit',
-                        }}
-                      >
-                        설정
-                      </button>
-                    </div>
-                  </div>
-                  <div style={{
-                    fontSize: 11, color: GRAY,
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}>
-                    {t.assignedTo || '담당자 미정'}
-                    {t.memo ? ` · ${t.memo}` : ''}
-                    {t.isUrgent && (
-                      <span style={{ color: BLUE, fontWeight: 600, marginLeft: 6 }}>
-                        · 긴급
-                      </span>
-                    )}
                   </div>
                 </div>
               ))}
