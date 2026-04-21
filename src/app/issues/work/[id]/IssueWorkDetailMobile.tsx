@@ -60,6 +60,17 @@ export default function IssueWorkDetailMobile() {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Partial<Work>>({})
   const [saving, setSaving] = useState(false)
+  const [houseNames, setHouseNames] = useState<string[]>([])
+  const [staffNames, setStaffNames] = useState<string[]>([])
+
+  useEffect(() => {
+    fetch('/api/houses').then(r => r.json()).then((d: any[]) => {
+      setHouseNames((Array.isArray(d) ? d : []).map(h => h['지점명']).filter(Boolean).sort())
+    }).catch(() => {})
+    fetch('/api/workers/staff').then(r => r.json()).then((d: any[]) => {
+      setStaffNames((Array.isArray(d) ? d : []).map(s => s['이름']).filter(Boolean).sort())
+    }).catch(() => {})
+  }, [])
 
   // 요청사항: 자동 저장 (debounced on blur)
   const [request, setRequest] = useState('')
@@ -211,12 +222,16 @@ export default function IssueWorkDetailMobile() {
         <div style={ROW}>
           <span style={LABEL}>지점</span>
           {editing ? (
-            <input
-              type="text"
+            <select
               value={draft.지점명 || ''}
               onChange={e => setDraft(d => ({ ...d, 지점명: e.target.value }))}
-              style={INPUT}
-            />
+              style={{ ...INPUT, width: 160 }}
+            >
+              {draft.지점명 && !houseNames.includes(draft.지점명) && (
+                <option value={draft.지점명}>{draft.지점명}</option>
+              )}
+              {houseNames.map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
           ) : (
             <span style={VALUE}>{work.지점명 || '-'}</span>
           )}
@@ -253,12 +268,16 @@ export default function IssueWorkDetailMobile() {
         <div style={ROW}>
           <span style={LABEL}>담당자</span>
           {editing ? (
-            <input
-              type="text"
+            <select
               value={draft.담당자명 || ''}
               onChange={e => setDraft(d => ({ ...d, 담당자명: e.target.value }))}
-              style={INPUT}
-            />
+              style={{ ...INPUT, width: 160 }}
+            >
+              {draft.담당자명 && !staffNames.includes(draft.담당자명) && (
+                <option value={draft.담당자명}>{draft.담당자명}</option>
+              )}
+              {staffNames.map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
           ) : (
             <span style={VALUE}>{work.담당자명 || '-'}</span>
           )}
