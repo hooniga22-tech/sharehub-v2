@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import IssuesMobile from './IssuesMobile';
 
@@ -137,6 +138,7 @@ const MENU = [
 
 /* ─── Main Component ─── */
 export default function IssuesDesktop() {
+  const router = useRouter();
   const [tab, setTab] = useState<DesktopTab>('schedule');
 
   /* ─── Data fetching (same sources as IssuesMobile) ─── */
@@ -246,7 +248,7 @@ export default function IssuesDesktop() {
   }, [worksInMonth, issuesInMonth, tasksInMonth, selCat, prefix]);
 
   /* Items for the selected date detail panel */
-  type DetailItem = { id: string; title: string; cat: 'clean' | 'repair' | 'etc'; location: string; assignee: string; status: string };
+  type DetailItem = { id: string; title: string; cat: 'clean' | 'repair' | 'etc'; location: string; assignee: string; status: string; source: 'work' | 'issue' | 'task' };
   const selectedDateItems = useMemo((): DetailItem[] => {
     if (!selectedDate) return [];
     const items: DetailItem[] = [];
@@ -259,14 +261,14 @@ export default function IssuesDesktop() {
         if (selCat === '수리' && cat !== 'repair') return;
         if (selCat === '기타' && cat !== 'etc') return;
       }
-      items.push({ id: w.용역ID, title: `${w.지점명} · ${w.작업종류}`, cat, location: w.지점명, assignee: w.담당자명, status: w.완료여부 === 'Y' ? '완료' : '예정' });
+      items.push({ id: w.용역ID, title: `${w.지점명} · ${w.작업종류}`, cat, location: w.지점명, assignee: w.담당자명, status: w.완료여부 === 'Y' ? '완료' : '예정', source: 'work' });
     });
 
     issuesInMonth.forEach(i => {
       if ((i.createdAt || '').slice(0, 10) !== selectedDate) return;
       if (i.status === '완료') return;
       if (selCat !== '전체' && selCat !== '수리') return;
-      items.push({ id: i.id, title: i.title, cat: 'repair', location: `${i.houseName} ${i.roomCode || ''}`.trim(), assignee: i.assignee || '', status: i.status });
+      items.push({ id: i.id, title: i.title, cat: 'repair', location: `${i.houseName} ${i.roomCode || ''}`.trim(), assignee: i.assignee || '', status: i.status, source: 'issue' });
     });
 
     tasksInMonth.forEach(t => {
@@ -279,7 +281,7 @@ export default function IssuesDesktop() {
         if (selCat === '수리' && cat !== 'repair') return;
         if (selCat === '기타' && cat !== 'etc') return;
       }
-      items.push({ id: t.id, title: t.title || `${t.houseName} 작업`, cat, location: `${t.houseName} ${t.roomCode || ''}`.trim(), assignee: t.assignedTo || '', status: t.status });
+      items.push({ id: t.id, title: t.title || `${t.houseName} 작업`, cat, location: `${t.houseName} ${t.roomCode || ''}`.trim(), assignee: t.assignedTo || '', status: t.status, source: 'task' });
     });
 
     return items;
@@ -510,10 +512,14 @@ export default function IssuesDesktop() {
                     {selectedDateItems.map(item => {
                       const colors = CAT_COLORS[item.cat];
                       const catLabel = item.cat === 'clean' ? '청소' : item.cat === 'repair' ? '수리' : '기타';
+                      const href = item.source === 'work' ? `/issues/work/${item.id}` : item.source === 'issue' ? `/issues/${item.id}` : null;
                       return (
-                        <div key={item.id} style={{
-                          background: T.bg, borderRadius: 10, padding: '12px 14px',
-                        }}>
+                        <div key={item.id}
+                          onClick={() => { if (href) router.push(href); }}
+                          style={{
+                            background: T.bg, borderRadius: 10, padding: '12px 14px',
+                            cursor: href ? 'pointer' : 'default',
+                          }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                             <span style={{
                               fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
