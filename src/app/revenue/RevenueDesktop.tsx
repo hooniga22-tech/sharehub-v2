@@ -113,7 +113,7 @@ export default function RevenueDesktop() {
 
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
           {/* Left: House list */}
-          <div style={{ width: 360, background: T.card, borderRight: `1px solid ${T.line}`, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+          <div style={{ width: 280, background: T.card, borderRight: `1px solid ${T.line}`, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
             {/* Month nav */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 16px', borderBottom: `1px solid ${T.divider}` }}>
               <button onClick={prevMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}><IconChevronLeft /></button>
@@ -130,7 +130,7 @@ export default function RevenueDesktop() {
             {guList.length > 0 && (
               <div style={{ display: 'flex', gap: 5, padding: '4px 16px 10px', overflowX: 'auto', flexShrink: 0 }}>
                 {['전체', ...guList].map(g => (
-                  <button key={g} onClick={() => setGu(g)} style={{ padding: '4px 10px', borderRadius: 100, fontSize: 11, fontWeight: gu === g ? 600 : 400, background: gu === g ? T.text : T.card, color: gu === g ? '#fff' : T.textSub, border: gu === g ? 'none' : `1px solid ${T.line}`, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, fontFamily: 'inherit' }}>{g}</button>
+                  <button key={g} onClick={() => setGu(g)} style={{ padding: '3px 8px', borderRadius: 100, fontSize: 10, fontWeight: gu === g ? 600 : 400, background: gu === g ? T.text : T.card, color: gu === g ? '#fff' : T.textSub, border: gu === g ? 'none' : `1px solid ${T.line}`, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, fontFamily: 'inherit' }}>{g}</button>
                 ))}
               </div>
             )}
@@ -138,7 +138,7 @@ export default function RevenueDesktop() {
             <div style={{ flex: 1, overflowY: 'auto' }}>
               {/* "전체" row */}
               <div onClick={() => setSelected(null)} style={{
-                padding: '14px 16px', cursor: 'pointer', borderBottom: `1px solid ${T.divider}`,
+                padding: '12px 14px', cursor: 'pointer', borderBottom: `1px solid ${T.divider}`,
                 background: selected === null ? T.blueVeryLight : '#FAFBFC',
                 borderLeft: selected === null ? `3px solid ${T.blue}` : '3px solid transparent',
               }}>
@@ -158,13 +158,14 @@ export default function RevenueDesktop() {
                 <div style={{ textAlign: 'center', padding: '40px 0', color: T.textMute, fontSize: 12 }}>불러오는 중...</div>
               ) : filtered.map((h, i) => (
                 <div key={h.house} onClick={() => setSelected(h.house)} style={{
-                  padding: '12px 16px', cursor: 'pointer', borderBottom: `1px solid ${T.divider}`,
+                  padding: '10px 14px', cursor: 'pointer', borderBottom: `1px solid ${T.divider}`,
                   background: selected === h.house ? T.blueVeryLight : T.card,
                   borderLeft: selected === h.house ? `3px solid ${T.blue}` : '3px solid transparent',
+                  minHeight: 48,
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{h.house}</div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.house}</div>
                       <div style={{ fontSize: 11, color: T.textMute }}>{h.gu}</div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
@@ -297,7 +298,7 @@ export default function RevenueDesktop() {
                     {/* Room list */}
                     <div style={{ fontSize: 14, fontWeight: 700, color: T.text, marginBottom: 10 }}>방별 수입 현황</div>
                     <div style={{ background: T.card, borderRadius: 12, border: `1px solid ${T.line}`, overflow: 'hidden' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 90px 90px 90px', borderBottom: `1px solid ${T.line}`, background: '#FAFBFC' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr 100px 100px 100px', borderBottom: `1px solid ${T.line}`, background: '#FAFBFC' }}>
                         {['방', '입주자', '월세', '관리비', '합계'].map(h => (
                           <div key={h} style={{ padding: '8px 12px', fontSize: 11, fontWeight: 600, color: T.textMute, textAlign: h === '방' || h === '입주자' ? 'left' : 'right' }}>{h}</div>
                         ))}
@@ -306,7 +307,7 @@ export default function RevenueDesktop() {
                         const rent = Number(t.월세) || 0;
                         const mgmt = Number(t.관리비) || 0;
                         return (
-                          <div key={t.방코드} style={{ display: 'grid', gridTemplateColumns: '80px 1fr 90px 90px 90px', borderBottom: `1px solid ${T.divider}` }}>
+                          <div key={t.방코드} style={{ display: 'grid', gridTemplateColumns: '70px 1fr 100px 100px 100px', borderBottom: `1px solid ${T.divider}` }}>
                             <div style={{ padding: '10px 12px', fontSize: 12, fontWeight: 600, color: T.textSub }}>{t.방코드}</div>
                             <div style={{ padding: '10px 12px', fontSize: 13, fontWeight: 600, color: T.text }}>{t.이름}</div>
                             <div style={{ padding: '10px 12px', fontSize: 12, color: T.textSub, textAlign: 'right' }}>{rent > 0 ? fmtShort(rent) : '-'}</div>
@@ -315,7 +316,7 @@ export default function RevenueDesktop() {
                           </div>
                         );
                       })}
-                      <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 90px 90px 90px', background: '#FAFBFC', borderTop: `1px solid ${T.line}` }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr 100px 100px 100px', background: '#FAFBFC', borderTop: `1px solid ${T.line}` }}>
                         <div style={{ padding: '10px 12px' }} />
                         <div style={{ padding: '10px 12px', fontSize: 12, fontWeight: 700, color: T.text }}>합계</div>
                         <div style={{ padding: '10px 12px', fontSize: 12, fontWeight: 700, color: T.text, textAlign: 'right' }}>{fmtShort(selectedHouse.rentTotal)}</div>
