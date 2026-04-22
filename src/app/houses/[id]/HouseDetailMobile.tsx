@@ -253,7 +253,7 @@ export default function HouseDetailMobile() {
                 ))}
                 {investor.investor?.['링크토큰'] && (
                   <div style={{ padding: '8px 0' }}>
-                    <button onClick={() => { copyText(`${window.location.origin}/investor/${investor.investor['링크토큰']}`); }}
+                    <button onClick={() => { copyText(`${window.location.origin}/portal/investor/${investor.investor['링크토큰']}`); }}
                       style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #e5e8eb', background: '#fff', fontSize: 12, fontWeight: 600, color: BLUE, cursor: 'pointer', fontFamily: 'inherit' }}>
                       🔗 투자자 링크 복사
                     </button>

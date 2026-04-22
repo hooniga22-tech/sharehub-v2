@@ -708,7 +708,7 @@ export default function IssuesMobile({ initialTab, hideChrome }: { initialTab?: 
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                     {s.링크토큰 ? (
-                      <Link href={`/worker/${s.링크토큰}`}
+                      <Link href={`/portal/worker/${s.링크토큰}`}
                         style={{
                           padding: '6px 12px', borderRadius: 8,
                           border: `1px solid ${BLUE}`, color: BLUE,

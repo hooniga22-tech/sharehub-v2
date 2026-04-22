@@ -130,7 +130,7 @@ export default function WorkersPage() {
   const copyLink = (name: string) => {
     const t = TOKEN_MAP[name];
     if (!t) return;
-    navigator.clipboard?.writeText(`${window.location.origin}/worker/${t}`);
+    navigator.clipboard?.writeText(`${window.location.origin}/portal/worker/${t}`);
     setCopiedStaff(name);
     setTimeout(() => setCopiedStaff(''), 1500);
   };
@@ -213,7 +213,7 @@ export default function WorkersPage() {
               </div>
               {staffToken && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <button onClick={() => window.open(`/worker/${staffToken}`, '_blank')}
+                  <button onClick={() => window.open(`/portal/worker/${staffToken}`, '_blank')}
                     style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: BLUE, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
                     개인 페이지
                   </button>

@@ -273,7 +273,7 @@ export default function WorkerDetailPage() {
                 <>
                   <button
                     onClick={() => {
-                      const url = `${window.location.origin}/worker/${data.token}`;
+                      const url = `${window.location.origin}/portal/worker/${data.token}`;
                       navigator.clipboard?.writeText(url).then(() => {
                         setCopied(true);
                         setTimeout(() => setCopied(false), 1500);
@@ -291,7 +291,7 @@ export default function WorkerDetailPage() {
                     {copied ? '복사됨!' : '링크 복사'}
                   </button>
                   <button
-                    onClick={() => window.open(`/worker/${data.token}`, '_blank')}
+                    onClick={() => window.open(`/portal/worker/${data.token}`, '_blank')}
                     style={{
                       background: PRIMARY, border: 'none',
                       borderRadius: 8, padding: '6px 10px',

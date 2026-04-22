@@ -458,7 +458,7 @@ export default function TenantsDesktop() {
                 <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
                   <button
                     onClick={() => {
-                      const url = `${window.location.origin}/tenant/${selected['링크토큰']}`;
+                      const url = `${window.location.origin}/portal/tenant/${selected['링크토큰']}`;
                       navigator.clipboard?.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });
                     }}
                     style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '8px 0', borderRadius: 8, border: `1px solid ${T.line}`, background: T.card, color: T.textSub, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
@@ -467,7 +467,7 @@ export default function TenantsDesktop() {
                     {copied ? '복사됨!' : '링크 복사'}
                   </button>
                   <button
-                    onClick={() => window.open(`/tenant/${selected['링크토큰']}`, '_blank')}
+                    onClick={() => window.open(`/portal/tenant/${selected['링크토큰']}`, '_blank')}
                     style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '8px 0', borderRadius: 8, border: 'none', background: T.blue, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
                   >
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
