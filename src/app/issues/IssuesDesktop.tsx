@@ -151,11 +151,9 @@ export default function IssuesDesktop() {
     Promise.all([
       fetch('/api/issues').then(r => r.json()),
       fetch('/api/workers').then(r => r.json()),
-      fetch('/api/tasks/active', { cache: 'no-store' }).then(r => r.json()).catch(() => null),
-    ]).then(([issueData, workData, taskData]) => {
+    ]).then(([issueData, workData]) => {
       setIssues(issueData.issues || []);
       setWorks(Array.isArray(workData) ? workData : []);
-      if (taskData?.success && Array.isArray(taskData.data)) setTasks(taskData.data);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);

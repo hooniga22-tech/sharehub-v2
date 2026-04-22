@@ -93,19 +93,9 @@ export default function IssuesMobile({ initialTab, hideChrome }: { initialTab?: 
   const [editDeleting, setEditDeleting] = useState(false);
 
   const loadInventory = () => {
-    setInventoryLoading(true);
-    // 인벤토리 탭(strict)과 일정/홈에서 쓰는 active 데이터(예정+인벤토리)를 병렬 로드.
-    Promise.all([
-      fetch('/api/tasks/inventory', { cache: 'no-store' }).then(r => r.json()).catch(() => null),
-      fetch('/api/tasks/active', { cache: 'no-store' }).then(r => r.json()).catch(() => null),
-    ])
-      .then(([invRes, actRes]) => {
-        if (invRes?.success && Array.isArray(invRes.data)) setInventory(invRes.data);
-        else setInventory([]);
-        if (actRes?.success && Array.isArray(actRes.data)) setTasks(actRes.data);
-        else setTasks([]);
-      })
-      .finally(() => setInventoryLoading(false));
+    // tasks/active, tasks/inventory API removed - states stay empty
+    setInventory([]);
+    setTasks([]);
   };
 
   useEffect(() => {

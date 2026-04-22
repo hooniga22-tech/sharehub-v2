@@ -98,9 +98,7 @@ export default function DashboardMobile() {
     fetch('/api/issues').then(r => r.json()).then(d => setIssues(d.issues || [])).catch(() => {}).finally(() => setLoadingI(false));
     fetch(`/api/payments?year=${now.getFullYear()}&month=${now.getMonth() + 1}`).then(r => r.json()).then(d => setPayments(Array.isArray(d) ? d : [])).catch(() => {}).finally(() => setLoadingP(false));
     fetch('/api/workers').then(r => r.json()).then(d => setWorkers(Array.isArray(d) ? d : [])).catch(() => {});
-    fetch('/api/tasks/active').then(r => r.json()).then(d => {
-      if (d?.success && Array.isArray(d.data)) setTasks(d.data);
-    }).catch(() => {});
+    // tasks/active API removed - tasks state stays empty
   }, []);
 
   // KPIs

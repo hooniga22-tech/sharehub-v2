@@ -53,8 +53,8 @@
 - [x] `/api/utility` GET - Supabase expenses+branches+expense_categories - `src/app/api/utility/route.ts`
 - [x] `/api/duty` GET - Supabase duty_schedules+tenants+rooms - `src/app/api/duty/route.ts`
 - [x] `/api/duty/exchange` - 삭제됨 (호출처 없음, 당번 교환 이력 미사용)
-- [ ] `/api/tasks/active` GET - Sheets 유지 - 프론트엔드 4곳에서 호출, tasks 테이블 없음
-- [ ] `/api/tasks/inventory` GET - Sheets 유지 - 프론트엔드 1곳에서 호출, tasks 테이블 없음
+- [x] `/api/tasks/active` - 삭제 완료 (프론트엔드 호출 제거, API 파일 삭제)
+- [x] `/api/tasks/inventory` - 삭제 완료 (프론트엔드 호출 제거, API 파일 삭제)
 - [x] `/api/apply/tour` GET - Supabase tour_applications - `src/app/api/apply/tour/route.ts`
 - [x] `/api/apply/cleaning` GET - Supabase cleaning_applications - `src/app/api/apply/cleaning/route.ts`
 - [x] `/api/apply/aircon` GET - Supabase aircon_applications - `src/app/api/apply/aircon/route.ts`

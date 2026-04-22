@@ -175,13 +175,11 @@ export default function DashboardDesktop() {
       fetch('/api/issues').then(r => r.json()).catch(() => ({ issues: [] })),
       fetch(`/api/payments?year=${now.getFullYear()}&month=${now.getMonth() + 1}`).then(r => r.json()).catch(() => []),
       fetch('/api/workers').then(r => r.json()).catch(() => []),
-      fetch('/api/tasks/active').then(r => r.json()).catch(() => null),
-    ]).then(([tenantData, issueData, paymentData, workerData, taskData]) => {
+    ]).then(([tenantData, issueData, paymentData, workerData]) => {
       setTenants(Array.isArray(tenantData) ? tenantData : []);
       setIssues(issueData.issues || []);
       setPayments(Array.isArray(paymentData) ? paymentData : []);
       setWorkers(Array.isArray(workerData) ? workerData : []);
-      if (taskData?.success && Array.isArray(taskData.data)) setTasks(taskData.data);
       setLoading(false);
     });
   }, []);
