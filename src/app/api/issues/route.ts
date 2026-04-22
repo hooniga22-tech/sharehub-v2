@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { getSheetData, appendRow } from '@/lib/sheets'
 import { createAdminClient } from '@/lib/supabase/server'
 import { listOrEmpty } from '@/lib/supabase/helpers'
 
@@ -37,16 +36,29 @@ export async function GET(req: Request) {
   }
 }
 
-// POST는 Step 4.5에서 전환 예정 - Sheets 유지
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const rows = await getSheetData('이슈')
-    let maxNum = 0
-    for (const r of rows) { const m = r[0]?.match(/issue_(\d+)/); if (m) maxNum = Math.max(maxNum, Number(m[1])) }
-    const id = `issue_${String(maxNum + 1).padStart(4, '0')}`
-    const today = new Date().toISOString().slice(0, 10)
-    await appendRow('이슈', [id, body.houseName || '', body.roomCode || '', body.title || '', body.content || '', body.category || '기타', '접수', body.assignee || '', today, '', body.cost || 0, body.memo || ''])
+    const supabase = createAdminClient()
+    const id = `issue_${Date.now()}`
+
+    let branchId: string | null = null
+    if (body.houseName) {
+      const { data: b } = await supabase.from('branches').select('id').eq('name', body.houseName).limit(1).single()
+      branchId = b?.id || null
+    }
+    let workerId: string | null = null
+    if (body.assignee) {
+      const { data: w } = await supabase.from('workers').select('id').eq('name', body.assignee).limit(1).single()
+      workerId = w?.id || null
+    }
+
+    const { error } = await supabase.from('issues').insert({
+      id, branch_id: branchId, title: body.title || '', description: body.content || '',
+      category: body.category || '기타', status: 'pending',
+      worker_id: workerId, cost: Number(body.cost) || null, memo: body.memo || null,
+    })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ success: true, id })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })

@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { getSheetData, updateRow, deleteRow } from '@/lib/sheets'
 import { createAdminClient } from '@/lib/supabase/server'
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -22,19 +21,24 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   }
 }
 
-// PUT/DELETE는 Step 4.5에서 전환 - Sheets 유지
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const body = await req.json()
-    const rows = await getSheetData('이슈')
-    const idx = rows.findIndex(r => r[0] === id)
-    if (idx === -1) return NextResponse.json({ error: 'not found' }, { status: 404 })
-    const e = rows[idx]
-    const today = new Date().toISOString().slice(0, 10)
-    const newStatus = body.status ?? e[6]
-    const completedAt = newStatus === '완료' ? (body.completedAt ?? e[9] ?? today) : (body.completedAt ?? e[9] ?? '')
-    await updateRow('이슈', idx, [e[0], e[1], e[2], body.title ?? e[3], body.content ?? e[4], body.category ?? e[5], newStatus, body.assignee ?? e[7], e[8], completedAt, body.cost ?? e[10], body.memo ?? (e[11] || '')])
+    const supabase = createAdminClient()
+    const statusMap: Record<string, string> = { '접수': 'pending', '진행중': 'in_progress', '완료': 'done', '취소': 'cancelled' }
+    const update: Record<string, any> = {}
+    if (body.title !== undefined) update.title = body.title
+    if (body.content !== undefined) update.description = body.content
+    if (body.category !== undefined) update.category = body.category
+    if (body.status !== undefined) update.status = statusMap[body.status] || body.status
+    if (body.cost !== undefined) update.cost = Number(body.cost) || null
+    if (body.memo !== undefined) update.memo = body.memo
+    if (body.status === '완료' || body.completedAt) {
+      update.completed_date = body.completedAt || new Date().toISOString().slice(0, 10)
+    }
+    const { error } = await supabase.from('issues').update(update).eq('id', id)
+    if (error) return NextResponse.json({ error: 'not found' }, { status: 404 })
     return NextResponse.json({ success: true })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
@@ -44,10 +48,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const rows = await getSheetData('이슈')
-    const idx = rows.findIndex(r => r[0] === id)
-    if (idx === -1) return NextResponse.json({ error: 'not found' }, { status: 404 })
-    await deleteRow('이슈', idx)
+    const supabase = createAdminClient()
+    const { error } = await supabase.from('issues').delete().eq('id', id)
+    if (error) return NextResponse.json({ error: 'not found' }, { status: 404 })
     return NextResponse.json({ success: true })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })

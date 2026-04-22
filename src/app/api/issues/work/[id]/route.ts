@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getSheetWithHeaders, colIdx, updateRow, deleteRow } from '@/lib/sheets'
 import { createAdminClient } from '@/lib/supabase/server'
-
-const SHEET = '용역'
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -25,35 +22,45 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   }
 }
 
-// PATCH/DELETE는 Step 4.5 - Sheets 유지
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const body = await req.json()
-    const { headers, rows } = await getSheetWithHeaders(SHEET)
-    const idx = rows.findIndex(r => r[colIdx(headers, '용역ID')] === id)
-    if (idx === -1) return NextResponse.json({ error: 'not found' }, { status: 404 })
-    const row = [...rows[idx]]
-    while (row.length < headers.length) row.push('')
-    const editable = ['예정일', '지점명', '담당자명', '작업종류', '메모', '요청사항', '완료일', '정산금액', '완료여부']
-    for (const field of editable) {
-      if (body[field] !== undefined) {
-        const ci = colIdx(headers, field)
-        if (ci >= 0) {
-          let val = body[field]
-          if (field === '완료여부') val = val === true || val === 'Y' ? 'Y' : 'N'
-          if (field === '정산금액') val = String(Number(val) || 0)
-          row[ci] = val
-        }
-      }
+    const supabase = createAdminClient()
+    const update: Record<string, any> = {}
+
+    if (body.예정일 !== undefined) update.scheduled_date = body.예정일 || null
+    if (body.작업종류 !== undefined) update.category = body.작업종류
+    if (body.메모 !== undefined) update.memo = body.메모
+    if (body.요청사항 !== undefined) update.description = body.요청사항
+    if (body.정산금액 !== undefined) update.cost = Number(body.정산금액) || null
+    if (body.완료여부 !== undefined) {
+      const isDone = body.완료여부 === true || body.완료여부 === 'Y'
+      update.status = isDone ? 'done' : 'pending'
+      if (isDone && !body.완료일) update.completed_date = new Date().toISOString().slice(0, 10)
     }
-    const doneCol = colIdx(headers, '완료여부')
-    const doneAtCol = colIdx(headers, '완료일')
-    if (doneCol >= 0 && row[doneCol] === 'Y' && doneAtCol >= 0 && !row[doneAtCol]) {
-      row[doneAtCol] = new Date().toISOString().slice(0, 10)
+    if (body.완료일 !== undefined) update.completed_date = body.완료일 || null
+    if (body.지점명 !== undefined) {
+      const { data: b } = await supabase.from('branches').select('id').eq('name', body.지점명).limit(1).single()
+      if (b) update.branch_id = b.id
     }
-    await updateRow(SHEET, idx, row)
-    return NextResponse.json({ ...(await getUpdated(id, headers, rows, idx, row)) })
+    if (body.담당자명 !== undefined) {
+      const { data: w } = await supabase.from('workers').select('id').eq('name', body.담당자명).limit(1).single()
+      if (w) update.worker_id = w.id
+    }
+
+    const { error } = await supabase.from('issues').update(update).eq('id', id)
+    if (error) return NextResponse.json({ error: 'not found' }, { status: 404 })
+
+    // 업데이트된 데이터 반환
+    const { data: updated } = await supabase.from('issues').select('*, branches(name), workers(name)').eq('id', id).single()
+    const sm: Record<string, string> = { done: 'Y', pending: 'N', in_progress: 'N', cancelled: 'N' }
+    return NextResponse.json({
+      rowIndex: 0, 용역ID: id, 예정일: updated?.scheduled_date || '', 지점명: updated?.branches?.name || '',
+      담당자명: updated?.workers?.name || '', 작업종류: updated?.category || '',
+      정산금액: updated?.cost || 0, 메모: updated?.memo || '', 요청사항: updated?.description || '',
+      완료여부: sm[updated?.status] || 'N', 완료일: updated?.completed_date || '',
+    })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }
@@ -62,21 +69,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const { headers, rows } = await getSheetWithHeaders(SHEET)
-    const idx = rows.findIndex(r => r[colIdx(headers, '용역ID')] === id)
-    if (idx === -1) return NextResponse.json({ error: 'not found' }, { status: 404 })
-    await deleteRow(SHEET, idx)
+    const supabase = createAdminClient()
+    const { error } = await supabase.from('issues').delete().eq('id', id)
+    if (error) return NextResponse.json({ error: 'not found' }, { status: 404 })
     return NextResponse.json({ success: true })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
-  }
-}
-
-async function getUpdated(id: string, headers: string[], _rows: string[][], idx: number, row: string[]) {
-  const cell = (name: string) => { const i = colIdx(headers, name); return i >= 0 ? (row[i] || '') : '' }
-  return {
-    rowIndex: idx, 용역ID: id, 예정일: cell('예정일'), 지점명: cell('지점명'),
-    담당자명: cell('담당자명'), 작업종류: cell('작업종류'), 정산금액: Number(cell('정산금액')) || 0,
-    메모: cell('메모'), 요청사항: cell('요청사항'), 완료여부: cell('완료여부') as 'Y' | 'N', 완료일: cell('완료일'),
   }
 }
