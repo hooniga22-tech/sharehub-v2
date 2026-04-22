@@ -1,16 +1,25 @@
 import { NextResponse } from 'next/server'
 import { getSheetData, updateRow } from '@/lib/sheets'
+import { createAdminClient } from '@/lib/supabase/server'
+import { listOrEmpty } from '@/lib/supabase/helpers'
 
-// 지점 시트 (13열): [0]지점ID [1]지점명 [2]구 [3]주소 [4]현관비번 [5]와이파이SSID [6]와이파이PW
-// [7]집월세 [8]투자자토큰 [9]총방수 [10]건물주명 [11]건물주연락처 [12]메모
-
-function rowToHouse(r: string[], rowIndex: number) {
+// Supabase branches -> 프론트엔드 기대 필드명 매핑
+function branchToHouse(b: any, idx: number) {
   return {
-    _rowIndex: rowIndex,
-    지점ID: r[0] || '', 지점명: r[1] || '', 구: r[2] || '', 주소: r[3] || '',
-    현관비번: r[4] || '', 와이파이SSID: r[5] || '', 와이파이PW: r[6] || '',
-    집월세: r[7] || '', 투자자토큰: r[8] || '', 총방수: r[9] || '',
-    건물주명: r[10] || '', 건물주연락처: r[11] || '', 메모: r[12] || '',
+    _rowIndex: idx,
+    지점ID: b.id || '',
+    지점명: b.name || '',
+    구: b.district || '',
+    주소: b.address || '',
+    현관비번: b.door_code || '',
+    와이파이SSID: b.wifi_ssid || '',
+    와이파이PW: b.wifi_password || '',
+    집월세: b.contract_rent != null ? String(b.contract_rent) : '',
+    투자자토큰: b.investor_id || '',
+    총방수: '',
+    건물주명: b.landlord_name || '',
+    건물주연락처: b.landlord_phone || '',
+    메모: b.memo || '',
   }
 }
 
@@ -20,15 +29,18 @@ export async function GET(req: Request) {
     const id = searchParams.get('id')
     const gu = searchParams.get('gu')
 
-    const rows = await getSheetData('지점')
-    let houses = rows.map((r, i) => rowToHouse(r, i))
+    const supabase = createAdminClient()
+    let query = supabase.from('branches').select('*').order('name')
+    if (gu) query = query.eq('district', gu)
+
+    const rows = await listOrEmpty<any>(query)
+    let houses = rows.map((r, i) => branchToHouse(r, i))
 
     if (id) {
       const found = houses.find(h => h.지점ID === id)
       if (!found) return NextResponse.json({ error: '없음' }, { status: 404 })
       return NextResponse.json(found)
     }
-    if (gu) houses = houses.filter(h => h.구 === gu)
 
     return NextResponse.json(houses)
   } catch (e) {
@@ -37,6 +49,7 @@ export async function GET(req: Request) {
   }
 }
 
+// PUT은 Step 4.4에서 전환 예정 - Sheets 유지
 export async function PUT(req: Request) {
   try {
     const body = await req.json()

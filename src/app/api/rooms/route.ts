@@ -1,25 +1,33 @@
 import { NextResponse } from 'next/server'
-import { getSheetData } from '@/lib/sheets'
+import { createAdminClient } from '@/lib/supabase/server'
+import { listOrEmpty } from '@/lib/supabase/helpers'
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
     const houseId = searchParams.get('houseId')
     const houseName = searchParams.get('houseName')
-    const rows = await getSheetData('방')
-    let rooms = rows.map((row, index) => ({
-      _rowIndex: index,
-      id: row[0] || '',
-      houseId: row[1] || '',
-      houseName: row[2] || '',
-      roomCode: row[3] || '',
-      roomType: row[4] || '',
-      area: row[5] || '',
-      baseRent: Number(row[6]) || 0,
-      memo: row[7] || '',
+
+    const supabase = createAdminClient()
+    let query = supabase.from('rooms').select('*, branches!inner(name)').order('room_code')
+
+    if (houseId) query = query.eq('branch_id', houseId)
+    if (houseName) query = query.eq('branches.name', houseName)
+
+    const rows = await listOrEmpty<any>(query)
+
+    const rooms = rows.map((r: any, i: number) => ({
+      _rowIndex: i,
+      id: r.id || '',
+      houseId: r.branch_id || '',
+      houseName: r.branches?.name || '',
+      roomCode: r.room_code || '',
+      roomType: r.room_type || '',
+      area: r.area || '',
+      baseRent: r.base_rent || 0,
+      memo: r.memo || '',
     }))
-    if (houseId) rooms = rooms.filter(r => r.houseId === houseId)
-    if (houseName) rooms = rooms.filter(r => r.houseName === houseName)
+
     return NextResponse.json(rooms)
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })

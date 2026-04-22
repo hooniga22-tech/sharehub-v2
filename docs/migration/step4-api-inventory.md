@@ -14,18 +14,18 @@
 
 지점, 방, 투자자, 워커, 플랫폼 등 변경이 거의 없는 마스터 데이터의 GET 메서드.
 
-- [ ] `/api/houses` GET - Sheets - `src/app/api/houses/route.ts`
-- [ ] `/api/houses/:id` GET - Sheets - `src/app/api/houses/[id]/route.ts`
-- [ ] `/api/houses/districts` GET - Sheets - `src/app/api/houses/districts/route.ts`
-- [ ] `/api/rooms` GET - Sheets - `src/app/api/rooms/route.ts`
-- [ ] `/api/investors` GET - Sheets - `src/app/api/investors/route.ts`
-- [ ] `/api/workers` GET - Sheets - `src/app/api/workers/route.ts`
-- [ ] `/api/workers/list` GET - Sheets - `src/app/api/workers/list/route.ts`
-- [ ] `/api/workers/staff` GET - Sheets - `src/app/api/workers/staff/route.ts`
-- [ ] `/api/workers/by-token/:token` GET - Sheets - `src/app/api/workers/by-token/[token]/route.ts`
-- [ ] `/api/management/workers` GET - Sheets - `src/app/api/management/workers/route.ts`
-- [ ] `/api/management/workers/:id` GET - Sheets - `src/app/api/management/workers/[id]/route.ts`
-- [ ] `/api/management/workers/:id/jobs` GET - Sheets - `src/app/api/management/workers/[id]/jobs/route.ts`
+- [x] `/api/houses` GET - Supabase branches - `src/app/api/houses/route.ts`
+- [x] `/api/houses/:id` GET - Supabase branches - `src/app/api/houses/[id]/route.ts`
+- [x] `/api/houses/districts` GET - Supabase branches - `src/app/api/houses/districts/route.ts`
+- [x] `/api/rooms` GET - Supabase rooms+branches - `src/app/api/rooms/route.ts`
+- [ ] `/api/investors` GET - Sheets - 건너뜀: investor_branches 조인 테이블 없음
+- [ ] `/api/workers` GET - Sheets - 건너뜀: 용역 시트(work orders) 중심, issues 테이블 구조 불일치
+- [ ] `/api/workers/list` GET - Sheets - 건너뜀: 용역 시트에서 unique 이름 추출
+- [x] `/api/workers/staff` GET - Supabase workers - `src/app/api/workers/staff/route.ts`
+- [x] `/api/workers/by-token/:token` GET - Supabase workers+branches (스케줄은 Sheets 유지) - `src/app/api/workers/by-token/[token]/route.ts`
+- [x] `/api/management/workers` GET - Supabase workers (월간 실적은 Sheets 유지) - `src/app/api/management/workers/route.ts`
+- [x] `/api/management/workers/:id` GET - Supabase workers (월간 실적은 Sheets 유지) - `src/app/api/management/workers/[id]/route.ts`
+- [x] `/api/management/workers/:id/jobs` GET - Supabase workers (작업 목록은 Sheets 유지) - `src/app/api/management/workers/[id]/jobs/route.ts`
 
 ## Step 4.2 - 입주자 + 수납 읽기 (중간 위험도)
 
