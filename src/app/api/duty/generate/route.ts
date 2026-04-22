@@ -1,25 +1,35 @@
 import { NextResponse } from 'next/server'
-import { getSheetData } from '@/lib/sheets'
+import { createAdminClient } from '@/lib/supabase/server'
+import { listOrEmpty } from '@/lib/supabase/helpers'
 
 export async function POST(req: Request) {
   try {
     const { house, weeksAhead = 8 } = await req.json()
+    const supabase = createAdminClient()
+
+    // 지점 ID
+    const { data: branch } = await supabase.from('branches').select('id').eq('name', house).limit(1).single()
+    if (!branch) return NextResponse.json({ duties: [], count: 0 })
 
     // 입주중 입주자 (방코드 순)
-    const tenantRows = await getSheetData('입주자')
-    const tenants = tenantRows
-      .filter(r => r[2] === house && (r[8] === '입주중' || r[8] === '계약중'))
-      .sort((a, b) => (a[3] || '') > (b[3] || '') ? 1 : -1)
+    const tenants = await listOrEmpty<any>(
+      supabase.from('tenants').select('id, name, rooms(room_code)')
+        .eq('branch_id', branch.id).in('status', ['active', 'contracted']).order('name')
+    )
+    tenants.sort((a: any, b: any) => ((a.rooms?.room_code || '') > (b.rooms?.room_code || '') ? 1 : -1))
 
     // 청소 용역 날짜
-    const workerRows = await getSheetData('용역')
-    const cleanDates = workerRows
-      .filter(r => r[2] === house && (r[4] || '').includes('청소'))
-      .map(r => r[1] || '')
+    const cleanRows = await listOrEmpty<any>(
+      supabase.from('issues').select('scheduled_date, category')
+        .eq('branch_id', branch.id).ilike('category', '%청소%')
+    )
+    const cleanDates = cleanRows.map((r: any) => r.scheduled_date || '')
 
-    // 기존 당번
-    const dutyRows = await getSheetData('당번')
-    const existing = dutyRows.filter(r => r[1] === house).map(r => r[2])
+    // 기존 당번 주차시작일
+    const existingRows = await listOrEmpty<any>(
+      supabase.from('duty_schedules').select('duty_week_start').eq('branch_id', branch.id)
+    )
+    const existing = existingRows.map((r: any) => r.duty_week_start)
 
     // 이번주 월요일
     const today = new Date()
@@ -41,7 +51,7 @@ export async function POST(req: Request) {
       // 청소주 확인
       const weekEnd = new Date(weekStart)
       weekEnd.setDate(weekStart.getDate() + 6)
-      const isCleaningWeek = cleanDates.some(d => {
+      const isCleaningWeek = cleanDates.some((d: string) => {
         const date = new Date(d)
         return date >= weekStart && date <= weekEnd
       })
@@ -56,7 +66,7 @@ export async function POST(req: Request) {
       const t = tenants[tenantIdx % tenants.length]
       newDuties.push({
         지점명: house, 주차시작일: weekStartStr,
-        방코드: t[3] || '', 입주자명: t[5] || '',
+        방코드: t.rooms?.room_code || '', 입주자명: t.name || '',
         당번유형: '당번',
         완료여부: weekStartStr < today.toISOString().split('T')[0] ? '미완료' : '예정',
       })
