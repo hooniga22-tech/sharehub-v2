@@ -11,9 +11,9 @@ function sbToPayment(p: any) {
   const mgmtPaid = p.maintenance_paid || 0
   const totalBilled = rentBilled + mgmtBilled
   const totalPaid = rentPaid + mgmtPaid
-  let status = '미납'
-  if (totalPaid >= totalBilled && totalBilled > 0) status = '납부완료'
-  else if (totalPaid > 0) status = '부분납부'
+  let status = 'unpaid'
+  if (totalPaid >= totalBilled && totalBilled > 0) status = 'paid'
+  else if (totalPaid > 0) status = 'partial'
   return {
     수납ID: p.id || '',
     입주자ID: p.tenant_id || '',
@@ -24,7 +24,7 @@ function sbToPayment(p: any) {
     청구액: String(totalBilled),
     납부액: String(totalPaid),
     납부일: p.rent_paid_date || p.maintenance_paid_date || '',
-    상태: status,
+    status: status,
     납부방법: '',
     메모: p.memo || '',
   }
@@ -53,11 +53,11 @@ export async function GET(req: Request) {
     const payments = rows.map(sbToPayment)
 
     const total = payments.length
-    const paid = payments.filter(p => p.상태 === '납부완료').length
-    const partial = payments.filter(p => p.상태 === '부분납부').length
+    const paid = payments.filter(p => p.status === 'paid').length
+    const partial = payments.filter(p => p.status === 'partial').length
     const unpaid = total - paid - partial
-    const paidAmount = payments.filter(p => p.상태 === '납부완료').reduce((s, p) => s + (Number(p.청구액) || 0), 0)
-    const unpaidAmount = payments.filter(p => p.상태 !== '납부완료').reduce((s, p) => s + (Number(p.청구액) || 0) - (Number(p.납부액) || 0), 0)
+    const paidAmount = payments.filter(p => p.status === 'paid').reduce((s, p) => s + (Number(p.청구액) || 0), 0)
+    const unpaidAmount = payments.filter(p => p.status !== 'paid').reduce((s, p) => s + (Number(p.청구액) || 0) - (Number(p.납부액) || 0), 0)
     const paidRate = total > 0 ? Math.round((paid / total) * 1000) / 10 : 0
 
     return NextResponse.json({

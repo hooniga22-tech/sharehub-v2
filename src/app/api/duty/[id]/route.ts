@@ -18,13 +18,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (error || !existing) return NextResponse.json({ error: 'not found' }, { status: 404 })
 
     const prev = parseMemo(existing.memo)
-    const isDone = body.isDone !== undefined ? (body.isDone ? 'Y' : 'N') : (prev.완료여부 === '완료' ? 'Y' : 'N')
+    const isDone = body.isDone !== undefined ? (body.isDone ? 'Y' : 'N') : (prev.완료여부 === 'done' ? 'Y' : 'N')
     const doneAt = body.isDone ? new Date().toISOString().split('T')[0] : (prev.완료일시 || '')
     const hasFine = body.hasFine !== undefined ? (body.hasFine ? 'Y' : 'N') : (prev.면제여부 || 'N')
 
     const extra = JSON.stringify({
       ...prev,
-      완료여부: isDone === 'Y' ? '완료' : prev.완료여부 || '예정',
+      완료여부: isDone === 'Y' ? 'done' : prev.완료여부 || 'scheduled',
       완료일시: doneAt,
       면제여부: hasFine,
       메모: body.note ?? prev.메모 ?? '',

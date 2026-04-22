@@ -59,7 +59,7 @@ export async function POST(req: Request) {
       })
 
       if (isCleaningWeek) {
-        newDuties.push({ 지점명: house, 주차시작일: weekStartStr, 방코드: '', 입주자명: '', 당번유형: '청소주', 완료여부: '스킵' })
+        newDuties.push({ 지점명: house, 주차시작일: weekStartStr, 방코드: '', 입주자명: '', 당번유형: 'cleaning_week', 완료여부: 'skipped' })
         continue
       }
 
@@ -69,8 +69,8 @@ export async function POST(req: Request) {
       newDuties.push({
         지점명: house, 주차시작일: weekStartStr,
         방코드: t.rooms?.room_code || '', 입주자명: t.name || '',
-        당번유형: '당번',
-        완료여부: weekStartStr < today.toISOString().split('T')[0] ? '미완료' : '예정',
+        당번유형: 'duty',
+        완료여부: weekStartStr < today.toISOString().split('T')[0] ? 'missed' : 'scheduled',
       })
       tenantIdx++
     }

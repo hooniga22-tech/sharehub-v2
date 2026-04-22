@@ -40,8 +40,8 @@ export async function GET(req: Request) {
       return {
         _rowIndex: i, 당번ID: r.id || '', 지점명: house,
         주차시작일: r.duty_week_start || '', 방코드: r.tenants?.rooms?.room_code || '',
-        입주자명: r.tenants?.name || '', 당번유형: extra.당번유형 || '당번',
-        완료여부: extra.완료여부 || '예정', 완료일시: extra.완료일시 || '',
+        입주자명: r.tenants?.name || '', 당번유형: extra.당번유형 || 'duty',
+        완료여부: extra.완료여부 || 'scheduled', 완료일시: extra.완료일시 || '',
         완료처리자: extra.완료처리자 || '',
         면제여부: extra.면제여부 || 'N', 면제사유: extra.면제사유 || '',
         메모: extra.메모 || '',
@@ -77,7 +77,7 @@ export async function POST(req: Request) {
       if (!branchId || !tenantId) return id
 
       const extra = JSON.stringify({
-        당번유형: d.당번유형 || '당번', 완료여부: d.완료여부 || '예정',
+        당번유형: d.당번유형 || 'duty', 완료여부: d.완료여부 || 'scheduled',
         완료일시: '', 완료처리자: '', 면제여부: 'N', 면제사유: '', 메모: '',
       })
       await supabase.from('duty_schedules').insert({
@@ -108,13 +108,13 @@ export async function PUT(req: Request) {
     if (error || !existing) return NextResponse.json({ error: '없음' }, { status: 404 })
 
     const prev = parseMemo(existing.memo)
-    const done = data.완료여부 ?? prev.완료여부 ?? '예정'
-    const doneAt = done === '완료'
+    const done = data.완료여부 ?? prev.완료여부 ?? 'scheduled'
+    const doneAt = done === 'done'
       ? (data.완료일시 ?? new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }))
       : (data.완료일시 ?? prev.완료일시 ?? '')
 
     const extra = JSON.stringify({
-      당번유형: prev.당번유형 || '당번',
+      당번유형: prev.당번유형 || 'duty',
       완료여부: done, 완료일시: doneAt,
       완료처리자: data.완료처리자 ?? prev.완료처리자 ?? '',
       면제여부: data.면제여부 ?? prev.면제여부 ?? 'N',

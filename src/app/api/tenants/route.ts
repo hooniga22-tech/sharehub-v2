@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { listOrEmpty } from '@/lib/supabase/helpers'
 import { requireAdmin } from '@/lib/auth-helpers'
+import { TENANT_STATUS_REVERSE } from '@/lib/status'
 
 // Supabase tenants+rooms+branches -> 프론트엔드 기대 필드 매핑
 function sbToTenant(t: any, idx: number) {
@@ -15,7 +16,7 @@ function sbToTenant(t: any, idx: number) {
     이름: t.name || '',
     입주일: t.contract_start || '',
     퇴실일: t.contract_end || '',
-    상태: t.status === 'active' ? '입주중' : t.status === 'moved_out' ? '퇴실완료' : t.status === 'cancelled' ? '계약취소' : '대기',
+    status: t.status || 'pending',
     보증금: t.deposit != null ? String(t.deposit) : '',
     월세: t.monthly_rent != null ? String(t.monthly_rent) : '',
     관리비: t.maintenance_fee != null ? String(t.maintenance_fee) : '',
@@ -80,13 +81,12 @@ export async function POST(req: Request) {
       platformId = plat?.id || null
     }
 
-    const statusMap: Record<string, string> = { '입주중': 'active', '퇴실완료': 'moved_out', '계약취소': 'cancelled', '대기': 'pending' }
     const { error } = await supabase.from('tenants').insert({
       id, room_id: roomId, name: body.이름 || '', phone: body.연락처 || '',
       birth_date: body.생년월일 || null, home_address: body.주소 || '',
       platform_id: platformId,
       contract_start: body.입주일 || null, contract_end: body.퇴실일 || null,
-      status: statusMap[body.상태 || '입주중'] || 'active',
+      status: TENANT_STATUS_REVERSE[body.상태] || body.status || 'active',
       deposit: Number(body.보증금) || null, monthly_rent: Number(body.월세) || null,
       maintenance_fee: Number(body.관리비) || null, memo: body.메모 || null,
       access_token: token,
@@ -106,13 +106,12 @@ export async function PUT(req: Request) {
     const supabase = createAdminClient()
 
     const update: Record<string, any> = {}
-    const statusMap: Record<string, string> = { '입주중': 'active', '퇴실완료': 'moved_out', '계약취소': 'cancelled', '공실': 'moved_out', '공실예정': 'active', '퇴실예정': 'active', '퇴실확정': 'active', '대기': 'pending' }
 
     if (data.이름 !== undefined) update.name = data.이름
     if (data.연락처 !== undefined) update.phone = data.연락처
     if (data.입주일 !== undefined) update.contract_start = data.입주일 || null
     if (data.퇴실일 !== undefined) update.contract_end = data.퇴실일 || null
-    if (data.상태 !== undefined) update.status = statusMap[data.상태] || 'active'
+    if (data.상태 !== undefined) update.status = TENANT_STATUS_REVERSE[data.상태] || data.status || 'active'
     if (data.보증금 !== undefined) update.deposit = Number(data.보증금) || null
     if (data.월세 !== undefined) update.monthly_rent = Number(data.월세) || null
     if (data.관리비 !== undefined) update.maintenance_fee = Number(data.관리비) || null

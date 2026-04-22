@@ -40,9 +40,9 @@ export async function GET(req: Request) {
       const payment = paymentMap.get(t.id)
       const rentBilled = payment ? (payment.rent_billed + payment.maintenance_billed) : 0
       const rentPaid = payment ? (payment.rent_paid + payment.maintenance_paid) : 0
-      let status = '미납'
-      if (rentPaid >= rentBilled && rentBilled > 0) status = '납부완료'
-      else if (rentPaid > 0) status = '부분납부'
+      let status = 'unpaid'
+      if (rentPaid >= rentBilled && rentBilled > 0) status = 'paid'
+      else if (rentPaid > 0) status = 'partial'
 
       platforms[platformName].tenants.push({
         tenantId: t.id,

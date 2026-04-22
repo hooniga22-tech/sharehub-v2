@@ -5,11 +5,10 @@ import { requireAdmin } from '@/lib/auth-helpers'
 
 // Supabase issues -> 프론트 기대 필드 매핑
 function sbToIssue(i: any, idx: number) {
-  const statusMap: Record<string, string> = { pending: '접수', in_progress: '진행중', done: '완료', cancelled: '취소' }
   return {
     rowIndex: idx, id: i.id || '', houseName: i.branches?.name || '', roomCode: i.rooms?.room_code || '',
     title: i.title || '', content: i.description || '', category: i.category || '기타',
-    status: statusMap[i.status] || i.status || '접수', assignee: i.workers?.name || '',
+    status: i.status || 'pending', assignee: i.workers?.name || '',
     createdAt: i.created_at ? i.created_at.slice(0, 10) : '', completedAt: i.completed_date || '',
     cost: i.cost || 0, memo: i.memo || '',
   }

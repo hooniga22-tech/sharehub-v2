@@ -13,7 +13,6 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
       .eq('access_token', token).single()
     if (error || !t) return NextResponse.json({ error: 'not found' }, { status: 404 })
 
-    const statusMap: Record<string, string> = { active: '입주중', moved_out: '퇴실완료', cancelled: '계약취소', pending: '대기' }
     const branch = t.rooms?.branches
     const branchId = t.rooms?.branch_id
 
@@ -32,7 +31,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
         name: t.name, phone: t.phone || '',
         rent: t.monthly_rent || 0, managementFee: t.maintenance_fee || 0, deposit: t.deposit || 0,
         startDate: t.contract_start || '', endDate: t.contract_end || '',
-        status: statusMap[t.status] || t.status,
+        status: t.status || 'pending',
         nationality: '', memo: t.memo || '', dDay,
       },
       house: branch ? {
