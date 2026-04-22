@@ -65,16 +65,16 @@
 
 ## Step 4.4 - 마스터 + 입주자/수납 쓰기 (높은 위험도)
 
-- [ ] `/api/houses` PUT - Sheets - `src/app/api/houses/route.ts`
-- [ ] `/api/houses/:id` PUT - Sheets - `src/app/api/houses/[id]/route.ts`
-- [ ] `/api/investors` POST, PUT - Sheets - `src/app/api/investors/route.ts`
-- [ ] `/api/workers` POST, PUT - Sheets - `src/app/api/workers/route.ts`
-- [ ] `/api/workers/:id` PUT - Sheets - `src/app/api/workers/[id]/route.ts`
-- [ ] `/api/workers/staff` POST - Sheets - `src/app/api/workers/staff/route.ts`
-- [ ] `/api/workers/portal/:id` PUT - Sheets - `src/app/api/workers/portal/[id]/route.ts`
-- [ ] `/api/workers/schedule/:id` PUT - Sheets - `src/app/api/workers/schedule/[id]/route.ts`
-- [ ] `/api/management/workers` POST - Sheets - `src/app/api/management/workers/route.ts`
-- [ ] `/api/management/workers/:id` PATCH - Sheets - `src/app/api/management/workers/[id]/route.ts`
+- [x] `/api/houses` PUT - Supabase branches - `src/app/api/houses/route.ts`
+- [x] `/api/houses/:id` PUT - Supabase branches - `src/app/api/houses/[id]/route.ts`
+- [x] `/api/investors` POST, PUT - Supabase investors - `src/app/api/investors/route.ts`
+- [x] `/api/workers` POST, PUT - Supabase issues (work orders) - `src/app/api/workers/route.ts`
+- [x] `/api/workers/:id` PUT - Supabase issues - `src/app/api/workers/[id]/route.ts`
+- [x] `/api/workers/staff` POST - Supabase workers - `src/app/api/workers/staff/route.ts`
+- [x] `/api/workers/portal/:id` PUT - Supabase workers - `src/app/api/workers/portal/[id]/route.ts`
+- [x] `/api/workers/schedule/:id` PUT - Supabase issues+expenses - `src/app/api/workers/schedule/[id]/route.ts`
+- [x] `/api/management/workers` POST - Supabase workers - `src/app/api/management/workers/route.ts`
+- [x] `/api/management/workers/:id` PATCH - Supabase workers - `src/app/api/management/workers/[id]/route.ts`
 - [ ] `/api/tenants` POST, PUT - Sheets - `src/app/api/tenants/route.ts`
 - [ ] `/api/tenants/:id` PUT - Sheets - `src/app/api/tenants/[id]/route.ts`
 - [ ] `/api/tenants/portal/supply` POST - Sheets - `src/app/api/tenants/portal/supply/route.ts`

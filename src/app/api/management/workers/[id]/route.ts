@@ -42,7 +42,6 @@ export async function GET(
   }
 }
 
-// PATCH는 Step 4.4에서 전환 예정 - Sheets 유지
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -50,14 +49,27 @@ export async function PATCH(
   try {
     const { id } = await params
     const body = await req.json()
-    const staffRows = await getSheetData(STAFF_TAB)
-    const idx = staffRows.findIndex(r => r[0] === id)
-    if (idx === -1) return NextResponse.json({ error: 'not found' }, { status: 404 })
-    const base = rowToWorker(staffRows[idx])
-    const merged = mergePatch(base, body || {})
-    merged.id = base.id
-    merged.token = base.token
-    await updateRow(STAFF_TAB, idx, workerToRow(merged))
+    const supabase = createAdminClient()
+
+    // 기존 데이터 조회
+    const { data: w, error: fetchErr } = await supabase.from('workers').select('*').eq('id', id).single()
+    if (fetchErr || !w) return NextResponse.json({ error: 'not found' }, { status: 404 })
+
+    // Supabase 업데이트
+    const update: Record<string, any> = {}
+    if (body.name !== undefined) update.name = body.name
+    if (body.phone !== undefined) update.phone = body.phone
+    if (body.field !== undefined) update.category = body.field
+    if (body.status !== undefined) update.is_active = body.status !== '만료'
+    if (body.baseAmount !== undefined) update.default_rate = Number(body.baseAmount) || null
+    if (body.memo !== undefined) update.memo = body.memo
+
+    const { error: updateErr } = await supabase.from('workers').update(update).eq('id', id)
+    if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
+
+    // 프론트엔드 기대 형식으로 응답
+    const base = sbToWorker(w)
+    const merged = { ...base, ...body, id: base.id, token: base.token }
     return NextResponse.json(merged)
   } catch (e) {
     console.error(e)

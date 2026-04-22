@@ -57,12 +57,32 @@ export async function GET(req: Request) {
   }
 }
 
-// POST/PUT는 Step 4.5에서 전환 - Sheets 유지
 export async function POST(req: Request) {
   try {
     const body = await req.json()
+    const supabase = createAdminClient()
     const id = `work_${Date.now()}`
-    await appendRow('용역', [id, body.예정일 || '', body.지점명 || '', body.담당자명 || '', body.작업종류 || '', body.정산금액 || '0', body.메모 || '', body.완료여부 || 'N'])
+
+    // 지점명 → branch_id, 담당자명 → worker_id 조회
+    let branchId: string | null = null
+    let workerId: string | null = null
+    if (body.지점명) {
+      const { data: b } = await supabase.from('branches').select('id').eq('name', body.지점명).limit(1).single()
+      branchId = b?.id || null
+    }
+    if (body.담당자명) {
+      const { data: w } = await supabase.from('workers').select('id').eq('name', body.담당자명).limit(1).single()
+      workerId = w?.id || null
+    }
+
+    const statusMap: Record<string, string> = { Y: 'done', N: 'pending' }
+    const { error } = await supabase.from('issues').insert({
+      id, branch_id: branchId, title: `${body.작업종류 || ''} - ${body.지점명 || ''}`,
+      category: body.작업종류 || '', status: statusMap[body.완료여부] || 'pending',
+      scheduled_date: body.예정일 || null, worker_id: workerId,
+      cost: Number(body.정산금액) || null, memo: body.메모 || null,
+    })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ success: true, id })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
@@ -73,11 +93,18 @@ export async function PUT(req: Request) {
   try {
     const body = await req.json()
     const { id, ...data } = body
-    const rows = await getSheetData('용역')
-    const rowIndex = rows.findIndex(r => r[0] === id)
-    if (rowIndex === -1) return NextResponse.json({ error: '없음' }, { status: 404 })
-    const e = rows[rowIndex]
-    await updateRow('용역', rowIndex, [e[0], data.예정일 ?? e[1], data.지점명 ?? e[2], data.담당자명 ?? e[3], data.작업종류 ?? e[4], data.정산금액 ?? e[5], data.메모 ?? (e[6] || ''), data.완료여부 ?? (e[7] || 'N')])
+    const supabase = createAdminClient()
+    const update: Record<string, any> = {}
+    if (data.예정일 !== undefined) update.scheduled_date = data.예정일 || null
+    if (data.작업종류 !== undefined) update.category = data.작업종류
+    if (data.정산금액 !== undefined) update.cost = Number(data.정산금액) || null
+    if (data.메모 !== undefined) update.memo = data.메모
+    if (data.완료여부 !== undefined) {
+      update.status = data.완료여부 === 'Y' ? 'done' : 'pending'
+      if (data.완료여부 === 'Y') update.completed_date = new Date().toISOString().slice(0, 10)
+    }
+    const { error } = await supabase.from('issues').update(update).eq('id', id)
+    if (error) return NextResponse.json({ error: '없음' }, { status: 404 })
     return NextResponse.json({ success: true })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })

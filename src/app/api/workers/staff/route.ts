@@ -33,24 +33,18 @@ export async function GET() {
   }
 }
 
-// POST는 Step 4.4에서 전환 예정 - Sheets 유지
-const SHEET = '용역담당자'
 export async function POST(req: Request) {
   try {
     const body = await req.json()
+    const supabase = createAdminClient()
     const id = `staff_${Date.now()}`
     const token = `w_${Math.random().toString(36).slice(2, 10)}`
-    const { headers } = await getSheetWithHeaders(SHEET)
-    const row = new Array(headers.length).fill('') as string[]
-    const set = (name: string, v: string) => {
-      const i = colIdx(headers, name)
-      if (i >= 0) row[i] = v
-    }
-    set('담당자ID', id); set('이름', body.이름 || ''); set('연락처', body.연락처 || '')
-    set('계좌번호', body.계좌번호 || ''); set('은행명', body.은행명 || ''); set('예금주', body.예금주 || '')
-    set('분야', body.분야 || ''); set('상태', body.상태 || '활동중'); set('링크토큰', token)
-    set('기본금액', body.기본금액 || ''); set('활동시작일', body.활동시작일 || ''); set('메모', body.메모 || '')
-    await appendRow(SHEET, row)
+    const { error } = await supabase.from('workers').insert({
+      id, name: body.이름 || '', phone: body.연락처 || '',
+      category: body.분야 || '', is_active: (body.상태 || '활동중') !== '만료',
+      default_rate: Number(body.기본금액) || null, access_token: token, memo: body.메모 || '',
+    })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ success: true, id, token })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })

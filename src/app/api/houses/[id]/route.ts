@@ -21,22 +21,25 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   }
 }
 
-// PUT은 Step 4.4에서 전환 예정 - Sheets 유지
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const body = await req.json()
-    const rows = await getSheetData('지점')
-    const rowIndex = rows.findIndex(r => r[0] === id)
-    if (rowIndex === -1) return NextResponse.json({ error: 'not found' }, { status: 404 })
-    const existing = rows[rowIndex]
-    await updateRow('지점', rowIndex, [
-      id,
-      body.name ?? existing[1], body.district ?? existing[2], body.address ?? existing[3],
-      body.doorPassword ?? existing[4], body.wifiSsid ?? existing[5], body.wifiPassword ?? existing[6],
-      body.buildingRent ?? existing[7], body.investorRatio ?? existing[8], body.operatorRatio ?? existing[9],
-      body.landlordName ?? existing[10], body.landlordPhone ?? existing[11], body.memo ?? existing[12],
-    ])
+    const supabase = createAdminClient()
+    const update: Record<string, any> = {}
+    if (body.name !== undefined) update.name = body.name
+    if (body.district !== undefined) update.district = body.district
+    if (body.address !== undefined) update.address = body.address
+    if (body.doorPassword !== undefined) update.door_code = body.doorPassword
+    if (body.wifiSsid !== undefined) update.wifi_ssid = body.wifiSsid
+    if (body.wifiPassword !== undefined) update.wifi_password = body.wifiPassword
+    if (body.buildingRent !== undefined) update.contract_rent = Number(body.buildingRent) || null
+    if (body.investorRatio !== undefined) update.investor_share_pct = Number(body.investorRatio) || 0
+    if (body.landlordName !== undefined) update.landlord_name = body.landlordName
+    if (body.landlordPhone !== undefined) update.landlord_phone = body.landlordPhone
+    if (body.memo !== undefined) update.memo = body.memo
+    const { error } = await supabase.from('branches').update(update).eq('id', id)
+    if (error) return NextResponse.json({ error: 'not found' }, { status: 404 })
     return NextResponse.json({ ok: true })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })

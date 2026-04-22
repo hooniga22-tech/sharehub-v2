@@ -84,13 +84,18 @@ export async function GET(req: Request) {
   }
 }
 
-// POST/PUT는 Step 4.4에서 전환 예정 - Sheets 유지
 export async function POST(req: Request) {
   try {
     const body = await req.json()
+    const supabase = createAdminClient()
     const id = `inv_${Date.now()}`
     const token = `i_${Math.random().toString(36).slice(2, 10)}`
-    await appendRow('투자자', [id, body.투자자명 || '', body.연락처 || '', body.계좌정보 || '', body.생년월일 || '', token, body.메모 || ''])
+    const { error } = await supabase.from('investors').insert({
+      id, name: body.투자자명 || '', phone: body.연락처 || '',
+      account_info: body.계좌정보 || '', birth_date: body.생년월일 || null,
+      access_token: token, memo: body.메모 || '',
+    })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ success: true, id, token })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
@@ -101,14 +106,15 @@ export async function PUT(req: Request) {
   try {
     const body = await req.json()
     const { id, ...data } = body
-    const rows = await getSheetData('투자자')
-    const rowIndex = rows.findIndex(r => r[0] === id)
-    if (rowIndex === -1) return NextResponse.json({ error: '없음' }, { status: 404 })
-    const e = rows[rowIndex]
-    await updateRow('투자자', rowIndex, [
-      e[0], data.투자자명 ?? e[1], data.연락처 ?? e[2], data.계좌정보 ?? e[3],
-      data.생년월일 ?? e[4], e[5], data.메모 ?? (e[6] || ''),
-    ])
+    const supabase = createAdminClient()
+    const update: Record<string, any> = {}
+    if (data.투자자명 !== undefined) update.name = data.투자자명
+    if (data.연락처 !== undefined) update.phone = data.연락처
+    if (data.계좌정보 !== undefined) update.account_info = data.계좌정보
+    if (data.생년월일 !== undefined) update.birth_date = data.생년월일 || null
+    if (data.메모 !== undefined) update.memo = data.메모
+    const { error } = await supabase.from('investors').update(update).eq('id', id)
+    if (error) return NextResponse.json({ error: '없음' }, { status: 404 })
     return NextResponse.json({ success: true })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })

@@ -49,23 +49,26 @@ export async function GET(req: Request) {
   }
 }
 
-// PUT은 Step 4.4에서 전환 예정 - Sheets 유지
 export async function PUT(req: Request) {
   try {
     const body = await req.json()
     const { id, ...data } = body
+    const supabase = createAdminClient()
 
-    const rows = await getSheetData('지점')
-    const rowIndex = rows.findIndex(r => r[0] === id)
-    if (rowIndex === -1) return NextResponse.json({ error: '없음' }, { status: 404 })
+    const update: Record<string, any> = {}
+    if (data.지점명 !== undefined) update.name = data.지점명
+    if (data.구 !== undefined) update.district = data.구
+    if (data.주소 !== undefined) update.address = data.주소
+    if (data.현관비번 !== undefined) update.door_code = data.현관비번
+    if (data.와이파이SSID !== undefined) update.wifi_ssid = data.와이파이SSID
+    if (data.와이파이PW !== undefined) update.wifi_password = data.와이파이PW
+    if (data.집월세 !== undefined) update.contract_rent = Number(data.집월세) || null
+    if (data.건물주명 !== undefined) update.landlord_name = data.건물주명
+    if (data.건물주연락처 !== undefined) update.landlord_phone = data.건물주연락처
+    if (data.메모 !== undefined) update.memo = data.메모
 
-    const e = rows[rowIndex]
-    await updateRow('지점', rowIndex, [
-      e[0], data.지점명 ?? e[1], data.구 ?? e[2], data.주소 ?? e[3],
-      data.현관비번 ?? e[4], data.와이파이SSID ?? e[5], data.와이파이PW ?? e[6],
-      data.집월세 ?? (e[7] || ''), data.투자자토큰 ?? (e[8] || ''), data.총방수 ?? (e[9] || ''),
-      data.건물주명 ?? (e[10] || ''), data.건물주연락처 ?? (e[11] || ''), data.메모 ?? (e[12] || ''),
-    ])
+    const { error } = await supabase.from('branches').update(update).eq('id', id)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ success: true })
   } catch (e) {
     console.error(e)

@@ -54,23 +54,15 @@ export async function GET() {
   }
 }
 
-// POST는 Step 4.4에서 전환 예정 - Sheets 유지
 export async function POST(req: Request) {
   try {
     const body = await req.json()
     const name = (body?.name || '').trim()
     if (!name) return NextResponse.json({ error: 'name 필수' }, { status: 400 })
 
-    const staffRows = await getSheetData(STAFF_TAB)
-    const existingIds = new Set<string>()
-    const existingTokens = new Set<string>()
-    for (const r of staffRows) {
-      if (r[0]) existingIds.add(r[0])
-      if (r[10]) existingTokens.add(r[10])
-    }
-
-    const id = makeStaffId(existingIds)
-    const token = makeToken(existingTokens)
+    const supabase = createAdminClient()
+    const id = makeStaffId(new Set<string>())
+    const token = makeToken(new Set<string>())
     const field: WorkerField = (body?.field === '수리' ? '수리' : '청소')
     const status: WorkerStatus = (body?.status === '만료' ? '만료' : '활동중')
 
@@ -81,7 +73,13 @@ export async function POST(req: Request) {
       rrnHead: String(body?.rrnHead || ''), baseAmount: Number(body?.baseAmount) || 0,
       token, startDate: String(body?.startDate || ''), memo: String(body?.memo || ''),
     }
-    await appendRow(STAFF_TAB, workerToRow(newWorker))
+
+    const { error } = await supabase.from('workers').insert({
+      id, name, phone: newWorker.phone, category: field,
+      is_active: status === '활동중', default_rate: newWorker.baseAmount || null,
+      access_token: token, memo: newWorker.memo || null,
+    })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json(newWorker, { status: 201 })
   } catch (e) {
     console.error(e)
