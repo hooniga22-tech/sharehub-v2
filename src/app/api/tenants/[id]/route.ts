@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { getSheetData, updateRow } from '@/lib/sheets'
 import { createAdminClient } from '@/lib/supabase/server'
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {

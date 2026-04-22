@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { getSheetWithHeaders, colIdx, appendRow } from '@/lib/sheets'
 import { createAdminClient } from '@/lib/supabase/server'
 import { listOrEmpty } from '@/lib/supabase/helpers'
 

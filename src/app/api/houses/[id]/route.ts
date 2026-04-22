@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { getSheetData, updateRow } from '@/lib/sheets'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getOrThrow } from '@/lib/supabase/helpers'
 
