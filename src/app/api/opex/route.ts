@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { getSheetData, appendRow, updateRow } from '@/lib/sheets'
 import { createAdminClient } from '@/lib/supabase/server'
 import { listOrEmpty } from '@/lib/supabase/helpers'
 
@@ -34,12 +33,31 @@ export async function GET(req: Request) {
   }
 }
 
-// POST/DELETE는 Step 4.5 - Sheets 유지
 export async function POST(req: Request) {
   try {
     const body = await req.json()
+    const supabase = createAdminClient()
     const id = `opex_${Date.now()}`
-    await appendRow('운영지출', [id, body.지점명 || '', body.날짜 || '', body.카테고리 || '', body.금액 || 0, body.내용 || '', body.담당자 || '', body.메모 || ''])
+    const date = body.날짜 || new Date().toISOString().slice(0, 10)
+    const ym = date.slice(0, 7)
+
+    let branchId: string | null = null
+    if (body.지점명) {
+      const { data: b } = await supabase.from('branches').select('id').eq('name', body.지점명).limit(1).single()
+      branchId = b?.id || null
+    }
+
+    let categoryId: string | null = null
+    if (body.카테고리) {
+      const { data: c } = await supabase.from('expense_categories').select('id').eq('label_ko', body.카테고리).limit(1).single()
+      categoryId = c?.id || null
+    }
+
+    await supabase.from('expenses').insert({
+      id, branch_id: branchId || '', category_id: categoryId || '',
+      category_free_text: body.카테고리 || '', paid_date: date, year_month: ym,
+      amount: Number(body.금액) || 0, vendor: body.내용 || null, memo: body.메모 || null,
+    })
     return NextResponse.json({ success: true, id })
   } catch (e) { return NextResponse.json({ error: String(e) }, { status: 500 }) }
 }
@@ -49,10 +67,10 @@ export async function DELETE(req: Request) {
     const { searchParams } = new URL(req.url)
     const id = searchParams.get('id')
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
-    const rows = await getSheetData('운영지출')
-    const idx = rows.findIndex(r => r[0] === id)
-    if (idx === -1) return NextResponse.json({ error: 'not found' }, { status: 404 })
-    await updateRow('운영지출', idx, ['deleted', '', '', '', '', '', '', ''])
+
+    const supabase = createAdminClient()
+    const { error } = await supabase.from('expenses').delete().eq('id', id)
+    if (error) return NextResponse.json({ error: 'not found' }, { status: 404 })
     return NextResponse.json({ success: true })
   } catch (e) { return NextResponse.json({ error: String(e) }, { status: 500 }) }
 }
