@@ -42,3 +42,6 @@ next-env.d.ts
 *.xlsx
 CleanShot*
 *.png
+
+# env files
+.env*.local
