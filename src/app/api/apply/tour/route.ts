@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { getSheetData, appendRow } from '@/lib/sheets'
 import { createAdminClient } from '@/lib/supabase/server'
 import { listOrEmpty } from '@/lib/supabase/helpers'
 
@@ -19,19 +18,17 @@ export async function GET() {
   }
 }
 
-// POST는 Step 4.5에서 전환 - Sheets 유지
 export async function POST(req: Request) {
   try {
     const body = await req.json()
+    const supabase = createAdminClient()
     const id = `tour_${Date.now()}`
-    const today = new Date().toISOString().split('T')[0]
-    await appendRow('투어신청', [
-      id, body.name || '', body.phone || '', body.gender || '',
-      body.region || '', body.houseName || '', body.roomType || '',
-      body.moveInDate || '', body.contractPeriod || '',
-      body.tourDate || '', body.tourTime || '', body.inquiry || '',
-      'N', '신청접수', today,
-    ])
+    const { error } = await supabase.from('tour_applications').insert({
+      id, tenant_name: body.name || '', phone: body.phone || '',
+      requested_date: body.tourDate || null,
+      visit_purpose: body.inquiry || '', status: '신청접수',
+    })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ ok: true, id })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })

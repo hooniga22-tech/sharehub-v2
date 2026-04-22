@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { appendRow } from '@/lib/sheets'
 import { createAdminClient } from '@/lib/supabase/server'
 import { listOrEmpty } from '@/lib/supabase/helpers'
 
@@ -19,9 +18,14 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const b = await req.json()
+    const supabase = createAdminClient()
     const id = `supply_${Date.now()}`
-    const today = new Date().toISOString().split('T')[0]
-    await appendRow('비품신청', [id, b.tenantId || '', b.tenantName || '', b.houseName || '', b.roomCode || '', Array.isArray(b.items) ? b.items.join(', ') : (b.items || ''), b.detail || '', '신청접수', today, ''])
+    const { error } = await supabase.from('supplies_applications').insert({
+      id, tenant_name: b.tenantName || b.tenantId || '',
+      item_list: Array.isArray(b.items) ? b.items.join(', ') : (b.items || ''),
+      memo: b.detail || '', status: '신청접수',
+    })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ ok: true, id })
   } catch (e) { return NextResponse.json({ error: String(e) }, { status: 500 }) }
 }
