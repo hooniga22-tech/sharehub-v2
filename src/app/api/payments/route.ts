@@ -69,29 +69,51 @@ export async function GET(req: Request) {
   }
 }
 
-// POST/PUT는 Step 4.4에서 전환 예정 - Sheets 유지
 export async function POST(req: Request) {
   try {
     const body = await req.json()
+    const supabase = createAdminClient()
+
+    // generate 모드: 활성 입주자 전원에 대해 미납 기록 일괄 생성
     if (body.action === 'generate') {
       const { year, month } = body
       if (!year || !month) return NextResponse.json({ error: 'missing year/month' }, { status: 400 })
       const ym = `${year}-${String(month).padStart(2, '0')}`
-      const [tenantRows, paymentRows] = await Promise.all([getSheetData('입주자'), getSheetData('수납')])
-      const active = tenantRows.filter(r => r[8] === '입주중')
-      const existing = new Set(paymentRows.filter(r => r[5] === ym).map(r => r[1]))
+
+      const [tenants, existing] = await Promise.all([
+        listOrEmpty<any>(supabase.from('tenants').select('id, monthly_rent').eq('status', 'active')),
+        listOrEmpty<any>(supabase.from('monthly_payments').select('tenant_id').eq('year_month', ym)),
+      ])
+      const existingSet = new Set(existing.map(e => e.tenant_id))
+      const inserts = []
       let count = 0
-      for (const t of active) {
-        if (existing.has(t[0])) continue
-        const id = `pay_${Date.now()}_${count}`
-        const charge = Number(t[10]) || 0
-        await appendRow('수납', [id, t[0], t[2], t[3], t[5], ym, String(charge), '0', '', '미납', '', ''])
+      for (const t of tenants) {
+        if (existingSet.has(t.id)) continue
+        inserts.push({
+          id: `pay_${Date.now()}_${count}`,
+          tenant_id: t.id, year_month: ym,
+          rent_billed: t.monthly_rent || 0, rent_paid: 0,
+          maintenance_billed: 0, maintenance_paid: 0,
+        })
         count++
+      }
+      if (inserts.length > 0) {
+        const { error } = await supabase.from('monthly_payments').insert(inserts)
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 })
       }
       return NextResponse.json({ success: true, generated: count })
     }
+
+    // 단건 생성
     const id = body.id || `pay_${Date.now()}`
-    await appendRow('수납', [id, body.입주자ID || '', body.지점명 || '', body.방코드 || '', body.이름 || '', body.연월 || '', body.청구액 || '0', body.납부액 || '0', body.납부일 || '', body.상태 || '미납', body.납부방법 || '', body.메모 || ''])
+    const rentBilled = Number(body.청구액) || 0
+    const rentPaid = Number(body.납부액) || 0
+    const { error } = await supabase.from('monthly_payments').insert({
+      id, tenant_id: body.입주자ID || '', year_month: body.연월 || '',
+      rent_billed: rentBilled, rent_paid: rentPaid,
+      rent_paid_date: body.납부일 || null, memo: body.메모 || null,
+    })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ success: true, id })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
@@ -102,15 +124,15 @@ export async function PUT(req: Request) {
   try {
     const body = await req.json()
     const { id, ...data } = body
-    const rows = await getSheetData('수납')
-    const rowIndex = rows.findIndex(r => r[0] === id)
-    if (rowIndex === -1) return NextResponse.json({ error: '없음' }, { status: 404 })
-    const e = rows[rowIndex]
-    await updateRow('수납', rowIndex, [
-      e[0], e[1], e[2], e[3], e[4], e[5],
-      data.청구액 ?? e[6], data.납부액 ?? e[7], data.납부일 ?? e[8],
-      data.상태 ?? e[9], data.납부방법 ?? (e[10] || ''), data.메모 ?? (e[11] || ''),
-    ])
+    const supabase = createAdminClient()
+    const update: Record<string, any> = {}
+    if (data.청구액 !== undefined) update.rent_billed = Number(data.청구액) || 0
+    if (data.납부액 !== undefined) update.rent_paid = Number(data.납부액) || 0
+    if (data.납부일 !== undefined) update.rent_paid_date = data.납부일 || null
+    if (data.메모 !== undefined) update.memo = data.메모
+    // 상태는 금액 기반으로 자동 계산되므로 별도 저장 안 함
+    const { error } = await supabase.from('monthly_payments').update(update).eq('id', id)
+    if (error) return NextResponse.json({ error: '없음' }, { status: 404 })
     return NextResponse.json({ success: true })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })

@@ -25,23 +25,28 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   }
 }
 
-// PUT는 Step 4.4에서 전환 예정 - Sheets 유지
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const body = await req.json()
-    const rows = await getSheetData('입주자')
-    const rowIndex = rows.findIndex(r => r[0] === id)
-    if (rowIndex === -1) return NextResponse.json({ error: 'not found' }, { status: 404 })
-    const existing = rows[rowIndex]
-    await updateRow('입주자', rowIndex, [
-      id, body.district ?? existing[1], body.houseName ?? existing[2], body.roomCode ?? existing[3],
-      body.roomType ?? existing[4], body.name ?? existing[5], body.startDate ?? existing[6],
-      body.endDate ?? existing[7], body.status ?? existing[8], body.deposit ?? existing[9],
-      body.rent ?? existing[10], body.managementFee ?? existing[11], body.memo ?? existing[12],
-      body.phone ?? existing[13], body.birthDate ?? existing[14], body.address ?? existing[15],
-      body.investor ?? existing[16], body.investorAccount ?? existing[17], body.investorPhone ?? existing[18],
-    ])
+    const supabase = createAdminClient()
+
+    const statusMap: Record<string, string> = { '입주중': 'active', '퇴실완료': 'moved_out', '계약취소': 'cancelled', '대기': 'pending' }
+    const update: Record<string, any> = {}
+    if (body.name !== undefined) update.name = body.name
+    if (body.phone !== undefined) update.phone = body.phone
+    if (body.startDate !== undefined) update.contract_start = body.startDate || null
+    if (body.endDate !== undefined) update.contract_end = body.endDate || null
+    if (body.status !== undefined) update.status = statusMap[body.status] || body.status
+    if (body.deposit !== undefined) update.deposit = Number(body.deposit) || null
+    if (body.rent !== undefined) update.monthly_rent = Number(body.rent) || null
+    if (body.managementFee !== undefined) update.maintenance_fee = Number(body.managementFee) || null
+    if (body.memo !== undefined) update.memo = body.memo
+    if (body.birthDate !== undefined) update.birth_date = body.birthDate || null
+    if (body.address !== undefined) update.home_address = body.address
+
+    const { error } = await supabase.from('tenants').update(update).eq('id', id)
+    if (error) return NextResponse.json({ error: 'not found' }, { status: 404 })
     return NextResponse.json({ ok: true })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })

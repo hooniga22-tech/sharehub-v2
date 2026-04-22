@@ -56,18 +56,40 @@ export async function GET(req: Request) {
   }
 }
 
-// POST/PUT는 Step 4.4에서 전환 예정 - Sheets 유지
 export async function POST(req: Request) {
   try {
     const body = await req.json()
+    const supabase = createAdminClient()
     const id = body.입주자ID || `tenant_${Date.now()}`
     const token = `t_${Math.random().toString(36).slice(2, 10)}`
-    await appendRow('입주자', [
-      id, body.구 || '', body.지점명 || '', body.방코드 || '', body.방타입 || '',
-      body.이름 || '', body.입주일 || '', body.퇴실일 || '', body.상태 || '입주중',
-      body.보증금 || '', body.월세 || '', body.관리비 || '', body.메모 || '',
-      body.연락처 || '', body.생년월일 || '', body.주소 || '', '', '', '', token, body.플랫폼 || '', body.이체계좌 || '',
-    ])
+
+    // 방 ID 조회 (지점명+방코드로)
+    let roomId: string | null = null
+    if (body.지점명 && body.방코드) {
+      const { data: rooms } = await supabase.from('rooms').select('id, branches!inner(name)')
+        .eq('room_code', body.방코드).eq('branches.name', body.지점명).limit(1)
+      roomId = rooms?.[0]?.id || null
+    }
+
+    // 플랫폼 ID 조회
+    let platformId: string | null = null
+    if (body.플랫폼) {
+      const { data: plat } = await supabase.from('platforms').select('id').eq('name', body.플랫폼).limit(1).single()
+      platformId = plat?.id || null
+    }
+
+    const statusMap: Record<string, string> = { '입주중': 'active', '퇴실완료': 'moved_out', '계약취소': 'cancelled', '대기': 'pending' }
+    const { error } = await supabase.from('tenants').insert({
+      id, room_id: roomId, name: body.이름 || '', phone: body.연락처 || '',
+      birth_date: body.생년월일 || null, home_address: body.주소 || '',
+      platform_id: platformId,
+      contract_start: body.입주일 || null, contract_end: body.퇴실일 || null,
+      status: statusMap[body.상태 || '입주중'] || 'active',
+      deposit: Number(body.보증금) || null, monthly_rent: Number(body.월세) || null,
+      maintenance_fee: Number(body.관리비) || null, memo: body.메모 || null,
+      access_token: token,
+    })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ success: true, id, token })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
@@ -78,20 +100,25 @@ export async function PUT(req: Request) {
   try {
     const body = await req.json()
     const { id, ...data } = body
-    const rows = await getSheetData('입주자')
-    const rowIndex = rows.findIndex(r => r[0] === id)
-    if (rowIndex === -1) return NextResponse.json({ error: '없음' }, { status: 404 })
-    const e = rows[rowIndex]
-    const updated = new Array(22).fill('')
-    for (let i = 0; i < 22; i++) updated[i] = e[i] || ''
-    const fieldMap: Record<string, number> = {
-      구: 1, 지점명: 2, 방코드: 3, 방타입: 4, 이름: 5, 입주일: 6, 퇴실일: 7, 상태: 8,
-      보증금: 9, 월세: 10, 관리비: 11, 메모: 12, 연락처: 13, 생년월일: 14, 주소: 15,
-    }
-    for (const [key, idx] of Object.entries(fieldMap)) {
-      if (data[key] !== undefined) updated[idx] = data[key]
-    }
-    await updateRow('입주자', rowIndex, updated)
+    const supabase = createAdminClient()
+
+    const update: Record<string, any> = {}
+    const statusMap: Record<string, string> = { '입주중': 'active', '퇴실완료': 'moved_out', '계약취소': 'cancelled', '공실': 'moved_out', '공실예정': 'active', '퇴실예정': 'active', '퇴실확정': 'active', '대기': 'pending' }
+
+    if (data.이름 !== undefined) update.name = data.이름
+    if (data.연락처 !== undefined) update.phone = data.연락처
+    if (data.입주일 !== undefined) update.contract_start = data.입주일 || null
+    if (data.퇴실일 !== undefined) update.contract_end = data.퇴실일 || null
+    if (data.상태 !== undefined) update.status = statusMap[data.상태] || 'active'
+    if (data.보증금 !== undefined) update.deposit = Number(data.보증금) || null
+    if (data.월세 !== undefined) update.monthly_rent = Number(data.월세) || null
+    if (data.관리비 !== undefined) update.maintenance_fee = Number(data.관리비) || null
+    if (data.메모 !== undefined) update.memo = data.메모
+    if (data.생년월일 !== undefined) update.birth_date = data.생년월일 || null
+    if (data.주소 !== undefined) update.home_address = data.주소
+
+    const { error } = await supabase.from('tenants').update(update).eq('id', id)
+    if (error) return NextResponse.json({ error: '없음' }, { status: 404 })
     return NextResponse.json({ success: true })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })

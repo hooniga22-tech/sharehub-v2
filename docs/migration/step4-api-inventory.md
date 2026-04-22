@@ -75,11 +75,11 @@
 - [x] `/api/workers/schedule/:id` PUT - Supabase issues+expenses - `src/app/api/workers/schedule/[id]/route.ts`
 - [x] `/api/management/workers` POST - Supabase workers - `src/app/api/management/workers/route.ts`
 - [x] `/api/management/workers/:id` PATCH - Supabase workers - `src/app/api/management/workers/[id]/route.ts`
-- [ ] `/api/tenants` POST, PUT - Sheets - `src/app/api/tenants/route.ts`
-- [ ] `/api/tenants/:id` PUT - Sheets - `src/app/api/tenants/[id]/route.ts`
-- [ ] `/api/tenants/portal/supply` POST - Sheets - `src/app/api/tenants/portal/supply/route.ts`
-- [ ] `/api/payments` POST, PUT - Sheets - `src/app/api/payments/route.ts`
-- [ ] `/api/payments/:id` PUT - Sheets - `src/app/api/payments/[id]/route.ts`
+- [x] `/api/tenants` POST, PUT - Supabase tenants (room_id FK lookup) - `src/app/api/tenants/route.ts`
+- [x] `/api/tenants/:id` PUT - Supabase tenants - `src/app/api/tenants/[id]/route.ts`
+- [x] `/api/tenants/portal/supply` POST - Supabase supplies_applications - `src/app/api/tenants/portal/supply/route.ts`
+- [x] `/api/payments` POST, PUT - Supabase monthly_payments (generate mode included) - `src/app/api/payments/route.ts`
+- [x] `/api/payments/:id` PUT - Supabase monthly_payments - `src/app/api/payments/[id]/route.ts`
 - [ ] `/api/payments/generate` POST - Sheets - `src/app/api/payments/generate/route.ts`
 - [ ] `/api/payments/confirm` POST - Sheets - `src/app/api/payments/confirm/route.ts`
 - [ ] `/api/payments/bulk-confirm` POST - Sheets - `src/app/api/payments/bulk-confirm/route.ts`
