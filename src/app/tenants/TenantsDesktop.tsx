@@ -7,11 +7,12 @@ import Link from 'next/link';
 import { buildTimelines, barStyle, MONTHS, DAYS_IN_MONTH } from '@/lib/timeline';
 import type { TenantSpan, HandoverSpan, HouseTimeline } from '@/types/timeline';
 import SidebarLogout from '@/components/layout/SidebarLogout'
+import { getTenantLabel, TENANT_STATUS_COLOR } from '@/lib/status'
 
 /* ─── Types ─── */
 type Tenant = {
   입주자ID: string; 구: string; 지점명: string; 방코드: string; 방타입: string;
-  이름: string; 입주일: string; 퇴실일: string; 상태: string;
+  이름: string; 입주일: string; 퇴실일: string; status: string;
   보증금: string; 월세: string; 관리비: string;
   메모: string; 연락처: string; 링크토큰: string;
 };
@@ -119,9 +120,8 @@ function exitMMDD(raw?: string): string {
   return `${Number(m[2])}/${Number(m[3])}`;
 }
 function statusBadge(status: string) {
-  if (status === '입주중') return { bg: T.greenLight, color: T.greenDark };
-  if (status === '퇴실예정' || status === '퇴실확정') return { bg: T.redLight, color: T.redDark };
-  if (status.includes('임박')) return { bg: T.orangeLight, color: T.orangeDark };
+  const c = TENANT_STATUS_COLOR[status];
+  if (c) return { bg: c.bg, color: c.fg };
   return { bg: T.divider, color: T.textMute };
 }
 
@@ -134,7 +134,7 @@ export default function TenantsDesktop() {
 
   const allTenants = Array.isArray(rawTenants) ? rawTenants : [];
   const allRooms = Array.isArray(rawRooms) ? rawRooms : [];
-  const tenants = allTenants.filter(t => t['상태'] !== '퇴실완료' && t['상태'] !== '계약취소');
+  const tenants = allTenants.filter(t => t.status !== 'moved_out' && t.status !== 'cancelled');
   const timelines = useMemo(() => buildTimelines(allTenants, allRooms), [allTenants, allRooms]);
 
   const [view, setView] = useState<ViewMode>('gantt');
@@ -419,12 +419,12 @@ export default function TenantsDesktop() {
                     ))}
                     {/* Rows */}
                     {tableData.map(t => {
-                      const badge = statusBadge(t['상태']);
+                      const badge = statusBadge(t.status || 'active');
                       const isSelected = selected?.['입주자ID'] === t['입주자ID'];
                       return (
                         <div key={t['입주자ID']} onClick={() => setSelected(t)} style={{ display: 'contents', cursor: 'pointer' }}>
                           <div style={{ padding: '10px 12px', fontSize: 12, borderBottom: `1px solid ${T.divider}`, background: isSelected ? T.blueLight : T.card }}>
-                            <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: badge.bg, color: badge.color }}>{t['상태']}</span>
+                            <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: badge.bg, color: badge.color }}>{getTenantLabel(t.status)}</span>
                           </div>
                           <div style={{ padding: '10px 12px', fontSize: 13, fontWeight: 600, color: T.text, borderBottom: `1px solid ${T.divider}`, background: isSelected ? T.blueLight : T.card, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t['이름']}</div>
                           <div style={{ padding: '10px 12px', fontSize: 12, color: T.textSub, borderBottom: `1px solid ${T.divider}`, background: isSelected ? T.blueLight : T.card }}>{t['지점명']}</div>
@@ -482,7 +482,7 @@ export default function TenantsDesktop() {
                 {[
                   ['지점', selected['지점명']],
                   ['방', `${selected['방코드']} (${selected['방타입'] || '-'})`],
-                  ['상태', selected['상태']],
+                  ['상태', getTenantLabel(selected.status)],
                   ['구', selected['구']],
                 ].map(([k, v]) => (
                   <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: 13 }}>

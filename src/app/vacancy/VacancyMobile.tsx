@@ -12,6 +12,21 @@ function sortByRoomCode(a: Tenant, b: Tenant) {
   return (a['방코드'] || '').localeCompare(b['방코드'] || '', 'ko');
 }
 
+function getDday(dateStr: string) {
+  if (!dateStr) return 999;
+  const d = new Date(dateStr);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return Math.ceil((d.getTime() - today.getTime()) / 86400000);
+}
+/** 공실: moved_out */
+function isVacantRoom(t: Tenant) { return t.status === 'moved_out'; }
+/** 공실예정: active + 퇴실일 90일 이내 */
+function isVacatingSoon(t: Tenant) {
+  if (t.status !== 'active') return false;
+  const dd = getDday(t['퇴실일']);
+  return dd >= 0 && dd <= 90;
+}
+
 function groupByHouse(list: Tenant[]) {
   const map = new Map<string, Tenant[]>();
   for (const t of list) {
@@ -50,9 +65,8 @@ function ColumnHeader() {
 }
 
 function RoomRow({ t }: { t: Tenant }) {
-  const st = t['상태'];
-  const isVacant = st === '공실';
-  const isSoon = st === '공실예정';
+  const isVacant = isVacantRoom(t);
+  const isSoon = isVacatingSoon(t);
   const bg = isVacant ? '#fafafa' : isSoon ? '#fffbf0' : '#fff';
   return (
     <div style={{ display: 'flex', alignItems: 'center', padding: '10px 16px', borderTop: '1px solid #f2f3f5', background: bg }}>
@@ -99,8 +113,8 @@ export default function VacancyMobile() {
     gu === '전체' ? tenants : tenants.filter(t => t['구'] === gu)
   , [tenants, gu]);
 
-  const vacantCount = useMemo(() => filtered.filter(t => t['상태'] === '공실').length, [filtered]);
-  const soonCount = useMemo(() => filtered.filter(t => t['상태'] === '공실예정').length, [filtered]);
+  const vacantCount = useMemo(() => filtered.filter(t => isVacantRoom(t)).length, [filtered]);
+  const soonCount = useMemo(() => filtered.filter(t => isVacatingSoon(t)).length, [filtered]);
 
   const toggle = (name: string) => setExpanded(p => ({ ...p, [name]: !p[name] }));
 
@@ -154,8 +168,8 @@ export default function VacancyMobile() {
         {groups.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 0', color: GRAY, fontSize: 13 }}>데이터가 없어요</div>
         ) : groups.map(([houseName, rooms]) => {
-          const houseVacant = rooms.filter(r => r['상태'] === '공실').length;
-          const houseSoon = rooms.filter(r => r['상태'] === '공실예정').length;
+          const houseVacant = rooms.filter(r => isVacantRoom(r)).length;
+          const houseSoon = rooms.filter(r => isVacatingSoon(r)).length;
           const isOpen = !!expanded[houseName];
           return (
             <div key={houseName} style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', border: '1px solid #f2f3f5' }}>
@@ -187,7 +201,7 @@ export default function VacancyMobile() {
 
   // === TAB 2: 입주가능 ===
   const renderTab2 = () => {
-    const available = filtered.filter(t => t['상태'] === '공실' || t['상태'] === '공실예정');
+    const available = filtered.filter(t => isVacantRoom(t) || isVacatingSoon(t));
     const groups = groupByHouse(available);
     const totalAvail = vacantCount + soonCount;
     return (
@@ -217,7 +231,7 @@ export default function VacancyMobile() {
 
   // === TAB 3: 즉시공실 ===
   const renderTab3 = () => {
-    const vacant = filtered.filter(t => t['상태'] === '공실');
+    const vacant = filtered.filter(t => isVacantRoom(t));
     const groups = groupByHouse(vacant);
     return (
       <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>

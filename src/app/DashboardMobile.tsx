@@ -65,7 +65,7 @@ function elapsed(dateStr: string) {
 
 type Issue = { id: string; title: string; category: string; status: string; createdAt: string; houseName?: string };
 type Tenant = Record<string, string>;
-type Payment = { 연월: string; 청구액: string; 상태: string };
+type Payment = { 연월: string; 청구액: string; status: string };
 type Worker = { 용역ID: string; 예정일: string; 지점명: string; 담당자명: string; 작업종류: string; 완료여부: string };
 type Task = {
   id: string; title: string; houseName: string; assignedTo: string;
@@ -81,6 +81,7 @@ export default function DashboardMobile() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [rooms, setRooms] = useState<any[]>([]);
   const [loadingT, setLoadingT] = useState(true);
   const [loadingI, setLoadingI] = useState(true);
   const [loadingP, setLoadingP] = useState(true);
@@ -98,26 +99,25 @@ export default function DashboardMobile() {
     fetch('/api/issues').then(r => r.json()).then(d => setIssues(d.issues || [])).catch(() => {}).finally(() => setLoadingI(false));
     fetch(`/api/payments?year=${now.getFullYear()}&month=${now.getMonth() + 1}`).then(r => r.json()).then(d => setPayments(Array.isArray(d) ? d : [])).catch(() => {}).finally(() => setLoadingP(false));
     fetch('/api/workers').then(r => r.json()).then(d => setWorkers(Array.isArray(d) ? d : [])).catch(() => {});
-    // tasks/active API removed - tasks state stays empty
+    fetch('/api/rooms').then(r => r.json()).then(d => setRooms(Array.isArray(d) ? d : [])).catch(() => {});
   }, []);
 
   // KPIs
   const occupancy = useMemo(() => {
-    const active = tenants.filter(t => t['상태'] === '입주중').length;
-    const vacant = tenants.filter(t => t['상태'] === '공실').length;
-    const total = active + vacant;
-    return total > 0 ? Math.round(active / total * 100) : 0;
-  }, [tenants]);
-  const pendingIssues = useMemo(() => issues.filter(i => i.status === '접수' || i.status === '처리중').length, [issues]);
+    const active = tenants.filter(t => t.status === 'active').length;
+    const total = rooms.length || 1;
+    return Math.round(active / total * 100);
+  }, [tenants, rooms]);
+  const pendingIssues = useMemo(() => issues.filter(i => i.status === 'pending' || i.status === 'in_progress').length, [issues]);
   const weekEnd = useMemo(() => getWeekEnd(), []);
   const weekStart = useMemo(() => getWeekStart(), []);
   const weeklyCheckouts = useMemo(() => tenants.filter(t => { if (!t['퇴실일']) return false; const d = new Date(t['퇴실일']); return d >= todayDate && d <= weekEnd; }).length, [tenants, weekEnd, todayDate]);
-  const unpaidAmount = useMemo(() => payments.filter(p => p.상태 === '미납').reduce((sum, p) => sum + (Number(p.청구액) || 0), 0), [payments]);
+  const unpaidAmount = useMemo(() => payments.filter(p => p.status === 'unpaid').reduce((sum, p) => sum + (Number(p.청구액) || 0), 0), [payments]);
   const todoIssues = useMemo(() => {
     const fromIssues: Issue[] = issues
-      .filter(i => i.status === '접수' || i.status === '처리중');
+      .filter(i => i.status === 'pending' || i.status === 'in_progress');
     const fromTasks: Issue[] = tasks
-      .filter(t => t.status === '예정')
+      .filter(t => t.status === 'scheduled')
       .map(t => ({
         id: t.id,
         title: t.title || `${(t.tags && t.tags[0]) || '할일'} · ${t.houseName || ''}`,

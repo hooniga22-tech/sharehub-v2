@@ -460,7 +460,7 @@ export default function TenantPortalPage() {
           // 계약금 row from 수납 탭
           const depositPay = allPayments.find((p: any) => p.연월 === '계약금');
           const dpAmt = depositPay ? (Number(depositPay.납부액) || Number(depositPay.청구액) || 0) : contractDeposit;
-          const dpPaid = depositPay ? depositPay.상태 === '납부완료' : true;
+          const dpPaid = depositPay ? depositPay.status === 'paid' : true;
 
           const CopyBtn = ({ text }: { text: string }) => text ? (
             <button onClick={e => { e.stopPropagation(); copyText(text); }}
@@ -471,7 +471,7 @@ export default function TenantPortalPage() {
 
           // Pay row for monthly items
           const PayRow = ({ p }: { p: any }) => {
-            const paid = p.상태 === '납부완료';
+            const paid = p.status === 'paid';
             const m = Number((p.연월 || '').split('-')[1]);
             const isOpen = expandedPay === p.수납ID;
             const statusLabel = paid ? t('완료', 'Paid') : t('미납', 'Unpaid');

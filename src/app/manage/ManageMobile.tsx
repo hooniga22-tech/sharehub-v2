@@ -27,7 +27,7 @@ export default function ManageMobile() {
 
     fetch('/api/tenants')
       .then(r => r.json())
-      .then((arr: any[]) => setVacant(Array.isArray(arr) ? arr.filter(t => t.상태 === '공실').length : 0))
+      .then((arr: any[]) => setVacant(Array.isArray(arr) ? arr.filter(t => t.status === 'moved_out').length : 0))
       .catch(() => {});
   }, []);
 

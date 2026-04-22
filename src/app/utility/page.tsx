@@ -77,7 +77,7 @@ export default function UtilityPage() {
 
       // Build house list with tenant counts + district + investor
       const tArr = Array.isArray(tenantData) ? tenantData : [];
-      const active = tArr.filter((t: Record<string, string>) => t['상태'] === '입주중' || t['상태'] === '계약중');
+      const active = tArr.filter((t: Record<string, string>) => t.status === 'active');
       const houseCountMap: Record<string, number> = {};
       for (const t of active) { const h = t['지점명']; if (h) houseCountMap[h] = (houseCountMap[h] || 0) + 1; }
       setHouses(Object.entries(houseCountMap).map(([name, tenants]) => ({

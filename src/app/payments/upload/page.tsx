@@ -9,7 +9,7 @@ const fmt = (n: number) => n.toLocaleString() + '원';
 
 type Payment = {
   수납ID: string; 입주자ID: string; 지점명: string; 방코드: string; 이름: string;
-  연월: string; 청구액: string; 납부액: string; 납부일: string; 상태: string;
+  연월: string; 청구액: string; 납부액: string; 납부일: string; status: string;
 };
 
 type ExcelRow = { 이름: string; 금액: number; 날짜: string; raw: Record<string, unknown> };
@@ -51,7 +51,7 @@ function matchPayments(payments: Payment[], excelRows: ExcelRow[]): MatchResult[
   const results: MatchResult[] = [];
 
   for (const p of payments) {
-    if (p.상태 === '납부완료') continue;
+    if (p.status === 'paid') continue;
 
     const charge = Number(p.청구액) || 0;
     let bestIdx = -1;

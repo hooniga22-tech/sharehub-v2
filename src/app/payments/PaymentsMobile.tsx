@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { getPaymentLabel } from '@/lib/status';
 
 const BLUE = '#3182F6', RED = '#e03131', GREEN = '#00B493';
 const fmt = (n: number) => n.toLocaleString() + '원';
 
 type Payment = {
   수납ID: string; 입주자ID: string; 지점명: string; 방코드: string; 이름: string;
-  연월: string; 청구액: string; 납부액: string; 납부일: string; 상태: string; 납부방법: string; 메모: string;
+  연월: string; 청구액: string; 납부액: string; 납부일: string; status: string; 납부방법: string; 메모: string;
 };
 type Summary = { total: number; paid: number; unpaid: number; partial: number; paidRate: number; paidAmount: number; unpaidAmount: number };
 
@@ -19,8 +20,8 @@ function kstNow() {
 }
 
 const badge = (status: string) => {
-  if (status === '납부완료') return { bg: '#e8f1fd', color: BLUE, label: '완납' };
-  if (status === '부분납부') return { bg: '#f2f4f6', color: '#888', label: '부분' };
+  if (status === 'paid') return { bg: '#e8f1fd', color: BLUE, label: '완납' };
+  if (status === 'partial') return { bg: '#f2f4f6', color: '#888', label: '부분' };
   return { bg: '#fff2f2', color: RED, label: '미납' };
 };
 
@@ -165,32 +166,32 @@ export default function PaymentsMobile() {
   // 구/지점 필터 기준 KPI
   const localSummary = (() => {
     const total = guFiltered.length;
-    const paid = guFiltered.filter(p => p.상태 === '납부완료').length;
-    const partial = guFiltered.filter(p => p.상태 === '부분납부').length;
+    const paid = guFiltered.filter(p => p.status === 'paid').length;
+    const partial = guFiltered.filter(p => p.status === 'partial').length;
     const unpaid = total - paid - partial;
-    const paidAmount = guFiltered.filter(p => p.상태 === '납부완료').reduce((s, p) => s + (Number(p.청구액) || 0), 0);
-    const unpaidAmount = guFiltered.filter(p => p.상태 !== '납부완료').reduce((s, p) => s + (Number(p.청구액) || 0) - (Number(p.납부액) || 0), 0);
+    const paidAmount = guFiltered.filter(p => p.status === 'paid').reduce((s, p) => s + (Number(p.청구액) || 0), 0);
+    const unpaidAmount = guFiltered.filter(p => p.status !== 'paid').reduce((s, p) => s + (Number(p.청구액) || 0) - (Number(p.납부액) || 0), 0);
     const paidRate = total > 0 ? Math.round((paid / total) * 1000) / 10 : 0;
     return { total, paid, unpaid, partial, paidRate, paidAmount, unpaidAmount };
   })();
 
   const filtered = guFiltered.filter(p => {
-    if (filter === '완납') return p.상태 === '납부완료';
-    if (filter === '미납') return p.상태 === '미납';
-    if (filter === '부분납부') return p.상태 === '부분납부';
+    if (filter === '완납') return p.status === 'paid';
+    if (filter === 'unpaid') return p.status === 'unpaid';
+    if (filter === 'partial') return p.status === 'partial';
     return true;
   }).sort((a, b) => {
-    const sa = a.상태 === '납부완료' ? 1 : 0;
-    const sb = b.상태 === '납부완료' ? 1 : 0;
+    const sa = a.status === 'paid' ? 1 : 0;
+    const sb = b.status === 'paid' ? 1 : 0;
     if (sa !== sb) return sa - sb;
     return getDplus(b) - getDplus(a);
   });
 
   const filterCounts: Record<string, number> = {
     '전체': guFiltered.length,
-    '미납': guFiltered.filter(p => p.상태 === '미납').length,
-    '완납': guFiltered.filter(p => p.상태 === '납부완료').length,
-    '부분납부': guFiltered.filter(p => p.상태 === '부분납부').length,
+    '미납': guFiltered.filter(p => p.status === 'unpaid').length,
+    '완납': guFiltered.filter(p => p.status === 'paid').length,
+    '부분납부': guFiltered.filter(p => p.status === 'partial').length,
   };
 
   const branchOptions = selectedGu ? (guBranchMap[selectedGu] || []) : [];
@@ -306,13 +307,13 @@ export default function PaymentsMobile() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {filtered.map(p => {
                   const isOpen = expanded === p.수납ID;
-                  const isPaid = p.상태 === '납부완료';
+                  const isPaid = p.status === 'paid';
                   const isPartial = partialMode === p.수납ID;
                   const dplus = getDplus(p);
                   const chargeAmt = Number(p.청구액) || 0;
                   const paidAmt = Number(p.납부액) || 0;
                   const remaining = chargeAmt - paidAmt;
-                  const b = badge(p.상태);
+                  const b = badge(p.status);
 
                   return (
                     <div key={p.수납ID} style={{ background: '#fff', borderRadius: 14, overflow: 'hidden' }}>
@@ -339,7 +340,7 @@ export default function PaymentsMobile() {
                       {/* Accordion Actions */}
                       {isOpen && !isPaid && (
                         <div style={{ padding: '0 16px 14px', borderTop: '1px solid #f2f4f6' }}>
-                          {p.상태 === '부분납부' && (
+                          {p.status === 'partial' && (
                             <div style={{ fontSize: 12, color: '#888', padding: '10px 0 8px' }}>
                               청구 {fmt(chargeAmt)} · 납부 {fmt(paidAmt)} · 잔액 {fmt(remaining)}
                             </div>

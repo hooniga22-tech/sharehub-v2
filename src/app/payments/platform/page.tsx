@@ -59,8 +59,8 @@ export default function PlatformTransferPage() {
 
   const platforms = data?.platforms || {}
   const allTenants = Object.values(platforms).flatMap(p => p.tenants)
-  const waitCount = allTenants.filter(t => !t.transferred && t.status === '납부완료').length
-  const waitAmount = allTenants.filter(t => !t.transferred && t.status === '납부완료').reduce((s, t) => s + t.paid, 0)
+  const waitCount = allTenants.filter(t => !t.transferred && t.status === 'paid').length
+  const waitAmount = allTenants.filter(t => !t.transferred && t.status === 'paid').reduce((s, t) => s + t.paid, 0)
   const doneCount = allTenants.filter(t => t.transferred).length
   const doneAmount = allTenants.filter(t => t.transferred).reduce((s, t) => s + t.paid, 0)
 
@@ -185,10 +185,10 @@ export default function PlatformTransferPage() {
               <Row label="지점" value={`${selectedSheet.house} · ${selectedSheet.room}`} />
               <Row label="월세" value={fmt(selectedSheet.rent)} />
               <Row label="납부액" value={fmt(selectedSheet.paid)} />
-              <Row label="수납상태" value={selectedSheet.status} color={selectedSheet.status === '납부완료' ? '#3182F6' : '#e03131'} />
+              <Row label="수납상태" value={selectedSheet.status} color={selectedSheet.status === 'paid' ? '#3182F6' : '#e03131'} />
               <Row label="이체상태" value={selectedSheet.transferred ? '이체완료' : '이체대기'} color={selectedSheet.transferred ? DONE : WAIT} />
             </div>
-            {!selectedSheet.transferred && selectedSheet.paymentId && selectedSheet.status === '납부완료' && (
+            {!selectedSheet.transferred && selectedSheet.paymentId && selectedSheet.status === 'paid' && (
               <button onClick={() => { markTransferred([selectedSheet.paymentId]); setSelectedSheet(null) }} disabled={saving}
                 style={{ width: '100%', marginTop: 20, padding: '14px 0', borderRadius: 12, border: 'none', background: DONE, color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: saving ? 0.5 : 1 }}>
                 이체 완료 처리
@@ -225,7 +225,7 @@ function WaitTab({ platforms, openPlatform, setOpenPlatform, checked, toggleChec
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {names.map(name => {
         const group = platforms[name]
-        const waiting = group.tenants.filter(t => !t.transferred && t.status === '납부완료')
+        const waiting = group.tenants.filter(t => !t.transferred && t.status === 'paid')
         const totalWait = waiting.reduce((s, t) => s + t.paid, 0)
         const isOpen = openPlatform === name
         const color = COLORS[name] || '#6B7280'

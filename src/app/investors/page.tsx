@@ -52,7 +52,7 @@ export default function InvestorsPage() {
   // 월세만 합계 by house (active tenants: 입주중/계약중)
   const rentByHouse = useMemo(() => {
     const map = new Map<string, number>();
-    const active = tenants.filter(t => t['상태'] === '입주중' || t['상태'] === '계약중');
+    const active = tenants.filter(t => t.status === 'active');
     for (const t of active) {
       const house = normalize(t['지점명'] || '');
       const rent = Number(t['월세']) || 0;

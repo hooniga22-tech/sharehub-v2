@@ -30,11 +30,15 @@ export default function HousesMobile() {
   const filtered = gu === '전체' ? houses : houses.filter(h => h['구'] === gu);
 
   const getStats = (name: string) => {
-    const ht = tenants.filter(t => t['지점명'] === name);
-    const active = ht.filter(t => t['상태'] === '입주중' || t['상태'] === '계약중').length;
-    const total = Number(houses.find(h => h['지점명'] === name)?.['총방수']) || ht.length || 1;
-    const vacancy = ht.filter(t => t['상태'] === '공실').length;
-    const soon = ht.filter(t => t['상태'] === '공실예정').length;
+    const ht = tenants.filter((t: any) => t['지점명'] === name);
+    const active = ht.filter((t: any) => t.status === 'active').length;
+    const total = Number(houses.find((h: any) => h['지점명'] === name)?.['총방수']) || ht.length || 1;
+    const vacancy = ht.filter((t: any) => t.status === 'moved_out').length;
+    const soon = ht.filter((t: any) => {
+      if (t.status !== 'active' || !t['퇴실일']) return false;
+      const dd = Math.ceil((new Date(t['퇴실일']).getTime() - Date.now()) / 86400000);
+      return dd >= 0 && dd <= 90;
+    }).length;
     return { active, total, vacancy, soon };
   };
 

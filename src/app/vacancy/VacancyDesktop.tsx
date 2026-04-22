@@ -48,6 +48,16 @@ function roomCodeShort(code: string) {
   const m = code.match(/^[A-Za-z]-?\d*/);
   return m ? m[0] : code.slice(0, 4);
 }
+/** 공실: moved_out */
+function isVacantRoom(t: Tenant) { return t.status === 'moved_out'; }
+/** 공실예정: active + 퇴실일 90일 이내 */
+function isVacatingSoon(t: Tenant) {
+  if (t.status !== 'active') return false;
+  const dd = getDday(t['퇴실일']);
+  return dd >= 0 && dd <= 90;
+}
+/** 입주중 (공실예정 아닌 active) */
+function isOccupied(t: Tenant) { return t.status === 'active' && !isVacatingSoon(t); }
 
 /* ─── Main ─── */
 export default function VacancyDesktop() {
@@ -74,9 +84,9 @@ export default function VacancyDesktop() {
 
   // KPI
   const totalRooms = filtered.length;
-  const occupiedCount = useMemo(() => filtered.filter(t => t['상태'] === '입주중' || t['상태'] === '계약중').length, [filtered]);
-  const vacantCount = useMemo(() => filtered.filter(t => t['상태'] === '공실').length, [filtered]);
-  const soonCount = useMemo(() => filtered.filter(t => t['상태'] === '공실예정').length, [filtered]);
+  const occupiedCount = useMemo(() => filtered.filter(t => isOccupied(t)).length, [filtered]);
+  const vacantCount = useMemo(() => filtered.filter(t => isVacantRoom(t)).length, [filtered]);
+  const soonCount = useMemo(() => filtered.filter(t => isVacatingSoon(t)).length, [filtered]);
 
   // Group by house
   type HouseGroup = { name: string; gu: string; rooms: Tenant[]; vacant: number; soon: number };
@@ -86,8 +96,8 @@ export default function VacancyDesktop() {
     const groups: HouseGroup[] = [];
     for (const [name, rooms] of map) {
       rooms.sort((a, b) => (a['방코드'] || '').localeCompare(b['방코드'] || '', 'ko'));
-      const vacant = rooms.filter(r => r['상태'] === '공실').length;
-      const soon = rooms.filter(r => r['상태'] === '공실예정').length;
+      const vacant = rooms.filter(r => isVacantRoom(r)).length;
+      const soon = rooms.filter(r => isVacatingSoon(r)).length;
       groups.push({ name, gu: rooms[0]?.['구'] || '', rooms, vacant, soon });
     }
     groups.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
@@ -108,18 +118,18 @@ export default function VacancyDesktop() {
       // Room type filter
       if (roomType !== '전체') rooms = rooms.filter(r => r['방타입'] === roomType);
       // Status filter
-      if (statusTab === 'vacant') rooms = rooms.filter(r => r['상태'] === '공실');
-      else if (statusTab === 'soon') rooms = rooms.filter(r => r['상태'] === '공실예정');
-      else if (statusTab === 'available') rooms = rooms.filter(r => r['상태'] === '공실' || r['상태'] === '공실예정');
+      if (statusTab === 'vacant') rooms = rooms.filter(r => isVacantRoom(r));
+      else if (statusTab === 'soon') rooms = rooms.filter(r => isVacatingSoon(r));
+      else if (statusTab === 'available') rooms = rooms.filter(r => isVacantRoom(r) || isVacatingSoon(r));
       if (rooms.length === 0) return null;
-      return { ...g, rooms, vacant: rooms.filter(r => r['상태'] === '공실').length, soon: rooms.filter(r => r['상태'] === '공실예정').length };
+      return { ...g, rooms, vacant: rooms.filter(r => isVacantRoom(r)).length, soon: rooms.filter(r => isVacatingSoon(r)).length };
     }).filter(Boolean) as HouseGroup[];
   }, [houseGroups, statusTab, roomType]);
 
   // Gu counts for sidebar
   const guCounts = useMemo(() => {
     const map: Record<string, number> = {};
-    tenants.filter(t => t['상태'] === '공실').forEach(t => { const g = t['구'] || ''; map[g] = (map[g] || 0) + 1; });
+    tenants.filter(t => isVacantRoom(t)).forEach(t => { const g = t['구'] || ''; map[g] = (map[g] || 0) + 1; });
     return map;
   }, [tenants]);
 
@@ -249,9 +259,8 @@ export default function VacancyDesktop() {
 
                       {/* Room rows */}
                       {previewRooms.map(t => {
-                        const st = t['상태'];
-                        const isVacant = st === '공실';
-                        const isSoon = st === '공실예정';
+                        const isVacant = isVacantRoom(t);
+                        const isSoon = isVacatingSoon(t);
                         const dday = isSoon ? getDday(t['퇴실일']) : 0;
                         return (
                           <div key={t['입주자ID'] || t['방코드']} style={{

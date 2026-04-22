@@ -86,7 +86,7 @@ export default function ManageDesktop() {
     fetch(`/api/expenses?year=${y}&month=${m}`).then(r => r.json()).then(d => setExpenses(Array.isArray(d) ? d : [])).catch(() => {});
   }, [y, m]);
 
-  const vacantCount = useMemo(() => tenants.filter(t => t['상태'] === '공실').length, [tenants]);
+  const vacantCount = useMemo(() => tenants.filter(t => t.status === 'moved_out').length, [tenants]);
   const unpaidCount = paySummary ? (paySummary.unpaid + paySummary.partial) : 0;
   const paidAmount = paySummary?.paidAmount ?? 0;
   const unpaidAmount = paySummary?.unpaidAmount ?? 0;
@@ -99,7 +99,7 @@ export default function ManageDesktop() {
     investors.forEach((inv: any) => { if (inv.houses) inv.houses.forEach((h: any) => set.add(h.houseName || '')); });
     return set.size;
   }, [investors]);
-  const leavingCount = useMemo(() => tenants.filter(t => t['상태'] === '퇴실예정' || t['상태'] === '퇴실확정').length, [tenants]);
+  const leavingCount = useMemo(() => tenants.filter(t => t.status === 'active' && t['퇴실일']).length, [tenants]);
 
   /* ─── Todo items (0건이면 렌더링 안 함) ─── */
   const todos = useMemo(() => {

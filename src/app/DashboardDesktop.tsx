@@ -8,7 +8,7 @@ import SidebarLogout from '@/components/layout/SidebarLogout'
 /* ─── Types (from DashboardMobile) ─── */
 type Tenant = Record<string, string>;
 type Issue = { id: string; title: string; category: string; status: string; createdAt: string; houseName?: string };
-type Payment = { 연월: string; 청구액: string; 상태: string };
+type Payment = { 연월: string; 청구액: string; status: string };
 type Worker = { 용역ID: string; 예정일: string; 지점명: string; 담당자명: string; 작업종류: string; 완료여부: string };
 type Task = {
   id: string; title: string; houseName: string; assignedTo: string;
@@ -167,6 +167,7 @@ export default function DashboardDesktop() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [rooms, setRooms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -176,11 +177,13 @@ export default function DashboardDesktop() {
       fetch('/api/issues').then(r => r.json()).catch(() => ({ issues: [] })),
       fetch(`/api/payments?year=${now.getFullYear()}&month=${now.getMonth() + 1}`).then(r => r.json()).catch(() => []),
       fetch('/api/workers').then(r => r.json()).catch(() => []),
-    ]).then(([tenantData, issueData, paymentData, workerData]) => {
+      fetch('/api/rooms').then(r => r.json()).catch(() => []),
+    ]).then(([tenantData, issueData, paymentData, workerData, roomData]) => {
       setTenants(Array.isArray(tenantData) ? tenantData : []);
       setIssues(issueData.issues || []);
       setPayments(Array.isArray(paymentData) ? paymentData : []);
       setWorkers(Array.isArray(workerData) ? workerData : []);
+      setRooms(Array.isArray(roomData) ? roomData : []);
       setLoading(false);
     });
   }, []);
@@ -308,17 +311,17 @@ export default function DashboardDesktop() {
   const todayDate = useMemo(() => { const d = kstDate(); d.setHours(0, 0, 0, 0); return d; }, []);
   const weekEnd = useMemo(() => getWeekEnd(), []);
 
-  const activeCount = useMemo(() => tenants.filter(t => t['상태'] === '입주중').length, [tenants]);
-  const vacantCount = useMemo(() => tenants.filter(t => t['상태'] === '공실').length, [tenants]);
-  const totalRooms = activeCount + vacantCount;
-  const occupancy = totalRooms > 0 ? Math.round(activeCount / totalRooms * 100) : 0;
+  const activeCount = useMemo(() => tenants.filter(t => t.status === 'active').length, [tenants]);
+  const vacantCount = useMemo(() => rooms.filter(r => r.vacancy_status === 'vacant').length, [rooms]);
+  const totalRooms = rooms.length || 1;
+  const occupancy = Math.round(activeCount / totalRooms * 100);
 
   const weeklyCheckouts = useMemo(() =>
     tenants.filter(t => { if (!t['퇴실일']) return false; const d = new Date(t['퇴실일']); return d >= todayDate && d <= weekEnd; }).length
   , [tenants, todayDate, weekEnd]);
 
-  const unpaidCount = useMemo(() => payments.filter(p => p.상태 === '미납').length, [payments]);
-  const unpaidAmount = useMemo(() => payments.filter(p => p.상태 === '미납').reduce((sum, p) => sum + (Number(p.청구액) || 0), 0), [payments]);
+  const unpaidCount = useMemo(() => payments.filter(p => p.status === 'unpaid').length, [payments]);
+  const unpaidAmount = useMemo(() => payments.filter(p => p.status === 'unpaid').reduce((sum, p) => sum + (Number(p.청구액) || 0), 0), [payments]);
 
   /* ─── Nav handlers ─── */
   const handlePrev = () => setCurrentMonth(new Date(calYear, calMonth - 1, 1));

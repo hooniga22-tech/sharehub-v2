@@ -55,7 +55,7 @@ export default function HouseDetailMobile() {
       } catch { /* not JSON */ }
 
       const ts = Array.isArray(tenantData) ? tenantData : [];
-      setTenants(ts.filter((t: any) => t['지점명'] === houseData['지점명'] && t['상태'] !== '퇴실완료'));
+      setTenants(ts.filter((t: any) => t['지점명'] === houseData['지점명'] && t.status !== 'moved_out'));
 
       // Load investor
       if (houseData['투자자토큰']) {
@@ -95,8 +95,12 @@ export default function HouseDetailMobile() {
   if (!house) return <div style={{ textAlign: 'center', padding: '80px 0', color: RED, fontSize: 13 }}>지점을 찾을 수 없어요</div>;
 
   const houseName = house['지점명'] || '';
-  const active = tenants.filter(t => t['상태'] === '입주중' || t['상태'] === '계약중').length;
-  const leaving = tenants.filter(t => t['상태'] === '공실예정').length;
+  const active = tenants.filter(t => t.status === 'active').length;
+  const leaving = tenants.filter(t => {
+    if (t.status !== 'active' || !t['퇴실일']) return false;
+    const dd = Math.ceil((new Date(t['퇴실일']).getTime() - Date.now()) / 86400000);
+    return dd >= 0 && dd <= 90;
+  }).length;
   const totalRooms = Number(house['총방수']) || tenants.length || 1;
   const vacancy = Math.max(0, totalRooms - active - leaving);
 
@@ -198,14 +202,15 @@ export default function HouseDetailMobile() {
             </div>
             <div style={{ background: '#fff', borderRadius: 14, overflow: 'hidden' }}>
               {tenants.length > 0 ? tenants.map((t, i) => {
-                const status = t['상태'] || '입주중';
+                const status = t.status || 'active';
                 const dday = getDday(t['퇴실일']);
+                const isSoon = status === 'active' && t['퇴실일'] && dday >= 0 && dday <= 90;
                 const statusCfg: Record<string, { bg: string; color: string; label: string }> = {
-                  '입주중': { bg: '#e8faf2', color: GREEN, label: '입주중' },
-                  '계약중': { bg: '#e8faf2', color: GREEN, label: '계약중' },
-                  '공실예정': { bg: '#fff8e1', color: ORANGE, label: '공실예정' },
+                  active: { bg: '#e8faf2', color: GREEN, label: '입주중' },
                 };
-                const sc = statusCfg[status] || statusCfg['입주중'];
+                const sc = isSoon
+                  ? { bg: '#fff8e1', color: ORANGE, label: '공실예정' }
+                  : (statusCfg[status] || statusCfg['active']);
                 return (
                   <div key={t['입주자ID']}>
                     {i > 0 && <div style={{ height: 1, background: '#f2f4f6' }} />}

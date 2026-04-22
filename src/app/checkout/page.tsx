@@ -9,7 +9,7 @@ const BLUE = '#3182F6', GREEN = '#3B6D11', GRAY = '#8b95a1';
 
 type Tenant = {
   입주자ID: string; 구: string; 지점명: string; 방코드: string; 방타입: string;
-  이름: string; 입주일: string; 퇴실일: string; 상태: string;
+  이름: string; 입주일: string; 퇴실일: string; status: string;
   보증금: string; 월세: string; 관리비: string; 메모: string;
 };
 
@@ -35,7 +35,7 @@ export default function CheckoutPage() {
   const { data: rawTenants, isLoading: tLoading } = useSWR<Tenant[]>('/api/tenants', fetcher);
   const { data: rawApps, isLoading: aLoading } = useSWR<CheckoutApp[]>('/api/apply/checkout', fetcher);
 
-  const allTenants = useMemo(() => (Array.isArray(rawTenants) ? rawTenants : []).filter(t => t.상태 === '퇴실완료'), [rawTenants]);
+  const allTenants = useMemo(() => (Array.isArray(rawTenants) ? rawTenants : []).filter(t => t.status === 'moved_out'), [rawTenants]);
   const apps = useMemo(() => Array.isArray(rawApps) ? rawApps : [], [rawApps]);
 
   const [viewTab, setViewTab] = useState<ViewTab>('applications');

@@ -11,7 +11,7 @@ const BLUE = '#3182f6', GRAY = '#8b95a1', GREEN = '#00c471', RED = '#f04452', OR
 const fmt = (n: number) => n.toLocaleString() + '원';
 
 type Tenant = Record<string, string>;
-type Payment = { 수납ID: string; 입주자ID: string; 지점명: string; 방코드: string; 이름: string; 연월: string; 청구액: string; 납부액: string; 납부일: string; 상태: string; 납부방법: string; 메모: string };
+type Payment = { 수납ID: string; 입주자ID: string; 지점명: string; 방코드: string; 이름: string; 연월: string; 청구액: string; 납부액: string; 납부일: string; status: string; 납부방법: string; 메모: string };
 type Issue = { id: string; title: string; category: string; status: string; createdAt: string };
 
 const calcDday = (dateStr: string): number => {
@@ -20,10 +20,10 @@ const calcDday = (dateStr: string): number => {
 };
 
 const statusBadge: Record<string, { bg: string; color: string }> = {
-  '입주중': { bg: '#e8faf2', color: '#0e6245' },
-  '계약중': { bg: '#e8faf2', color: '#0e6245' },
-  '공실예정': { bg: '#fff8e1', color: '#b7791f' },
-  '퇴실완료': { bg: '#f2f4f6', color: GRAY },
+  active: { bg: '#e8faf2', color: '#0e6245' },
+  pending: { bg: '#fff8e1', color: '#b7791f' },
+  moved_out: { bg: '#f2f4f6', color: GRAY },
+  cancelled: { bg: '#f2f4f6', color: GRAY },
 };
 
 export default function TenantDetailPage() {
@@ -84,10 +84,10 @@ export default function TenantDetailPage() {
     try {
       await fetch('/api/payments', {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: p.수납ID, 상태: '납부완료', 납부액: p.청구액, 납부일: payDate }),
+        body: JSON.stringify({ id: p.수납ID, status: 'paid', 납부액: p.청구액, 납부일: payDate }),
       });
       mutatePayments(payments.map(pp =>
-        pp.수납ID === p.수납ID ? { ...pp, 상태: '납부완료', 납부액: pp.청구액, 납부일: payDate } : pp
+        pp.수납ID === p.수납ID ? { ...pp, status: 'paid', 납부액: pp.청구액, 납부일: payDate } : pp
       ), false);
       showToast('납부 완료 처리됐어요');
     } catch { }
@@ -125,7 +125,7 @@ export default function TenantDetailPage() {
             청구액: String(fee),
             납부액: String(fee),
             납부일: todayStr,
-            상태: '납부완료',
+            status: 'paid',
             메모: '계약취소 위약금',
           }),
         });
@@ -173,8 +173,8 @@ export default function TenantDetailPage() {
     );
   }
 
-  const status = tenant.상태 || '입주중';
-  const badge = statusBadge[status] || statusBadge['입주중'];
+  const status = tenant.status || 'active';
+  const badge = statusBadge[status] || statusBadge['active'];
   const dday = calcDday(tenant.퇴실일);
   const rent = Number(tenant.월세) || 0;
   const mgmt = Number(tenant.관리비) || 0;
@@ -256,13 +256,13 @@ export default function TenantDetailPage() {
         // 월별 수납 데이터 (연월이 YYYY-MM 형식인 것만)
         const monthlyPayments = payments.filter(p => /^\d{4}-\d{2}$/.test(p.연월));
         const thisMonthPays = monthlyPayments.filter(p => p.연월 === currentYM);
-        const unpaidThisMonth = thisMonthPays.filter(p => p.상태 !== '납부완료');
+        const unpaidThisMonth = thisMonthPays.filter(p => p.status !== 'paid');
         const allPaid = thisMonthPays.length > 0 && unpaidThisMonth.length === 0;
         const hasUnpaid = unpaidThisMonth.length > 0;
 
         // 납부 이력 (완납된 것들 + 이전달 전체), 최신순 정렬
         const historyItems = monthlyPayments
-          .filter(p => hasUnpaid ? (p.상태 === '납부완료') : true)
+          .filter(p => hasUnpaid ? (p.status === 'paid') : true)
           .sort((a, b) => b.연월.localeCompare(a.연월));
 
         // 월별 그룹화 (같은 연월 합산)
@@ -500,7 +500,7 @@ export default function TenantDetailPage() {
       </div>
 
       {/* 계약 취소 버튼 */}
-      {(status === '계약예정' || status === '입주중') && (
+      {(status === 'pending' || status === 'active') && (
         <div style={{ padding: '0 16px', marginTop: 8 }}>
           <button onClick={() => setShowCancelModal(true)}
             style={{ width: '100%', padding: 13, borderRadius: 12, border: '1px solid #E24B4A', background: '#fff', color: '#E24B4A', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>

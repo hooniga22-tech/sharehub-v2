@@ -10,7 +10,7 @@ import { buildTimelines } from '@/lib/timeline';
 
 type Tenant = {
   입주자ID: string; 구: string; 지점명: string; 방코드: string; 방타입: string;
-  이름: string; 입주일: string; 퇴실일: string; 상태: string;
+  이름: string; 입주일: string; 퇴실일: string; status: string;
   보증금: string; 월세: string; 관리비: string;
   메모: string; 연락처: string;
 }
@@ -22,7 +22,7 @@ export default function TenantsMobile() {
     revalidateOnReconnect: true,
   });
   const { data: rawRooms } = useSWR('/api/rooms', fetcher);
-  const tenants = (Array.isArray(rawTenants) ? rawTenants : []).filter(t => t['상태'] !== '퇴실완료');
+  const tenants = (Array.isArray(rawTenants) ? rawTenants : []).filter(t => t.status !== 'moved_out');
   const error = swrError ? '데이터를 불러오지 못했어요' : '';
   const router = useRouter();
   const [search, setSearch] = useState('');

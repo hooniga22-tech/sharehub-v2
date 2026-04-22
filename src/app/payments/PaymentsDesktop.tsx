@@ -8,7 +8,7 @@ import SidebarLogout from '@/components/layout/SidebarLogout'
 /* ─── Types ─── */
 type Payment = {
   수납ID: string; 입주자ID: string; 지점명: string; 방코드: string; 이름: string;
-  연월: string; 청구액: string; 납부액: string; 납부일: string; 상태: string; 납부방법: string; 메모: string;
+  연월: string; 청구액: string; 납부액: string; 납부일: string; status: string; 납부방법: string; 메모: string;
 };
 type Summary = { total: number; paid: number; unpaid: number; partial: number; paidRate: number; paidAmount: number; unpaidAmount: number };
 type Tab = 'overview' | 'unpaid' | 'match' | 'platform';
@@ -197,17 +197,17 @@ export default function PaymentsDesktop() {
 
   const localSummary = useMemo(() => {
     const total = guFiltered.length;
-    const paid = guFiltered.filter(p => p.상태 === '납부완료').length;
-    const partial = guFiltered.filter(p => p.상태 === '부분납부').length;
+    const paid = guFiltered.filter(p => p.status === 'paid').length;
+    const partial = guFiltered.filter(p => p.status === 'partial').length;
     const unpaid = total - paid - partial;
-    const paidAmount = guFiltered.filter(p => p.상태 === '납부완료').reduce((s, p) => s + (Number(p.청구액) || 0), 0);
-    const unpaidAmount = guFiltered.filter(p => p.상태 !== '납부완료').reduce((s, p) => s + (Number(p.청구액) || 0) - (Number(p.납부액) || 0), 0);
+    const paidAmount = guFiltered.filter(p => p.status === 'paid').reduce((s, p) => s + (Number(p.청구액) || 0), 0);
+    const unpaidAmount = guFiltered.filter(p => p.status !== 'paid').reduce((s, p) => s + (Number(p.청구액) || 0) - (Number(p.납부액) || 0), 0);
     const paidRate = total > 0 ? Math.round((paid / total) * 1000) / 10 : 0;
     return { total, paid, unpaid, partial, paidRate, paidAmount, unpaidAmount };
   }, [guFiltered]);
 
   const unpaidItems = useMemo(() => {
-    let list = guFiltered.filter(p => p.상태 !== '납부완료');
+    let list = guFiltered.filter(p => p.status !== 'paid');
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(p => p.이름.toLowerCase().includes(q) || p.지점명.toLowerCase().includes(q));
@@ -222,7 +222,7 @@ export default function PaymentsDesktop() {
       const b = p.지점명 || '미분류';
       if (!map[b]) map[b] = { gu: branchGuMap[b] || '', total: 0, unpaid: 0, unpaidAmt: 0 };
       map[b].total++;
-      if (p.상태 !== '납부완료') { map[b].unpaid++; map[b].unpaidAmt += (Number(p.청구액) || 0) - (Number(p.납부액) || 0); }
+      if (p.status !== 'paid') { map[b].unpaid++; map[b].unpaidAmt += (Number(p.청구액) || 0) - (Number(p.납부액) || 0); }
     });
     return Object.entries(map).sort((a, b) => b[1].unpaid - a[1].unpaid);
   }, [guFiltered, branchGuMap]);

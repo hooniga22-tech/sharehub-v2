@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SidebarLogout from '@/components/layout/SidebarLogout'
+import { getTenantLabel } from '@/lib/status'
 
 /* ─── Types ─── */
 type House = Record<string, string>;
@@ -118,7 +119,7 @@ export default function HousesPcLayout({ selectedHouseId }: { selectedHouseId?: 
         else setUtilAccounts({});
       } catch { setUtilAccounts({}); }
 
-      const ts = allTenants.filter(t => t['지점명'] === h['지점명'] && t['상태'] !== '퇴실완료');
+      const ts = allTenants.filter(t => t['지점명'] === h['지점명'] && t.status !== 'moved_out');
       setDetailTenants(ts);
 
       if (h['투자자토큰']) {
@@ -138,10 +139,10 @@ export default function HousesPcLayout({ selectedHouseId }: { selectedHouseId?: 
 
   const getStats = (name: string) => {
     const ht = allTenants.filter(t => t['지점명'] === name);
-    const active = ht.filter(t => t['상태'] === '입주중' || t['상태'] === '계약중').length;
+    const active = ht.filter(t => t.status === 'active').length;
     const total = Number(houses.find(h => h['지점명'] === name)?.['총방수']) || ht.length || 1;
-    const vacancy = ht.filter(t => t['상태'] === '공실').length;
-    const soon = ht.filter(t => t['상태'] === '공실예정').length;
+    const vacancy = ht.filter(t => t.status === 'moved_out').length;
+    const soon = ht.filter(t => t.status === 'active' && t['퇴실일'] && getDday(t['퇴실일']) >= 0 && getDday(t['퇴실일']) <= 90).length;
     return { active, total, vacancy, soon };
   };
 
@@ -153,8 +154,8 @@ export default function HousesPcLayout({ selectedHouseId }: { selectedHouseId?: 
   const selectHouse = (id: string) => { setActiveId(id); router.push(`/houses/${id}`); };
 
   // Detail helpers
-  const detailActive = detailTenants.filter(t => t['상태'] === '입주중' || t['상태'] === '계약중').length;
-  const detailLeaving = detailTenants.filter(t => t['상태'] === '공실예정').length;
+  const detailActive = detailTenants.filter(t => t.status === 'active').length;
+  const detailLeaving = detailTenants.filter(t => t.status === 'active' && t['퇴실일'] && getDday(t['퇴실일']) >= 0 && getDday(t['퇴실일']) <= 90).length;
   const detailTotalRooms = Number(detail?.['총방수']) || detailTenants.length || 1;
   const detailVacancy = Math.max(0, detailTotalRooms - detailActive - detailLeaving);
   const getDday = (d: string) => { if (!d) return 0; return Math.ceil((new Date(d).getTime() - Date.now()) / 86400000); };
@@ -347,15 +348,16 @@ export default function HousesPcLayout({ selectedHouseId }: { selectedHouseId?: 
                           ))}
                         </div>
                         {detailTenants.length > 0 ? detailTenants.map(t => {
-                          const status = t['상태'] || '입주중';
+                          const status = t.status || 'active';
                           const dday = getDday(t['퇴실일']);
-                          const sc: Record<string, { bg: string; color: string }> = { '입주중': { bg: T.greenLight, color: T.greenDark }, '계약중': { bg: T.greenLight, color: T.greenDark }, '공실예정': { bg: T.orangeLight, color: T.orangeDark } };
-                          const s = sc[status] || sc['입주중'];
+                          const isSoon = status === 'active' && t['퇴실일'] && dday >= 0 && dday <= 90;
+                          const sc: Record<string, { bg: string; color: string }> = { active: { bg: T.greenLight, color: T.greenDark } };
+                          const s = isSoon ? { bg: T.orangeLight, color: T.orangeDark } : (sc[status] || sc['active']);
                           return (
                             <div key={t['입주자ID']} style={{ display: 'grid', gridTemplateColumns: '80px 1fr 90px 90px', borderBottom: `1px solid ${T.divider}` }}>
                               <div style={{ padding: '10px 12px', fontSize: 12, fontWeight: 600, color: T.textSub }}>{t['방코드']}</div>
                               <div style={{ padding: '10px 12px', fontSize: 13, fontWeight: 600, color: T.text }}>{t['이름']}</div>
-                              <div style={{ padding: '10px 12px' }}><span style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: s.bg, color: s.color }}>{status}</span></div>
+                              <div style={{ padding: '10px 12px' }}><span style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: s.bg, color: s.color }}>{isSoon ? '공실예정' : getTenantLabel(status)}</span></div>
                               <div style={{ padding: '10px 12px', fontSize: 12, color: dday > 0 && dday <= 30 ? T.red : T.textMute }}>{t['퇴실일'] ? (t['퇴실일'] as string).slice(0, 10) : '-'}</div>
                             </div>
                           );
