@@ -1,53 +1,52 @@
 import { NextResponse } from 'next/server'
-import { getSheetData, appendRow } from '@/lib/sheets'
 import { createAdminClient } from '@/lib/supabase/server'
 import { listOrEmpty } from '@/lib/supabase/helpers'
 import {
-  STAFF_TAB, WORK_TAB,
-  workerToRow,
-  kstYearMonth, aggregateMonthlyStats, sortWorkers,
+  kstYearMonth, sortWorkers,
   makeStaffId, makeToken,
 } from '@/lib/workers-helper'
 import type { Worker, WorkerWithStats, WorkerField, WorkerStatus } from '@/types/worker'
 
-// Supabase workers -> Worker 타입 변환
 function sbToWorker(w: any): Worker {
   return {
-    id: w.id || '',
-    name: w.name || '',
+    id: w.id || '', name: w.name || '',
     field: (w.category === '수리' ? '수리' : '청소') as WorkerField,
     status: (w.is_active ? '활동중' : '만료') as WorkerStatus,
-    phone: w.phone || '',
-    bankName: '',
-    accountNumber: '',
-    holder: '',
-    rrnHead: '',
-    baseAmount: w.default_rate || 0,
-    token: w.access_token || '',
-    startDate: '',
-    memo: w.memo || '',
+    phone: w.phone || '', bankName: '', accountNumber: '', holder: '', rrnHead: '',
+    baseAmount: w.default_rate || 0, token: w.access_token || '', startDate: '', memo: w.memo || '',
   }
 }
 
-// GET /api/management/workers -> WorkerWithStats[]
 export async function GET() {
   try {
     const supabase = createAdminClient()
+    const ymPrefix = kstYearMonth()
+
     const [sbWorkers, workRows] = await Promise.all([
       listOrEmpty<any>(supabase.from('workers').select('*')),
-      getSheetData(WORK_TAB), // 용역 시트 (월간 실적 집계용, Step 4.3에서 전환 예정)
+      listOrEmpty<any>(
+        supabase.from('issues').select('scheduled_date, cost, workers(name)')
+          .like('scheduled_date', `${ymPrefix}%`)
+      ),
     ])
 
-    const workers = sbWorkers.map(sbToWorker)
-    const ymPrefix = kstYearMonth()
-    const statsMap = aggregateMonthlyStats(workRows, ymPrefix)
+    // 월간 실적 집계
+    const statsMap = new Map<string, { count: number; total: number }>()
+    for (const r of workRows) {
+      const name = r.workers?.name
+      if (!name) continue
+      const cur = statsMap.get(name) || { count: 0, total: 0 }
+      cur.count++
+      cur.total += Number(r.cost) || 0
+      statsMap.set(name, cur)
+    }
 
+    const workers = sbWorkers.map(sbToWorker)
     const withStats: WorkerWithStats[] = workers.map(w => {
       const s = statsMap.get(w.name) || { count: 0, total: 0 }
       return { ...w, thisMonthJobs: s.count, thisMonthTotal: s.total }
     })
-    const sorted = sortWorkers(withStats)
-    return NextResponse.json(sorted)
+    return NextResponse.json(sortWorkers(withStats))
   } catch (e) {
     console.error(e)
     return NextResponse.json({ error: String(e) }, { status: 500 })
