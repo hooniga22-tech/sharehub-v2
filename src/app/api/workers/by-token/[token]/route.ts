@@ -35,8 +35,10 @@ export async function GET(
       .eq('worker_id', w.id)
 
     if (year && month) {
-      const prefix = `${year}-${String(month).padStart(2, '0')}`
-      query = query.like('scheduled_date', `${prefix}%`)
+      const m = String(month).padStart(2, '0')
+      const startDate = `${year}-${m}-01`
+      const nextMonth = Number(m) === 12 ? `${Number(year) + 1}-01-01` : `${year}-${String(Number(m) + 1).padStart(2, '0')}-01`
+      query = query.gte('scheduled_date', startDate).lt('scheduled_date', nextMonth)
     }
 
     const issues = await listOrEmpty<any>(query)

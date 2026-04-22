@@ -26,10 +26,13 @@ export async function GET() {
 
     const [sbWorkers, workRows] = await Promise.all([
       listOrEmpty<any>(supabase.from('workers').select('*')),
-      listOrEmpty<any>(
-        supabase.from('issues').select('scheduled_date, cost, workers(name)')
-          .like('scheduled_date', `${ymPrefix}%`)
-      ),
+      listOrEmpty<any>((() => {
+        const [y, m] = ymPrefix.split('-')
+        const startDate = `${y}-${m}-01`
+        const nextMonth = Number(m) === 12 ? `${Number(y) + 1}-01-01` : `${y}-${String(Number(m) + 1).padStart(2, '0')}-01`
+        return supabase.from('issues').select('scheduled_date, cost, workers(name)')
+          .gte('scheduled_date', startDate).lt('scheduled_date', nextMonth)
+      })()),
     ])
 
     // 월간 실적 집계

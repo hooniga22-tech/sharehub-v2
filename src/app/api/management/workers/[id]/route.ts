@@ -28,8 +28,11 @@ export async function GET(
 
     const worker = sbToWorker(w)
     const ymPrefix = kstYearMonth()
+    const [y, m] = ymPrefix.split('-')
+    const startDate = `${y}-${m}-01`
+    const nextMonth = Number(m) === 12 ? `${Number(y) + 1}-01-01` : `${y}-${String(Number(m) + 1).padStart(2, '0')}-01`
     const workRows = await listOrEmpty<any>(
-      supabase.from('issues').select('cost').eq('worker_id', id).like('scheduled_date', `${ymPrefix}%`)
+      supabase.from('issues').select('cost').eq('worker_id', id).gte('scheduled_date', startDate).lt('scheduled_date', nextMonth)
     )
     const count = workRows.length
     const total = workRows.reduce((s: number, r: any) => s + (Number(r.cost) || 0), 0)
