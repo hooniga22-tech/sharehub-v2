@@ -1,9 +1,20 @@
 import { NextResponse } from 'next/server'
 import { getSheetData, appendRow, updateRow, getSheetWithHeaders, colIdx } from '@/lib/sheets'
+import { createAdminClient } from '@/lib/supabase/server'
+import { listOrEmpty } from '@/lib/supabase/helpers'
 
-// 용역 시트는 헤더명 기반 파싱 (요청사항/완료일 포함)
+// issues 테이블 -> 용역(work) 응답 매핑
+function issueToWork(i: any, idx: number) {
+  const statusMap: Record<string, string> = { done: 'Y', cancelled: 'N', pending: 'N', in_progress: 'N' }
+  return {
+    _rowIndex: idx,
+    용역ID: i.id || '', 예정일: i.scheduled_date || '', 지점명: i.branches?.name || '',
+    담당자명: i.workers?.name || '', 작업종류: i.category || '',
+    정산금액: String(i.cost || 0), 메모: i.memo || '', 요청사항: i.description || '',
+    완료여부: statusMap[i.status] || 'N', 완료일: i.completed_date || '',
+  }
+}
 
-// GET /api/workers — 전체/필터/토큰 조회
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
@@ -12,56 +23,26 @@ export async function GET(req: Request) {
     const month = searchParams.get('month')
     const staff = searchParams.get('staff')
 
-    const { headers: wh, rows } = await getSheetWithHeaders('용역')
-    const wcol = (name: string) => colIdx(wh, name)
-    const wIdId = wcol('용역ID')
-    const wIdDate = wcol('예정일')
-    const wIdHouse = wcol('지점명')
-    const wIdWorker = wcol('담당자명')
-    const wIdType = wcol('작업종류')
-    const wIdAmount = wcol('정산금액')
-    const wIdMemo = wcol('메모')
-    const wIdDone = wcol('완료여부')
-    const wIdRequest = wcol('요청사항')
-    const wIdDoneAt = wcol('완료일')
-    const cell = (r: string[], i: number) => (i >= 0 ? (r[i] || '') : '')
+    const supabase = createAdminClient()
 
-    let works = rows.map((r, i) => ({
-      _rowIndex: i,
-      용역ID: cell(r, wIdId),
-      예정일: cell(r, wIdDate),
-      지점명: cell(r, wIdHouse),
-      담당자명: cell(r, wIdWorker),
-      작업종류: cell(r, wIdType),
-      정산금액: cell(r, wIdAmount) || '0',
-      메모: cell(r, wIdMemo),
-      요청사항: cell(r, wIdRequest),
-      완료여부: cell(r, wIdDone) || 'N',
-      완료일: cell(r, wIdDoneAt),
-    }))
-
+    // 토큰 조회: 담당자 정보 + 해당 담당자 일정
     if (token) {
-      const { headers, rows: staffRows } = await getSheetWithHeaders('용역담당자')
-      const tokCol = colIdx(headers, '링크토큰')
-      const get = (r: string[], name: string) => {
-        const i = colIdx(headers, name)
-        return i >= 0 ? (r[i] || '') : ''
-      }
-      const found = staffRows.find(r => (r[tokCol] || '') === token)
-      if (!found) return NextResponse.json({ error: '없음' }, { status: 404 })
-      const staffName = get(found, '이름')
+      const { data: w, error } = await supabase.from('workers').select('*').eq('access_token', token).single()
+      if (error || !w) return NextResponse.json({ error: '없음' }, { status: 404 })
       const staffInfo = {
-        담당자ID: get(found, '담당자ID'),
-        이름: staffName,
-        연락처: get(found, '연락처'),
-        분야: get(found, '분야'),
-        구분: get(found, '구분'),
-        링크토큰: get(found, '링크토큰'),
-        기본금액: get(found, '기본금액'),
+        담당자ID: w.id, 이름: w.name, 연락처: w.phone || '', 분야: w.category || '',
+        구분: '', 링크토큰: w.access_token || '', 기본금액: String(w.default_rate || ''),
       }
-      works = works.filter(w => w.담당자명 === staffName)
-      return NextResponse.json({ staff: staffInfo, schedules: works })
+      const issues = await listOrEmpty<any>(
+        supabase.from('issues').select('*, branches(name), workers(name)').eq('worker_id', w.id)
+      )
+      return NextResponse.json({ staff: staffInfo, schedules: issues.map((i, idx) => issueToWork(i, idx)) })
     }
+
+    // 전체 조회
+    let query = supabase.from('issues').select('*, branches(name), workers(name)')
+    const rows = await listOrEmpty<any>(query)
+    let works = rows.map((r, i) => issueToWork(r, i))
 
     if (year && month) {
       const prefix = `${year}-${String(month).padStart(2, '0')}`
@@ -76,30 +57,18 @@ export async function GET(req: Request) {
   }
 }
 
-// POST /api/workers — 용역 일정 추가
+// POST/PUT는 Step 4.5에서 전환 - Sheets 유지
 export async function POST(req: Request) {
   try {
     const body = await req.json()
     const id = `work_${Date.now()}`
-    const row = [
-      id,
-      body.예정일 || '',
-      body.지점명 || '',
-      body.담당자명 || '',
-      body.작업종류 || '',
-      body.정산금액 || '0',
-      body.메모 || '',
-      body.완료여부 || 'N',
-    ]
-    await appendRow('용역', row)
+    await appendRow('용역', [id, body.예정일 || '', body.지점명 || '', body.담당자명 || '', body.작업종류 || '', body.정산금액 || '0', body.메모 || '', body.완료여부 || 'N'])
     return NextResponse.json({ success: true, id })
   } catch (e) {
-    console.error(e)
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }
 }
 
-// PUT /api/workers — 완료 처리 / 금액 수정
 export async function PUT(req: Request) {
   try {
     const body = await req.json()
@@ -107,22 +76,10 @@ export async function PUT(req: Request) {
     const rows = await getSheetData('용역')
     const rowIndex = rows.findIndex(r => r[0] === id)
     if (rowIndex === -1) return NextResponse.json({ error: '없음' }, { status: 404 })
-
     const e = rows[rowIndex]
-    const updated = [
-      e[0],
-      data.예정일 ?? e[1],
-      data.지점명 ?? e[2],
-      data.담당자명 ?? e[3],
-      data.작업종류 ?? e[4],
-      data.정산금액 ?? e[5],
-      data.메모 ?? (e[6] || ''),
-      data.완료여부 ?? (e[7] || 'N'),
-    ]
-    await updateRow('용역', rowIndex, updated)
+    await updateRow('용역', rowIndex, [e[0], data.예정일 ?? e[1], data.지점명 ?? e[2], data.담당자명 ?? e[3], data.작업종류 ?? e[4], data.정산금액 ?? e[5], data.메모 ?? (e[6] || ''), data.완료여부 ?? (e[7] || 'N')])
     return NextResponse.json({ success: true })
   } catch (e) {
-    console.error(e)
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }
 }

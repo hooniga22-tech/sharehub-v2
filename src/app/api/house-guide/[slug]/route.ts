@@ -1,36 +1,29 @@
 import { NextResponse } from 'next/server'
-import { getSheetData } from '@/lib/sheets'
+import { createAdminClient } from '@/lib/supabase/server'
+import { listOrEmpty } from '@/lib/supabase/helpers'
 
 export async function GET(_: Request, { params }: { params: Promise<{ slug: string }> }) {
   try {
     const { slug } = await params
     const decoded = decodeURIComponent(slug)
-    const houseRows = await getSheetData('지점')
-    const tenantRows = await getSheetData('입주자')
+    const supabase = createAdminClient()
 
-    const houseRow = houseRows.find(r =>
-      r[1]?.trim() === decoded || r[0]?.trim() === decoded
+    // 지점 조회 (name 또는 id로)
+    const branches = await listOrEmpty<any>(supabase.from('branches').select('*'))
+    const branch = branches.find(b => b.name?.trim() === decoded || b.id === decoded)
+    if (!branch) return NextResponse.json({ error: 'not found' }, { status: 404 })
+
+    // 활성 입주자 수
+    const tenants = await listOrEmpty<any>(
+      supabase.from('tenants').select('id, rooms!inner(branch_id)').eq('status', 'active')
     )
-    if (!houseRow) return NextResponse.json({ error: 'not found' }, { status: 404 })
-
-    const houseName = houseRow[1]?.trim()
-
-    // 입주자: [2]지점명 [8]상태
-    const activeCount = tenantRows.filter(r =>
-      r[2]?.trim() === houseName && r[8] === '입주중'
-    ).length
+    const activeCount = tenants.filter(t => t.rooms?.branch_id === branch.id).length
 
     return NextResponse.json({
-      id: houseRow[0],
-      name: houseName,
-      district: houseRow[2] || '',
-      address: houseRow[3] || '',
-      doorPassword: houseRow[4] || '',
-      wifiSsid: houseRow[5] || '',
-      wifiPassword: houseRow[6] || '',
-      landlordName: houseRow[10] || '',
-      memo: houseRow[12] || '',
-      activeCount,
+      id: branch.id, name: branch.name, district: branch.district || '',
+      address: branch.address || '', doorPassword: branch.door_code || '',
+      wifiSsid: branch.wifi_ssid || '', wifiPassword: branch.wifi_password || '',
+      landlordName: branch.landlord_name || '', memo: branch.memo || '', activeCount,
     })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })

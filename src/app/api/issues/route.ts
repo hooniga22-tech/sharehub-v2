@@ -1,7 +1,19 @@
 import { NextResponse } from 'next/server'
 import { getSheetData, appendRow } from '@/lib/sheets'
+import { createAdminClient } from '@/lib/supabase/server'
+import { listOrEmpty } from '@/lib/supabase/helpers'
 
-// row: [0]이슈ID [1]지점명 [2]방코드 [3]제목 [4]내용 [5]카테고리 [6]상태 [7]담당자 [8]등록일 [9]완료일 [10]비용 [11]메모
+// Supabase issues -> 프론트 기대 필드 매핑
+function sbToIssue(i: any, idx: number) {
+  const statusMap: Record<string, string> = { pending: '접수', in_progress: '진행중', done: '완료', cancelled: '취소' }
+  return {
+    rowIndex: idx, id: i.id || '', houseName: i.branches?.name || '', roomCode: i.rooms?.room_code || '',
+    title: i.title || '', content: i.description || '', category: i.category || '기타',
+    status: statusMap[i.status] || i.status || '접수', assignee: i.workers?.name || '',
+    createdAt: i.created_at ? i.created_at.slice(0, 10) : '', completedAt: i.completed_date || '',
+    cost: i.cost || 0, memo: i.memo || '',
+  }
+}
 
 export async function GET(req: Request) {
   try {
@@ -9,29 +21,14 @@ export async function GET(req: Request) {
     const house = searchParams.get('house')
     const room = searchParams.get('room')
 
-    const rows = await getSheetData('이슈')
+    const supabase = createAdminClient()
+    let query = supabase.from('issues').select('*, branches(name), rooms(room_code), workers(name)')
 
-    let issues = rows
-      .map((r, i) => ({
-        rowIndex: i,
-        id: r[0] || '',
-        houseName: r[1] || '',
-        roomCode: r[2] || '',
-        title: r[3] || '',
-        content: r[4] || '',
-        category: r[5] || '기타',
-        status: r[6] || '접수',
-        assignee: r[7] || '',
-        createdAt: r[8] || '',
-        completedAt: r[9] || '',
-        cost: Number(r[10]) || 0,
-        memo: r[11] || '',
-      }))
-      .filter(i => i.id) // 이슈ID가 없는 빈 행 제외
+    const rows = await listOrEmpty<any>(query)
+    let issues = rows.map((r, i) => sbToIssue(r, i)).filter(i => i.id)
 
     if (house) issues = issues.filter(i => i.houseName === house)
     if (room) issues = issues.filter(i => i.roomCode === room)
-
     issues.sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1))
 
     return NextResponse.json({ issues })
@@ -40,33 +37,16 @@ export async function GET(req: Request) {
   }
 }
 
+// POST는 Step 4.5에서 전환 예정 - Sheets 유지
 export async function POST(req: Request) {
   try {
     const body = await req.json()
     const rows = await getSheetData('이슈')
-    // issue_XXXX 형식 자동 생성
     let maxNum = 0
-    for (const r of rows) {
-      const m = r[0]?.match(/issue_(\d+)/)
-      if (m) maxNum = Math.max(maxNum, Number(m[1]))
-    }
+    for (const r of rows) { const m = r[0]?.match(/issue_(\d+)/); if (m) maxNum = Math.max(maxNum, Number(m[1])) }
     const id = `issue_${String(maxNum + 1).padStart(4, '0')}`
     const today = new Date().toISOString().slice(0, 10)
-    const row = [
-      id,
-      body.houseName || '',
-      body.roomCode || '',
-      body.title || '',
-      body.content || '',
-      body.category || '기타',
-      '접수',
-      body.assignee || '',
-      today,
-      '',
-      body.cost || 0,
-      body.memo || '',
-    ]
-    await appendRow('이슈', row)
+    await appendRow('이슈', [id, body.houseName || '', body.roomCode || '', body.title || '', body.content || '', body.category || '기타', '접수', body.assignee || '', today, '', body.cost || 0, body.memo || ''])
     return NextResponse.json({ success: true, id })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })

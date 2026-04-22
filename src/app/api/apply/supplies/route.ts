@@ -1,18 +1,19 @@
 import { NextResponse } from 'next/server'
-import { getSheetData, appendRow } from '@/lib/sheets'
+import { appendRow } from '@/lib/sheets'
+import { createAdminClient } from '@/lib/supabase/server'
+import { listOrEmpty } from '@/lib/supabase/helpers'
 
 export async function GET() {
   try {
-    const rows = await getSheetData('비품신청')
+    const supabase = createAdminClient()
+    const rows = await listOrEmpty<any>(supabase.from('supplies_applications').select('*'))
     return NextResponse.json(rows.map((r, i) => ({
-      _rowIndex: i, id: r[0] || '', tenantId: r[1] || '',
-      tenantName: r[2] || '', houseName: r[3] || '', roomCode: r[4] || '',
-      items: r[5] || '', detail: r[6] || '',
-      status: r[7] || '신청접수', createdAt: r[8] || '', processedAt: r[9] || '',
+      _rowIndex: i, id: r.id || '', tenantId: '', tenantName: r.tenant_name || '',
+      houseName: '', roomCode: '', items: r.item_list || '', detail: r.memo || '',
+      status: r.status || '신청접수', createdAt: r.created_at ? r.created_at.slice(0, 10) : '',
+      processedAt: r.delivery_date || '',
     })))
-  } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 500 })
-  }
+  } catch (e) { return NextResponse.json({ error: String(e) }, { status: 500 }) }
 }
 
 export async function POST(req: Request) {
@@ -20,13 +21,7 @@ export async function POST(req: Request) {
     const b = await req.json()
     const id = `supply_${Date.now()}`
     const today = new Date().toISOString().split('T')[0]
-    await appendRow('비품신청', [
-      id, b.tenantId || '', b.tenantName || '', b.houseName || '', b.roomCode || '',
-      Array.isArray(b.items) ? b.items.join(', ') : (b.items || ''),
-      b.detail || '', '신청접수', today, '',
-    ])
+    await appendRow('비품신청', [id, b.tenantId || '', b.tenantName || '', b.houseName || '', b.roomCode || '', Array.isArray(b.items) ? b.items.join(', ') : (b.items || ''), b.detail || '', '신청접수', today, ''])
     return NextResponse.json({ ok: true, id })
-  } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 500 })
-  }
+  } catch (e) { return NextResponse.json({ error: String(e) }, { status: 500 }) }
 }
