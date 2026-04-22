@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getSheetData } from '@/lib/sheets'
-
-// 여러 시트 조합: 입주자 + 공과금 + 운영지출 + 용역 + 투자자
+import { createAdminClient } from '@/lib/supabase/server'
+import { listOrEmpty } from '@/lib/supabase/helpers'
 
 export async function GET(req: Request) {
   try {
@@ -9,59 +8,55 @@ export async function GET(req: Request) {
     const year = searchParams.get('year') || String(new Date().getFullYear())
     const month = searchParams.get('month') || String(new Date().getMonth() + 1)
     const houseFilter = searchParams.get('house')
-    const monthPad = String(month).padStart(2, '0')
-    const prefix = `${year}-${monthPad}`
+    const ym = `${year}-${String(month).padStart(2, '0')}`
 
-    const [tenantRows, utilRows, opexRows, workerRows, investorRows] = await Promise.all([
-      getSheetData('입주자'),
-      getSheetData('공과금'),
-      getSheetData('운영지출'),
-      getSheetData('용역'),
-      getSheetData('투자자'),
+    const supabase = createAdminClient()
+
+    const [tenants, branches, expenses, investors] = await Promise.all([
+      listOrEmpty<any>(supabase.from('tenants').select('*, rooms(room_code, branch_id, branches(name, district))').eq('status', 'active')),
+      listOrEmpty<any>(supabase.from('branches').select('id, name, district, contract_rent, investor_id, investor_share_pct')),
+      listOrEmpty<any>(supabase.from('expenses').select('*').eq('year_month', ym)),
+      listOrEmpty<any>(supabase.from('investors').select('id, name, access_token')),
     ])
 
-    // 입주자: [0]ID [1]구 [2]지점명 [5]이름 [3]방코드 [8]상태 [10]월세 [11]관리비
-    const tenants = tenantRows.filter(r => r[8] === '입주중' || r[8] === '계약중')
+    // Group tenants by branch
+    const tenantsByBranch = new Map<string, any[]>()
+    for (const t of tenants) {
+      const bid = t.rooms?.branch_id
+      if (!bid) continue
+      if (!tenantsByBranch.has(bid)) tenantsByBranch.set(bid, [])
+      tenantsByBranch.get(bid)!.push(t)
+    }
 
-    // 공과금: [0]ID [1]지점명 [2]연도 [3]월 [4]전기 [5]가스 [6]수도 [7]인터넷 [8]정수기
-    const utilities = utilRows.filter(r => r[2] === year && r[3] === month)
+    // Expense by branch
+    const expenseByBranch = new Map<string, number>()
+    for (const e of expenses) {
+      expenseByBranch.set(e.branch_id, (expenseByBranch.get(e.branch_id) || 0) + (e.amount || 0))
+    }
 
-    // 운영지출: [0]ID [1]지점명 [2]날짜 [3]카테고리 [4]금액 [5]내용 [6]담당자
-    const opex = opexRows.filter(r => (r[2] || '').startsWith(prefix))
+    const investorMap = new Map<string, any>()
+    for (const inv of investors) investorMap.set(inv.id, inv)
 
-    // 용역: [0]ID [1]예정일 [2]지점명 [3]담당자명 [4]작업종류 [5]정산금액 [7]완료여부
-    const workers = workerRows.filter(r => (r[1] || '').startsWith(prefix) && r[7] === 'Y')
-
-    // 투자자: [0]ID [1]투자자명 [2]연락처 [3]지점명 [4]배분비율 [5]링크토큰
-    const houseNames = [...new Set(tenants.map(r => r[2]))].filter(Boolean)
-
-    const houses = houseNames.map((houseName, idx) => {
-      const ht = tenants.filter(r => r[2] === houseName)
-      const rentTotal = ht.reduce((a, r) => a + (Number(r[10]) || 0), 0)
-      const mgmtTotal = ht.reduce((a, r) => a + (Number(r[11]) || 0), 0)
+    const houses = branches.map((b, idx) => {
+      const ht = tenantsByBranch.get(b.id) || []
+      const rentTotal = ht.reduce((s: number, t: any) => s + (t.monthly_rent || 0), 0)
+      const mgmtTotal = ht.reduce((s: number, t: any) => s + (t.maintenance_fee || 0), 0)
       const revenue = rentTotal + mgmtTotal
+      const expenseTotal = expenseByBranch.get(b.id) || 0
+      const profit = revenue - expenseTotal
 
-      const util = utilities.find(r => r[1] === houseName)
-      const utilTotal = util ? [4, 5, 6, 7, 8].reduce((a, i) => a + (Number(util[i]) || 0), 0) : 0
-      const workerTotal = workers.filter(r => r[2] === houseName).reduce((a, r) => a + (Number(r[5]) || 0), 0)
-      const opexTotal = opex.filter(r => r[1] === houseName).reduce((a, r) => a + (Number(r[4]) || 0), 0)
-      const expense = utilTotal + workerTotal + opexTotal
-      const profit = revenue - expense
-
-      const inv = investorRows.find(r => r[3] === houseName)
-      const invRatio = inv ? (Number(inv[4]) || 0) / 100 : 0
+      const invRatio = (b.investor_share_pct || 0) / 100
+      const inv = b.investor_id ? investorMap.get(b.investor_id) : null
       const invShare = inv ? Math.round(profit * invRatio) : 0
 
       return {
-        id: idx + 1, house: houseName, gu: ht[0]?.[1] || '',
+        id: idx + 1, house: b.name, gu: b.district || '',
         tenantCount: ht.length, revenue, rentTotal, mgmtTotal,
-        expense, utilTotal, workerTotal, opexTotal, profit,
-        ownShare: profit - invShare,
-        investor: inv ? { name: inv[1], token: inv[5], ratio: invRatio, share: invShare } : null,
-        tenants: ht.map(r => ({ 방코드: r[3], 이름: r[5], 월세: r[10], 관리비: r[11] })),
-        utilDetail: util ? { 전기: util[4], 수도: util[6], 가스: util[5], 인터넷: util[7], 정수기: util[8] } : null,
-        workerDetail: workers.filter(r => r[2] === houseName).map(r => ({ 담당자명: r[3], 작업종류: r[4], 정산금액: r[5], 예정일: r[1] })),
-        opexDetail: opex.filter(r => r[1] === houseName).map(r => ({ 카테고리: r[3], 금액: r[4], 내용: r[5], 날짜: r[2] })),
+        expense: expenseTotal, utilTotal: 0, workerTotal: 0, opexTotal: expenseTotal,
+        profit, ownShare: profit - invShare,
+        investor: inv ? { name: inv.name, token: inv.access_token, ratio: invRatio, share: invShare } : null,
+        tenants: ht.map((t: any) => ({ '\uBC29\uCF54\uB4DC': t.rooms?.room_code || '', '\uC774\uB984': t.name || '', '\uC6D4\uC138': String(t.monthly_rent || 0), '\uAD00\uB9AC\uBE44': String(t.maintenance_fee || 0) })),
+        utilDetail: null, workerDetail: [], opexDetail: [],
       }
     })
 

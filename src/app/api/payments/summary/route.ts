@@ -1,63 +1,47 @@
 import { NextResponse } from 'next/server'
-import { getSheetData } from '@/lib/sheets'
+import { createAdminClient } from '@/lib/supabase/server'
+import { listOrEmpty } from '@/lib/supabase/helpers'
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
     const month = searchParams.get('month') || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
-    const [year, m] = month.split('-')
-    const targetMonth = `${year}-${m}`
+    const targetMonth = month
 
-    // Get tenants and payment data
-    const [tenantRows, paymentRows] = await Promise.all([
-      getSheetData('입주자'),
-      getSheetData('납부'),
-    ])
+    const supabase = createAdminClient()
 
-    // Parse tenants (active only)
-    const tenants = tenantRows
-      .filter(r => r[8] === '입주중' || r[8] === '계약중')
-      .map(r => ({
-        id: r[0] || '',
-        district: r[1] || '',
-        house: r[2] || '',
-        roomCode: r[3] || '',
-        name: r[5] || '',
-        rent: Number(r[9]) || 0,
-        deposit: Number(r[10]) || 0,
-        phone: r[12] || '',
-        paymentDay: 1,
-      }))
+    // 활성 입주자
+    const tenants = await listOrEmpty<any>(
+      supabase.from('tenants').select('*, rooms(room_code, branches(name, district))')
+        .in('status', ['active'])
+    )
 
-    // Parse payments for this month
-    const payments = paymentRows
-      .filter(r => (r[6] || '').startsWith(targetMonth))
-      .map(r => ({
-        id: r[0] || '',
-        tenantId: r[1] || '',
-        tenantName: r[2] || '',
-        houseName: r[3] || '',
-        roomCode: r[4] || '',
-        type: r[5] || '',
-        dueDate: r[6] || '',
-        rent: Number(r[7]) || 0,
-        mgmtFee: Number(r[8]) || 0,
-        rentPaid: r[9] === 'Y',
-        mgmtPaid: r[10] === 'Y',
-      }))
+    // 해당 월 납부 기록
+    const payments = await listOrEmpty<any>(
+      supabase.from('monthly_payments').select('*').eq('year_month', targetMonth)
+    )
+    const paymentByTenant = new Map<string, any>()
+    for (const p of payments) paymentByTenant.set(p.tenant_id, p)
 
-    // Build per-tenant status
     const tenantPayments = tenants.map(t => {
-      const tp = payments.filter(p => p.tenantId === t.id)
-      const hasPaid = tp.some(p => p.rentPaid)
-      const dueDate = tp[0]?.dueDate || `${targetMonth}-01`
+      const p = paymentByTenant.get(t.id)
+      const hasPaid = p ? (p.rent_paid >= p.rent_billed && p.rent_billed > 0) : false
+      const dueDate = `${targetMonth}-01`
       const lateDays = !hasPaid ? Math.max(0, Math.floor((Date.now() - new Date(dueDate).getTime()) / 86400000)) : 0
 
       return {
-        ...t,
+        id: t.id,
+        district: t.rooms?.branches?.district || '',
+        house: t.rooms?.branches?.name || '',
+        roomCode: t.rooms?.room_code || '',
+        name: t.name || '',
+        rent: t.deposit || 0,
+        deposit: t.deposit || 0,
+        phone: t.phone || '',
+        paymentDay: 1,
         status: hasPaid ? 'paid' as const : 'unpaid' as const,
         lateDays,
-        monthlyRent: t.rent,
+        monthlyRent: t.monthly_rent || 0,
       }
     })
 

@@ -29,18 +29,18 @@
 
 ## Step 4.2 - 입주자 + 수납 읽기 (중간 위험도)
 
-- [ ] `/api/tenants` GET - Sheets - `src/app/api/tenants/route.ts`
-- [ ] `/api/tenants/:id` GET - Sheets - `src/app/api/tenants/[id]/route.ts`
-- [ ] `/api/payments` GET - Sheets - `src/app/api/payments/route.ts`
-- [ ] `/api/payments/summary` GET - Sheets - `src/app/api/payments/summary/route.ts`
-- [ ] `/api/platform-transfers` GET - Sheets - `src/app/api/platform-transfers/route.ts`
-- [ ] `/api/tenant-portal/:token` GET - Sheets - `src/app/api/tenant-portal/[token]/route.ts`
-- [ ] `/api/investor-portal/:token` GET - Sheets - `src/app/api/investor-portal/[token]/route.ts`
-- [ ] `/api/tenant-duty` GET - Sheets - `src/app/api/tenant-duty/route.ts`
-- [ ] `/api/vacancies` GET - Sheets - `src/app/api/vacancies/route.ts`
-- [ ] `/api/dashboard` GET - Sheets - `src/app/api/dashboard/route.ts`
-- [ ] `/api/revenue` GET - Sheets - `src/app/api/revenue/route.ts`
-- [ ] `/api/finance/summary` GET - Sheets - `src/app/api/finance/summary/route.ts`
+- [x] `/api/tenants` GET - Supabase tenants+rooms+branches - `src/app/api/tenants/route.ts`
+- [x] `/api/tenants/:id` GET - Supabase tenants+rooms+branches - `src/app/api/tenants/[id]/route.ts`
+- [x] `/api/payments` GET - Supabase monthly_payments+tenants - `src/app/api/payments/route.ts`
+- [x] `/api/payments/summary` GET - Supabase tenants+monthly_payments - `src/app/api/payments/summary/route.ts`
+- [x] `/api/platform-transfers` GET - Supabase tenants+platforms+monthly_payments - `src/app/api/platform-transfers/route.ts`
+- [x] `/api/tenant-portal/:token` GET - Supabase tenants+rooms+branches+issues - `src/app/api/tenant-portal/[token]/route.ts`
+- [x] `/api/investor-portal/:token` GET - Supabase investors+branches+tenants - `src/app/api/investor-portal/[token]/route.ts`
+- [ ] `/api/tenant-duty` GET - Sheets - 건너뜀: duty_schedules 테이블 스키마 불일치
+- [ ] `/api/vacancies` GET - Sheets - 건너뜀: Supabase에 vacancies 테이블 없음
+- [x] `/api/dashboard` GET - Supabase tenants+branches+issues+expenses - `src/app/api/dashboard/route.ts`
+- [x] `/api/revenue` GET - Supabase tenants+branches+expenses+investors - `src/app/api/revenue/route.ts`
+- [x] `/api/finance/summary` GET - Supabase tenants+branches+expenses - `src/app/api/finance/summary/route.ts`
 
 ## Step 4.3 - 이슈 + 신청서 5종 + 지출 읽기 (중간 위험도)
 

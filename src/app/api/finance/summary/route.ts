@@ -1,98 +1,66 @@
 import { NextResponse } from 'next/server'
-import { getSheetData } from '@/lib/sheets'
+import { createAdminClient } from '@/lib/supabase/server'
+import { listOrEmpty } from '@/lib/supabase/helpers'
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
     const year = Number(searchParams.get('year')) || new Date().getFullYear()
     const month = Number(searchParams.get('month')) || new Date().getMonth() + 1
+    const ym = `${year}-${String(month).padStart(2, '0')}`
 
-    const [tenantRows, utilityRows, houseRows, opexRows] = await Promise.all([
-      getSheetData('입주자'),
-      getSheetData('공과금'),
-      getSheetData('지점'),
-      getSheetData('운영지출'),
+    const supabase = createAdminClient()
+
+    const [tenants, branches, expenses] = await Promise.all([
+      listOrEmpty<any>(supabase.from('tenants').select('*, rooms(branch_id)').eq('status', 'active')),
+      listOrEmpty<any>(supabase.from('branches').select('id, name, district, contract_rent, memo')),
+      listOrEmpty<any>(supabase.from('expenses').select('*').eq('year_month', ym)),
     ])
 
     const houseMap: Record<string, { id: string; district: string; buildingRent: number; isConsignment: boolean }> = {}
-    for (const row of houseRows) {
-      const name = row[1]?.trim()
-      if (!name) continue
-      houseMap[name] = {
-        id: row[0],
-        district: row[2] || '',
-        buildingRent: Number(row[7]) || 0,
-        isConsignment: (row[12]?.trim() || '') === '위탁운영',
-      }
+    for (const b of branches) {
+      houseMap[b.name] = { id: b.id, district: b.district || '', buildingRent: b.contract_rent || 0, isConsignment: false }
     }
 
     const incomeMap: Record<string, { rent: number; mgmt: number; count: number }> = {}
-    for (const row of tenantRows) {
-      if (row[8] === '퇴실') continue
-      const houseName = row[2]?.trim()
-      if (!houseName) continue
-      const rent = Number(row[10]) || 0
-      const mgmt = Number(row[11]) || 0
-      if (!incomeMap[houseName]) incomeMap[houseName] = { rent: 0, mgmt: 0, count: 0 }
-      incomeMap[houseName].rent += rent
-      incomeMap[houseName].mgmt += mgmt
-      incomeMap[houseName].count += 1
-    }
-
-    const expenseMap: Record<string, number> = {}
-    for (const row of utilityRows) {
-      // 공과금: [0]ID [1]지점명 [2]연도 [3]월 [4]전기 [5]가스 [6]수도 [7]인터넷 [8]정수기 [9]메모 [10]청소 [11]기타
-      if (Number(row[2]) !== year || Number(row[3]) !== month) continue
-      const houseName = row[1]?.trim()
-      if (!houseName) continue
-      const total = [4, 5, 6, 7, 8, 10, 11].reduce((sum, i) => sum + (Number(row[i]) || 0), 0)
-      expenseMap[houseName] = (expenseMap[houseName] || 0) + total
-    }
-
-    // 기타지출(운영지출) 집계
-    // 운영지출: [0]지출ID [1]지점명 [2]날짜 [3]카테고리 [4]금액 [5]내용 [6]담당자 [7]메모 [8]월 [9]메모
-    const opexMap: Record<string, number> = {}
-    for (const row of opexRows) {
-      const dateStr = row[2] || ''
-      const d = dateStr ? new Date(dateStr) : null
-      const rowYear = d ? d.getFullYear() : 0
-      const rowMonth = Number(row[8]) || (d ? d.getMonth() + 1 : 0)
-      if (rowYear !== year || rowMonth !== month) continue
-      if (row[9] === '삭제됨' || Number(row[4]) === 0) continue
-      const hn = row[1]?.trim()
+    for (const t of tenants) {
+      const branch = branches.find((b: any) => b.id === t.rooms?.branch_id)
+      const hn = branch?.name
       if (!hn) continue
-      opexMap[hn] = (opexMap[hn] || 0) + (Number(row[4]) || 0)
+      if (!incomeMap[hn]) incomeMap[hn] = { rent: 0, mgmt: 0, count: 0 }
+      incomeMap[hn].rent += t.monthly_rent || 0
+      incomeMap[hn].mgmt += t.maintenance_fee || 0
+      incomeMap[hn].count += 1
+    }
+
+    // expenses grouped by branch
+    const expenseMap: Record<string, number> = {}
+    for (const e of expenses) {
+      const branch = branches.find((b: any) => b.id === e.branch_id)
+      const hn = branch?.name || ''
+      if (hn) expenseMap[hn] = (expenseMap[hn] || 0) + (e.amount || 0)
     }
 
     const results = Object.keys(houseMap).map(houseName => {
       const house = houseMap[houseName]
       const income = incomeMap[houseName] || { rent: 0, mgmt: 0, count: 0 }
-      const utilityExpense = expenseMap[houseName] || 0
-      const opexExpense = opexMap[houseName] || 0
-      const buildingRent = house.buildingRent
+      const utilityExpense = 0 // utilities table doesn't exist separately in Supabase
+      const opexExpense = expenseMap[houseName] || 0
       const totalIncome = income.rent + income.mgmt
-      const totalExpense = buildingRent + utilityExpense + opexExpense
-      const profit = totalIncome - totalExpense
+      const totalExpense = house.buildingRent + utilityExpense + opexExpense
       return {
-        houseId: house.id, houseName, district: house.district,
-        isConsignment: house.isConsignment, tenantCount: income.count,
-        rent: income.rent, managementFee: income.mgmt, totalIncome,
-        buildingRent, utilityExpense, opexExpense, totalExpense, profit,
-        hasUtility: !!expenseMap[houseName],
+        houseId: house.id, houseName, district: house.district, isConsignment: house.isConsignment,
+        tenantCount: income.count, rent: income.rent, managementFee: income.mgmt, totalIncome,
+        buildingRent: house.buildingRent, utilityExpense, opexExpense, totalExpense,
+        profit: totalIncome - totalExpense, hasUtility: false,
       }
-    })
-
-    results.sort((a, b) => b.profit - a.profit)
+    }).sort((a, b) => b.profit - a.profit)
 
     const totals = results.reduce((acc, r) => ({
-      tenantCount: acc.tenantCount + r.tenantCount,
-      totalIncome: acc.totalIncome + r.totalIncome,
-      totalRent: acc.totalRent + r.rent,
-      totalMgmt: acc.totalMgmt + r.managementFee,
-      buildingRent: acc.buildingRent + r.buildingRent,
-      utilityExpense: acc.utilityExpense + r.utilityExpense,
-      opexExpense: acc.opexExpense + r.opexExpense,
-      totalExpense: acc.totalExpense + r.totalExpense,
+      tenantCount: acc.tenantCount + r.tenantCount, totalIncome: acc.totalIncome + r.totalIncome,
+      totalRent: acc.totalRent + r.rent, totalMgmt: acc.totalMgmt + r.managementFee,
+      buildingRent: acc.buildingRent + r.buildingRent, utilityExpense: acc.utilityExpense + r.utilityExpense,
+      opexExpense: acc.opexExpense + r.opexExpense, totalExpense: acc.totalExpense + r.totalExpense,
       profit: acc.profit + r.profit,
     }), { tenantCount: 0, totalIncome: 0, totalRent: 0, totalMgmt: 0, buildingRent: 0, utilityExpense: 0, opexExpense: 0, totalExpense: 0, profit: 0 })
 

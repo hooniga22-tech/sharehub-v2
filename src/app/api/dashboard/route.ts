@@ -1,152 +1,93 @@
 import { NextResponse } from 'next/server'
-import { getSheetData } from '@/lib/sheets'
+import { createAdminClient } from '@/lib/supabase/server'
+import { listOrEmpty } from '@/lib/supabase/helpers'
 
 export async function GET() {
   try {
     const now = new Date()
     const year = now.getFullYear()
     const month = now.getMonth() + 1
-    const today = now.toISOString().split('T')[0]
+    const ym = `${year}-${String(month).padStart(2, '0')}`
 
-    const [tenantRows, houseRows, issueRows, workerRows, utilityRows] = await Promise.all([
-      getSheetData('입주자'),
-      getSheetData('지점'),
-      getSheetData('이슈'),
-      getSheetData('용역'),
-      getSheetData('공과금'),
+    const supabase = createAdminClient()
+
+    const [tenants, branches, issues, expenses] = await Promise.all([
+      listOrEmpty<any>(supabase.from('tenants').select('*, rooms(room_code, branch_id, branches(name))')),
+      listOrEmpty<any>(supabase.from('branches').select('id, name, contract_rent')),
+      listOrEmpty<any>(supabase.from('issues').select('*')),
+      listOrEmpty<any>(supabase.from('expenses').select('*').eq('year_month', ym)),
     ])
 
-    // 전체 방 수 (입주자 시트 기반)
-    const totalRooms = tenantRows.length
-    const activeTenants = tenantRows.filter(r => r[8] === '입주중')
-    const exitSoon = tenantRows.filter(r => {
-      if (r[8] !== '입주중') return false
-      const end = r[7]
+    const totalRooms = tenants.length
+    const activeTenants = tenants.filter((t: any) => t.status === 'active')
+    const exitSoon = tenants.filter((t: any) => {
+      if (t.status !== 'active') return false
+      const end = t.contract_end
       if (!end) return false
       const diff = (new Date(end).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
       return diff >= 0 && diff <= 30
     })
-    const vacant = tenantRows.filter(r => r[8] === '퇴실' || r[8] === '공실')
+    const vacant = tenants.filter((t: any) => t.status === 'moved_out' || t.status === 'cancelled')
 
-    // 만료임박 30일 이내 (D-day 계산 포함)
-    const expiringTenants = tenantRows
-      .filter(r => {
-        if (r[8] !== '입주중') return false
-        const end = r[7]
-        if (!end) return false
-        const diff = Math.ceil((new Date(end).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-        return diff >= 0 && diff <= 30
-      })
-      .map(r => {
-        const diff = Math.ceil((new Date(r[7]).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-        return {
-          name: r[5],
-          houseName: r[2],
-          roomCode: r[3],
-          endDate: r[7],
-          dDay: diff,
-          tenantId: r[0],
-        }
-      })
-      .sort((a, b) => a.dDay - b.dDay)
-
-    // 미처리 이슈 (접수 + 진행중)
-    const pendingIssues = issueRows
-      .filter(r => r[6] === '접수' || r[6] === '진행중')
-      .map(r => ({
-        id: r[0],
-        houseName: r[1],
-        title: r[3],
-        category: r[5],
-        status: r[6],
-        createdAt: r[8],
+    const expiringTenants = exitSoon
+      .map((t: any) => ({
+        name: t.name, houseName: t.rooms?.branches?.name || '', roomCode: t.rooms?.room_code || '',
+        endDate: t.contract_end, tenantId: t.id,
+        dDay: Math.ceil((new Date(t.contract_end).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
       }))
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .sort((a: any, b: any) => a.dDay - b.dDay)
 
-    // 이번달 용역 현황
-    // 용역: [0]ID [1]예정일 [2]지점명 [3]담당자명 [4]작업종류 [5]정산금액 [6]메모 [7]완료여부
-    const thisMonthWorkers = workerRows.filter(r => {
-      const d = r[1]
-      if (!d) return false
-      return d.startsWith(`${year}-${String(month).padStart(2, '0')}`)
-    })
-    const pendingWorkers = thisMonthWorkers.filter(r => r[7] !== 'Y')
-    const completedWorkers = thisMonthWorkers.filter(r => r[7] === 'Y')
-    const workerPaymentTotal = thisMonthWorkers.reduce((sum, r) => sum + (Number(r[5]) || 0), 0)
+    const pendingIssues = issues
+      .filter((i: any) => i.status === 'pending' || i.status === 'in_progress')
+      .map((i: any) => ({ id: i.id, houseName: '', title: i.title, category: i.category, status: i.status, createdAt: i.created_at }))
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
-    // 이번달 수입 집계
+    // Income by branch
     const incomeMap: Record<string, { rent: number; mgmt: number }> = {}
-    for (const row of tenantRows) {
-      if (row[8] === '퇴실') continue
-      const hn = row[2]?.trim()
+    for (const t of activeTenants) {
+      const hn = t.rooms?.branches?.name || ''
       if (!hn) continue
       if (!incomeMap[hn]) incomeMap[hn] = { rent: 0, mgmt: 0 }
-      incomeMap[hn].rent += Number(row[10]) || 0
-      incomeMap[hn].mgmt += Number(row[11]) || 0
+      incomeMap[hn].rent += t.monthly_rent || 0
+      incomeMap[hn].mgmt += t.maintenance_fee || 0
     }
 
-    // 이번달 공과금 집계
+    // Expense by branch
     const expenseMap: Record<string, number> = {}
-    for (const row of utilityRows) {
-      // 공과금: [0]ID [1]지점명 [2]연도 [3]월 [4]전기 [5]가스 [6]수도 [7]인터넷 [8]정수기 [9]메모 [10]청소 [11]기타
-      if (Number(row[2]) !== year || Number(row[3]) !== month) continue
-      const hn = row[1]?.trim()
-      if (!hn) continue
-      expenseMap[hn] = (expenseMap[hn] || 0) + [4, 5, 6, 7, 8, 10, 11].reduce((s, i) => s + (Number(row[i]) || 0), 0)
+    for (const e of expenses) {
+      const branch = branches.find((b: any) => b.id === e.branch_id)
+      const hn = branch?.name || ''
+      if (hn) expenseMap[hn] = (expenseMap[hn] || 0) + (e.amount || 0)
     }
 
-    // 집월세 집계
+    // Building rent map
     const buildingRentMap: Record<string, number> = {}
-    for (const row of houseRows) {
-      buildingRentMap[row[1]?.trim()] = Number(row[7]) || 0
-    }
+    for (const b of branches) buildingRentMap[b.name] = b.contract_rent || 0
 
-    // 지점별 순이익 TOP5
     const profitRanking = Object.keys(incomeMap).map(hn => {
-      const income = incomeMap[hn]
-      const totalIncome = income.rent + income.mgmt
+      const inc = incomeMap[hn]
+      const totalIncome = inc.rent + inc.mgmt
       const expense = (buildingRentMap[hn] || 0) + (expenseMap[hn] || 0)
       return { houseName: hn, totalIncome, expense, profit: totalIncome - expense }
-    })
-      .sort((a, b) => b.profit - a.profit)
-      .slice(0, 5)
+    }).sort((a, b) => b.profit - a.profit).slice(0, 5)
 
-    // 전체 합계
     const totalIncome = Object.values(incomeMap).reduce((s, v) => s + v.rent + v.mgmt, 0)
-    const totalExpense = Object.keys(incomeMap).reduce((s, hn) => {
-      return s + (buildingRentMap[hn] || 0) + (expenseMap[hn] || 0)
-    }, 0)
-    const totalProfit = totalIncome - totalExpense
-    const totalRent = Object.values(incomeMap).reduce((s, v) => s + v.rent, 0)
-    const totalMgmt = Object.values(incomeMap).reduce((s, v) => s + v.mgmt, 0)
+    const totalExpense = Object.keys(incomeMap).reduce((s, hn) => s + (buildingRentMap[hn] || 0) + (expenseMap[hn] || 0), 0)
 
     return NextResponse.json({
       summary: {
-        totalRooms,
-        activeTenants: activeTenants.length,
-        exitSoon: exitSoon.length,
-        vacantRooms: vacant.length,
-        pendingIssues: pendingIssues.length,
-        pendingWorkers: pendingWorkers.length,
+        totalRooms, activeTenants: activeTenants.length, exitSoon: exitSoon.length,
+        vacantRooms: vacant.length, pendingIssues: pendingIssues.length, pendingWorkers: 0,
       },
       finance: {
-        totalIncome,
-        totalRent,
-        totalMgmt,
-        totalExpense,
-        totalProfit,
-        year,
-        month,
+        totalIncome, totalRent: Object.values(incomeMap).reduce((s, v) => s + v.rent, 0),
+        totalMgmt: Object.values(incomeMap).reduce((s, v) => s + v.mgmt, 0),
+        totalExpense, totalProfit: totalIncome - totalExpense, year, month,
       },
       expiringTenants,
       pendingIssues: pendingIssues.slice(0, 5),
       profitRanking,
-      workerSummary: {
-        total: thisMonthWorkers.length,
-        pending: pendingWorkers.length,
-        completed: completedWorkers.length,
-        paymentTotal: workerPaymentTotal,
-      },
+      workerSummary: { total: 0, pending: 0, completed: 0, paymentTotal: 0 },
     })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
