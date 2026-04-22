@@ -1,25 +1,20 @@
 import { NextResponse } from 'next/server'
-import { getSheetData, appendRow } from '@/lib/sheets'
+import { createAdminClient } from '@/lib/supabase/server'
+import { listOrEmpty } from '@/lib/supabase/helpers'
 
-// row: [0]이슈ID [1]지점명 [2]방코드 [3]제목 [4]내용 [5]카테고리 [6]상태 [7]담당자 [8]등록일 [9]완료일 [10]비용 [11]메모
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-}
-
+// CORS preflight
 export async function OPTIONS() {
-  return new Response(null, { status: 204, headers: corsHeaders })
+  return new NextResponse(null, {
+    headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' },
+  })
 }
 
+// GET - 이슈 빠른 생성 (쿼리 파라미터로 생성)
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
     const title = searchParams.get('title')
-    if (!title) {
-      return NextResponse.json({ error: 'title은 필수입니다' }, { status: 400, headers: corsHeaders })
-    }
+    if (!title) return NextResponse.json({ error: 'title required' }, { status: 400 })
 
     const houseName = searchParams.get('houseName') || ''
     const category = searchParams.get('category') || '기타'
@@ -27,38 +22,35 @@ export async function GET(req: Request) {
     const dueDate = searchParams.get('dueDate') || ''
     const priority = searchParams.get('priority') || ''
 
-    const rows = await getSheetData('이슈')
-    let maxNum = 0
-    for (const r of rows) {
-      const m = r[0]?.match(/issue_(\d+)/)
-      if (m) maxNum = Math.max(maxNum, Number(m[1]))
+    const supabase = createAdminClient()
+
+    // 지점 ID 조회 (있으면)
+    let branchId: string | null = null
+    if (houseName) {
+      const branches = await listOrEmpty<any>(supabase.from('branches').select('id').eq('name', houseName).limit(1))
+      branchId = branches[0]?.id || null
     }
-    const id = `issue_${String(maxNum + 1).padStart(4, '0')}`
-    const today = new Date().toISOString().slice(0, 10)
 
-    const memo = [
-      priority && `우선순위:${priority}`,
-      dueDate && `기한:${dueDate}`,
-    ].filter(Boolean).join(' / ')
+    // 워커 ID 조회 (있으면)
+    let workerId: string | null = null
+    if (assignee) {
+      const workers = await listOrEmpty<any>(supabase.from('workers').select('id').eq('name', assignee).limit(1))
+      workerId = workers[0]?.id || null
+    }
 
-    const row = [
-      id,
-      houseName,
-      '',        // roomCode
-      title,
-      '',        // content
-      category,
-      '접수',
-      assignee,
-      today,
-      '',        // completedAt
-      0,         // cost
-      memo,
-    ]
-    await appendRow('이슈', row)
+    const memo = [priority ? `우선순위:${priority}` : '', dueDate ? `기한:${dueDate}` : ''].filter(Boolean).join(' / ')
+    const id = `issue_${Date.now()}`
 
-    return NextResponse.json({ success: true, id, title, houseName, category }, { headers: corsHeaders })
+    const { error } = await supabase.from('issues').insert({
+      id, branch_id: branchId, title, category, status: 'pending',
+      scheduled_date: dueDate || null, worker_id: workerId, memo: memo || null,
+    })
+    if (error) throw error
+
+    const res = NextResponse.json({ success: true, id, title, houseName, category })
+    res.headers.set('Access-Control-Allow-Origin', '*')
+    return res
   } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 500, headers: corsHeaders })
+    return NextResponse.json({ error: String(e) }, { status: 500 })
   }
 }

@@ -36,8 +36,8 @@
 - [x] `/api/platform-transfers` GET - Supabase tenants+platforms+monthly_payments - `src/app/api/platform-transfers/route.ts`
 - [x] `/api/tenant-portal/:token` GET - Supabase tenants+rooms+branches+issues - `src/app/api/tenant-portal/[token]/route.ts`
 - [x] `/api/investor-portal/:token` GET - Supabase investors+branches+tenants - `src/app/api/investor-portal/[token]/route.ts`
-- [ ] `/api/tenant-duty` GET - Sheets - 건너뜀: duty_schedules 테이블 스키마 불일치
-- [ ] `/api/vacancies` GET - Sheets - 건너뜀: Supabase에 vacancies 테이블 없음
+- [x] `/api/tenant-duty` GET - Supabase duty_schedules+tenants+rooms - `src/app/api/tenant-duty/route.ts`
+- [x] `/api/vacancies` GET - Supabase rooms+tenants (계산 기반) - `src/app/api/vacancies/route.ts`
 - [x] `/api/dashboard` GET - Supabase tenants+branches+issues+expenses - `src/app/api/dashboard/route.ts`
 - [x] `/api/revenue` GET - Supabase tenants+branches+expenses+investors - `src/app/api/revenue/route.ts`
 - [x] `/api/finance/summary` GET - Supabase tenants+branches+expenses - `src/app/api/finance/summary/route.ts`
@@ -46,21 +46,21 @@
 
 - [x] `/api/issues` GET - Supabase issues+branches+rooms+workers - `src/app/api/issues/route.ts`
 - [x] `/api/issues/:id` GET - Supabase issues+branches+rooms+workers - `src/app/api/issues/[id]/route.ts`
-- [ ] `/api/issues/work/:id` GET - Sheets - 건너뜀: 용역 시트 특화 필드 구조, issues 테이블과 불일치
-- [ ] `/api/issues/quick-add` GET - Sheets - 건너뜀: GET이 데이터 생성하는 특수 엔드포인트
+- [x] `/api/issues/work/:id` GET - Supabase issues+branches+workers - `src/app/api/issues/work/[id]/route.ts`
+- [x] `/api/issues/quick-add` GET - Supabase issues (INSERT via GET) - `src/app/api/issues/quick-add/route.ts`
 - [x] `/api/expenses` GET - Supabase expenses+branches+expense_categories - `src/app/api/expenses/route.ts`
-- [ ] `/api/utilities` GET - Sheets - 건너뜀: Supabase에 공과금 전용 테이블 없음
-- [ ] `/api/utility` GET - Sheets - 건너뜀: 위와 동일
-- [ ] `/api/duty` GET - Sheets - 건너뜀: duty_schedules 스키마 불일치
-- [ ] `/api/duty/exchange` GET - Sheets - 건너뜀: 당번교환 테이블 없음
-- [ ] `/api/tasks/active` GET - Sheets - 건너뜀: tasks 테이블 없음
-- [ ] `/api/tasks/inventory` GET - Sheets - 건너뜀: tasks 테이블 없음
+- [x] `/api/utilities` GET - Supabase expenses+branches+expense_categories - `src/app/api/utilities/route.ts`
+- [x] `/api/utility` GET - Supabase expenses+branches+expense_categories - `src/app/api/utility/route.ts`
+- [x] `/api/duty` GET - Supabase duty_schedules+tenants+rooms - `src/app/api/duty/route.ts`
+- [x] `/api/duty/exchange` - 삭제됨 (호출처 없음, 당번 교환 이력 미사용)
+- [ ] `/api/tasks/active` GET - Sheets 유지 - 프론트엔드 4곳에서 호출, tasks 테이블 없음
+- [ ] `/api/tasks/inventory` GET - Sheets 유지 - 프론트엔드 1곳에서 호출, tasks 테이블 없음
 - [x] `/api/apply/tour` GET - Supabase tour_applications - `src/app/api/apply/tour/route.ts`
 - [x] `/api/apply/cleaning` GET - Supabase cleaning_applications - `src/app/api/apply/cleaning/route.ts`
 - [x] `/api/apply/aircon` GET - Supabase aircon_applications - `src/app/api/apply/aircon/route.ts`
 - [x] `/api/apply/checkout` GET - Supabase checkout_applications - `src/app/api/apply/checkout/route.ts`
 - [x] `/api/apply/supplies` GET - Supabase supplies_applications - `src/app/api/apply/supplies/route.ts`
-- [ ] `/api/opex` GET - Sheets - 건너뜀: 운영지출 한국어 필드 구조
+- [x] `/api/opex` GET - Supabase expenses+branches+expense_categories - `src/app/api/opex/route.ts`
 - [x] `/api/house-guide/:slug` GET - Supabase branches+tenants - `src/app/api/house-guide/[slug]/route.ts`
 
 ## Step 4.4 - 마스터 + 입주자/수납 쓰기 (높은 위험도)

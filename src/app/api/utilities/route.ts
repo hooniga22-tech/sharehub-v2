@@ -1,111 +1,72 @@
 import { NextResponse } from 'next/server'
 import { getSheetData, appendRow, updateRow } from '@/lib/sheets'
-
-// 공과금 탭: [0]ID [1]지점명 [2]연도 [3]월 [4]전기 [5]가스 [6]수도 [7]인터넷 [8]정수기 [9]메모 [10]청소 [11]기타 [12]합계메모 [13]입력일
-// 지점 탭: [0]지점ID [1]지점명 [2]구 [3]주소 ... [7]집월세
-
-const normalize = (name: string) => name.replace(/하우스$/, '').trim().toLowerCase()
+import { createAdminClient } from '@/lib/supabase/server'
+import { listOrEmpty } from '@/lib/supabase/helpers'
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
     const year = searchParams.get('year') || String(new Date().getFullYear())
     const month = searchParams.get('month') || String(new Date().getMonth() + 1)
+    const ym = `${year}-${String(month).padStart(2, '0')}`
 
-    const [utilRows, houseInfoRows] = await Promise.all([
-      getSheetData('공과금'),
-      getSheetData('지점'),
+    const supabase = createAdminClient()
+    const [branches, expenseRows] = await Promise.all([
+      listOrEmpty<any>(supabase.from('branches').select('id, name, district')),
+      listOrEmpty<any>(supabase.from('expenses').select('*, expense_categories(code)').eq('year_month', ym)),
     ])
 
-    // 해당 연도+월 데이터만 필터
-    const monthData = utilRows.filter(r => r[2] === year && r[3] === month)
-    const dataByHouse = new Map<string, typeof monthData[0]>()
-    for (const r of monthData) {
-      dataByHouse.set(normalize(r[1] || ''), r)
+    const codeMap: Record<string, string> = { electricity: '전기', gas: '가스', water: '수도', internet: '인터넷', water_purifier: '정수기', cleaning: '청소', other: '기타' }
+    const utilCodes = new Set(Object.keys(codeMap))
+
+    const byBranch = new Map<string, Record<string, number>>()
+    for (const e of expenseRows) {
+      const code = e.expense_categories?.code
+      if (!code || !utilCodes.has(code)) continue
+      const bid = e.branch_id
+      if (!byBranch.has(bid)) byBranch.set(bid, {})
+      const key = codeMap[code] || '기타'
+      byBranch.get(bid)![key] = (byBranch.get(bid)![key] || 0) + (e.amount || 0)
     }
 
-    // 구별 지점 그룹 ([1]지점명, [2]구)
-    const districtMap = new Map<string, { houseName: string; district: string }[]>()
-    for (const r of houseInfoRows) {
-      const houseName = r[1] || ''
-      const district = r[2] || '기타'
-      if (!houseName) continue
-      if (!districtMap.has(district)) districtMap.set(district, [])
-      districtMap.get(district)!.push({ houseName, district })
+    const districtMap = new Map<string, any[]>()
+    for (const b of branches) {
+      const d = b.district || '기타'
+      if (!districtMap.has(d)) districtMap.set(d, [])
+      const data = byBranch.get(b.id) || {}
+      const hasData = Object.keys(data).length > 0
+      const total = Object.values(data).reduce((s: number, v) => s + ((v as number) || 0), 0)
+      districtMap.get(d)!.push({ houseName: b.name, hasData, ...Object.fromEntries(['전기', '가스', '수도', '인터넷', '정수기', '기타'].map(k => [k, data[k] || 0])), total })
     }
 
-    let totalAmount = 0
-    let completedCount = 0
-    let missingCount = 0
-
-    const districts = [...districtMap.entries()].map(([name, houseList]) => {
-      let distTotal = 0
-      let distCompleted = 0
-      let distMissing = 0
-
-      const houses = houseList.map(({ houseName }) => {
-        const row = dataByHouse.get(normalize(houseName))
-        if (!row) {
-          distMissing++
-          return { houseName, hasData: false as const }
-        }
-        const 전기 = Number(row[4]) || 0
-        const 가스 = Number(row[5]) || 0
-        const 수도 = Number(row[6]) || 0
-        const 인터넷 = Number(row[7]) || 0
-        const 정수기 = Number(row[8]) || 0
-        const 기타 = Number(row[11]) || 0
-        const total = 전기 + 가스 + 수도 + 인터넷 + 정수기 + 기타
-        distTotal += total
-        distCompleted++
-        return { houseName, hasData: true as const, 전기, 가스, 수도, 인터넷, 정수기, 기타, total }
-      })
-
-      totalAmount += distTotal
-      completedCount += distCompleted
-      missingCount += distMissing
-
-      return {
-        name,
-        houses,
-        totalAmount: distTotal,
-        completedCount: distCompleted,
-        missingCount: distMissing,
-      }
+    let totalAmount = 0, completedCount = 0, missingCount = 0
+    const districts = [...districtMap.entries()].map(([name, houses]) => {
+      const dt = houses.reduce((s, h) => s + h.total, 0)
+      const cc = houses.filter(h => h.hasData).length
+      const mc = houses.filter(h => !h.hasData).length
+      totalAmount += dt; completedCount += cc; missingCount += mc
+      return { name, houses, totalAmount: dt, completedCount: cc, missingCount: mc }
     })
 
-    return NextResponse.json({
-      districts,
-      summary: { totalAmount, completedCount, missingCount },
-    })
+    return NextResponse.json({ districts, summary: { totalAmount, completedCount, missingCount } })
   } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 500 })
+    console.error(e); return NextResponse.json({ error: String(e) }, { status: 500 })
   }
 }
 
+// POST는 Step 4.5 - Sheets 유지
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { houseName, year, month, 전기, 가스, 수도, 인터넷, 정수기, 기타 } = body
-    if (!houseName || !year || !month) {
-      return NextResponse.json({ error: 'missing fields' }, { status: 400 })
-    }
-
-    const id = `util_${houseName}_${year}${String(month).padStart(2, '0')}`
-    const now = new Date().toISOString().slice(0, 10)
-    const row = [id, houseName, String(year), String(month), 전기 ?? 0, 가스 ?? 0, 수도 ?? 0, 인터넷 ?? 0, 정수기 ?? 0, '', 0, 기타 ?? 0, '', now]
-
-    const existingRows = await getSheetData('공과금')
-    const existingIdx = existingRows.findIndex(r => r[0] === id)
-
-    if (existingIdx >= 0) {
-      await updateRow('공과금', existingIdx, row)
+    const { houseName, year: y, month: m, ...fields } = body
+    const rows = await getSheetData('공과금')
+    const idx = rows.findIndex(r => r[1] === houseName && r[2] === String(y) && r[3] === String(m))
+    if (idx >= 0) {
+      const e = rows[idx]
+      await updateRow('공과금', idx, [e[0], houseName, String(y), String(m), fields['전기'] ?? e[4], fields['가스'] ?? e[5], fields['수도'] ?? e[6], fields['인터넷'] ?? e[7], fields['정수기'] ?? e[8], fields['메모'] ?? (e[9] || ''), fields['청소'] ?? (e[10] || ''), fields['기타'] ?? (e[11] || ''), '', new Date().toISOString().slice(0, 10)])
     } else {
-      await appendRow('공과금', row)
+      await appendRow('공과금', [`util_${Date.now()}`, houseName, String(y), String(m), fields['전기'] || 0, fields['가스'] || 0, fields['수도'] || 0, fields['인터넷'] || 0, fields['정수기'] || 0, '', fields['청소'] || 0, fields['기타'] || 0, '', new Date().toISOString().slice(0, 10)])
     }
-
-    return NextResponse.json({ success: true, id })
-  } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 500 })
-  }
+    return NextResponse.json({ success: true })
+  } catch (e) { return NextResponse.json({ error: String(e) }, { status: 500 }) }
 }

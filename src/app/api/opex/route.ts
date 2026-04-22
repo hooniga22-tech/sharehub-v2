@@ -1,21 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSheetData, appendRow, updateRow } from '@/lib/sheets'
-
-// 운영지출 시트 (8열): [0]지출ID [1]지점명 [2]날짜 [3]카테고리 [4]금액 [5]내용 [6]담당자 [7]메모
-
-function rowToOpex(r: string[], rowIndex: number) {
-  return {
-    _rowIndex: rowIndex,
-    지출ID: r[0] || '',
-    지점명: r[1] || '',
-    날짜: r[2] || '',
-    카테고리: r[3] || '',
-    금액: r[4] || '0',
-    내용: r[5] || '',
-    담당자: r[6] || '',
-    메모: r[7] || '',
-  }
-}
+import { createAdminClient } from '@/lib/supabase/server'
+import { listOrEmpty } from '@/lib/supabase/helpers'
 
 export async function GET(req: Request) {
   try {
@@ -25,65 +11,48 @@ export async function GET(req: Request) {
     const house = searchParams.get('house') || searchParams.get('houseName')
     const category = searchParams.get('category')
 
-    const rows = await getSheetData('운영지출')
-    let data = rows.map((r, i) => rowToOpex(r, i)).filter(d => d.지출ID !== 'deleted' && d.지출ID)
+    const supabase = createAdminClient()
+    let query = supabase.from('expenses').select('*, branches(name), expense_categories(label_ko)')
 
-    if (year && month) {
-      const prefix = `${year}-${String(month).padStart(2, '0')}`
-      data = data.filter(d => (d.날짜 || '').startsWith(prefix))
-    } else if (year) {
-      data = data.filter(d => (d.날짜 || '').startsWith(year))
-    }
+    if (year && month) query = query.eq('year_month', `${year}-${String(month).padStart(2, '0')}`)
+    else if (year) query = query.like('year_month', `${year}%`)
 
-    if (house) data = data.filter(d => d.지점명 === house)
-    if (category) data = data.filter(d => d.카테고리 === category)
+    const rows = await listOrEmpty<any>(query)
+    let items = rows.map((r, i) => ({
+      _rowIndex: i, 지출ID: r.id || '', 지점명: r.branches?.name || '',
+      날짜: r.paid_date || '', 카테고리: r.expense_categories?.label_ko || r.category_free_text || '',
+      금액: String(r.amount || 0), 내용: r.vendor || '', 담당자: '', 메모: r.memo || '',
+    }))
 
-    data.sort((a, b) => (a.날짜 > b.날짜 ? -1 : 1))
+    if (house) items = items.filter(i => i.지점명 === house)
+    if (category) items = items.filter(i => i.카테고리 === category)
+    items.sort((a, b) => b.날짜.localeCompare(a.날짜))
 
-    return NextResponse.json(data)
+    return NextResponse.json(items)
   } catch (e) {
-    console.error(e)
-    return NextResponse.json({ error: String(e) }, { status: 500 })
+    console.error(e); return NextResponse.json({ error: String(e) }, { status: 500 })
   }
 }
 
+// POST/DELETE는 Step 4.5 - Sheets 유지
 export async function POST(req: Request) {
   try {
     const body = await req.json()
     const id = `opex_${Date.now()}`
-    const today = new Date().toISOString().split('T')[0]
-
-    await appendRow('운영지출', [
-      id,
-      body.지점명 || body.houseName || '',
-      body.날짜 || body.date || today,
-      body.카테고리 || body.category || '',
-      String(body.금액 || body.amount || ''),
-      body.내용 || body.content || '',
-      body.담당자 || body.assignee || '',
-      body.메모 || body.memo || '',
-    ])
+    await appendRow('운영지출', [id, body.지점명 || '', body.날짜 || '', body.카테고리 || '', body.금액 || 0, body.내용 || '', body.담당자 || '', body.메모 || ''])
     return NextResponse.json({ success: true, id })
-  } catch (e) {
-    console.error(e)
-    return NextResponse.json({ error: String(e) }, { status: 500 })
-  }
+  } catch (e) { return NextResponse.json({ error: String(e) }, { status: 500 }) }
 }
 
 export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
     const id = searchParams.get('id')
-    if (!id) return NextResponse.json({ error: 'id 필요' }, { status: 400 })
-
+    if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
     const rows = await getSheetData('운영지출')
-    const rowIndex = rows.findIndex(r => r[0] === id)
-    if (rowIndex === -1) return NextResponse.json({ error: '없음' }, { status: 404 })
-
-    await updateRow('운영지출', rowIndex, ['deleted', '', '', '', '', '', '', ''])
+    const idx = rows.findIndex(r => r[0] === id)
+    if (idx === -1) return NextResponse.json({ error: 'not found' }, { status: 404 })
+    await updateRow('운영지출', idx, ['deleted', '', '', '', '', '', '', ''])
     return NextResponse.json({ success: true })
-  } catch (e) {
-    console.error(e)
-    return NextResponse.json({ error: String(e) }, { status: 500 })
-  }
+  } catch (e) { return NextResponse.json({ error: String(e) }, { status: 500 }) }
 }

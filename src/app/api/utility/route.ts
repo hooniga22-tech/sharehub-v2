@@ -1,25 +1,10 @@
 import { NextResponse } from 'next/server'
 import { getSheetData, appendRow, updateRow } from '@/lib/sheets'
+import { createAdminClient } from '@/lib/supabase/server'
+import { listOrEmpty } from '@/lib/supabase/helpers'
 
-// 공과금 시트 (10열): [0]ID [1]지점명 [2]연도 [3]월 [4]전기 [5]가스 [6]수도 [7]인터넷 [8]정수기 [9]메모
+const codeMap: Record<string, string> = { electricity: '전기', gas: '가스', water: '수도', internet: '인터넷', water_purifier: '정수기' }
 
-function rowToUtil(r: string[], rowIndex: number) {
-  return {
-    _rowIndex: rowIndex,
-    ID: r[0] || '',
-    지점명: r[1] || '',
-    연도: r[2] || '',
-    월: r[3] || '',
-    전기: r[4] || '0',
-    가스: r[5] || '0',
-    수도: r[6] || '0',
-    인터넷: r[7] || '0',
-    정수기: r[8] || '0',
-    메모: r[9] || '',
-  }
-}
-
-// GET /api/utility — 전체/필터 조회
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
@@ -27,85 +12,50 @@ export async function GET(req: Request) {
     const month = searchParams.get('month')
     const house = searchParams.get('house')
 
-    const rows = await getSheetData('공과금')
-    let data = rows.map((r, i) => rowToUtil(r, i))
+    const supabase = createAdminClient()
+    let query = supabase.from('expenses').select('*, branches(name), expense_categories(code)')
+    if (year && month) query = query.eq('year_month', `${year}-${String(month).padStart(2, '0')}`)
+    if (house) query = query.eq('branches.name', house)
 
-    if (year) data = data.filter(d => d.연도 === year)
-    if (month) data = data.filter(d => d.월 === month)
-    if (house) data = data.filter(d => d.지점명 === house)
-
-    return NextResponse.json(data)
-  } catch (e) {
-    console.error(e)
-    return NextResponse.json({ error: String(e) }, { status: 500 })
-  }
+    const rows = await listOrEmpty<any>(query)
+    return NextResponse.json(rows.map((r, i) => ({
+      _rowIndex: i, ID: r.id || '', 지점명: r.branches?.name || '',
+      연도: r.year_month?.split('-')[0] || '', 월: String(Number(r.year_month?.split('-')[1]) || ''),
+      전기: r.expense_categories?.code === 'electricity' ? String(r.amount) : '',
+      가스: r.expense_categories?.code === 'gas' ? String(r.amount) : '',
+      수도: r.expense_categories?.code === 'water' ? String(r.amount) : '',
+      인터넷: r.expense_categories?.code === 'internet' ? String(r.amount) : '',
+      정수기: r.expense_categories?.code === 'water_purifier' ? String(r.amount) : '',
+      메모: r.memo || '',
+    })))
+  } catch (e) { return NextResponse.json({ error: String(e) }, { status: 500 }) }
 }
 
-// POST /api/utility — 공과금 입력 (upsert)
+// POST/PUT는 Step 4.5 - Sheets 유지
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const houseName = body.지점명 || ''
-    const yr = String(body.연도 || new Date().getFullYear())
-    const mo = String(body.월 || new Date().getMonth() + 1)
-
-    // Check for existing entry
     const rows = await getSheetData('공과금')
-    const existIdx = rows.findIndex(r => r[1] === houseName && r[2] === yr && r[3] === mo)
-
-    if (existIdx !== -1) {
-      const e = rows[existIdx]
-      const updated = [
-        e[0], e[1], e[2], e[3],
-        body.전기 !== undefined ? String(body.전기) : e[4],
-        body.가스 !== undefined ? String(body.가스) : e[5],
-        body.수도 !== undefined ? String(body.수도) : e[6],
-        body.인터넷 !== undefined ? String(body.인터넷) : e[7],
-        body.정수기 !== undefined ? String(body.정수기) : e[8],
-        body.메모 ?? (e[9] || ''),
-      ]
-      await updateRow('공과금', existIdx, updated)
-      return NextResponse.json({ success: true, id: e[0], updated: true })
+    const idx = rows.findIndex(r => r[1] === body.지점명 && r[2] === body.연도 && r[3] === body.월)
+    if (idx >= 0) {
+      const e = rows[idx]
+      await updateRow('공과금', idx, [e[0], body.지점명, body.연도, body.월, body.전기 ?? e[4], body.가스 ?? e[5], body.수도 ?? e[6], body.인터넷 ?? e[7], body.정수기 ?? e[8], body.메모 ?? (e[9] || '')])
+      return NextResponse.json({ success: true, mode: 'update' })
     }
-
     const id = `util_${Date.now()}`
-    const row = [
-      id, houseName, yr, mo,
-      String(body.전기 || ''), String(body.가스 || ''), String(body.수도 || ''),
-      String(body.인터넷 || ''), String(body.정수기 || ''), body.메모 || '',
-    ]
-    await appendRow('공과금', row)
-    return NextResponse.json({ success: true, id })
-  } catch (e) {
-    console.error(e)
-    return NextResponse.json({ error: String(e) }, { status: 500 })
-  }
+    await appendRow('공과금', [id, body.지점명, body.연도, body.월, body.전기 || 0, body.가스 || 0, body.수도 || 0, body.인터넷 || 0, body.정수기 || 0, body.메모 || ''])
+    return NextResponse.json({ success: true, mode: 'create', id })
+  } catch (e) { return NextResponse.json({ error: String(e) }, { status: 500 }) }
 }
 
-// PUT /api/utility — 공과금 수정
 export async function PUT(req: Request) {
   try {
     const body = await req.json()
-    const { id, ...data } = body
-
     const rows = await getSheetData('공과금')
-    const rowIndex = rows.findIndex(r => r[0] === id)
-    if (rowIndex === -1) return NextResponse.json({ error: '없음' }, { status: 404 })
-
-    const e = rows[rowIndex]
-    const updated = [
-      e[0], e[1], e[2], e[3],
-      data.전기 !== undefined ? String(data.전기) : e[4],
-      data.가스 !== undefined ? String(data.가스) : e[5],
-      data.수도 !== undefined ? String(data.수도) : e[6],
-      data.인터넷 !== undefined ? String(data.인터넷) : e[7],
-      data.정수기 !== undefined ? String(data.정수기) : e[8],
-      data.메모 !== undefined ? data.메모 : (e[9] || ''),
-    ]
-    await updateRow('공과금', rowIndex, updated)
+    const idx = rows.findIndex(r => r[0] === body.ID)
+    if (idx === -1) return NextResponse.json({ error: '없음' }, { status: 404 })
+    const e = rows[idx]
+    await updateRow('공과금', idx, [e[0], e[1], e[2], e[3], body.전기 ?? e[4], body.가스 ?? e[5], body.수도 ?? e[6], body.인터넷 ?? e[7], body.정수기 ?? e[8], body.메모 ?? (e[9] || '')])
     return NextResponse.json({ success: true })
-  } catch (e) {
-    console.error(e)
-    return NextResponse.json({ error: String(e) }, { status: 500 })
-  }
+  } catch (e) { return NextResponse.json({ error: String(e) }, { status: 500 }) }
 }
