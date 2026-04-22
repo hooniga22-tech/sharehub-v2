@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getSheetData, updateRow, appendRow } from '@/lib/sheets'
+import { createAdminClient } from '@/lib/supabase/server'
+import { listOrEmpty } from '@/lib/supabase/helpers'
 
 interface ConfirmItem {
   tenantId: string
@@ -8,54 +9,38 @@ interface ConfirmItem {
   roomCode: string
   amount: number
   date: string
-  type: string // 월세, 공과금, etc.
-  method: string // 자동매칭, 수동연결
+  type: string
+  method: string
 }
 
 export async function POST(req: Request) {
   try {
     const { items, month } = await req.json() as { items: ConfirmItem[]; month: string }
-    if (!items || items.length === 0) {
-      return NextResponse.json({ error: 'no items' }, { status: 400 })
-    }
+    if (!items || items.length === 0) return NextResponse.json({ error: 'no items' }, { status: 400 })
 
-    // Get existing payment rows
-    const paymentRows = await getSheetData('납부')
+    const supabase = createAdminClient()
+    const existing = await listOrEmpty<any>(
+      supabase.from('monthly_payments').select('id, tenant_id').eq('year_month', month)
+    )
+    const existingMap = new Map<string, string>()
+    for (const e of existing) existingMap.set(e.tenant_id, e.id)
 
     let confirmed = 0
     for (const item of items) {
-      // Find existing payment row for this tenant + month
-      const rowIndex = paymentRows.findIndex(r =>
-        r[1] === item.tenantId &&
-        (r[6] || '').startsWith(month)
-      )
-
-      if (rowIndex >= 0) {
-        // Update existing row
-        const existing = paymentRows[rowIndex]
-        await updateRow('납부', rowIndex, [
-          existing[0], existing[1], existing[2], existing[3], existing[4],
-          existing[5], existing[6], existing[7], existing[8],
-          'Y', // rentPaid
-          existing[10],
-          `${item.method} · ${item.date}`,
-        ])
+      const payId = existingMap.get(item.tenantId)
+      if (payId) {
+        await supabase.from('monthly_payments').update({
+          rent_paid: item.amount, rent_paid_date: item.date,
+          memo: `${item.method} · ${item.date}`,
+        }).eq('id', payId)
       } else {
-        // Create new row
-        await appendRow('납부', [
-          `pay_${Date.now()}_${confirmed}`,
-          item.tenantId,
-          item.tenantName,
-          item.houseName,
-          item.roomCode,
-          item.type || '월세',
-          `${month}-01`,
-          item.amount,
-          0,
-          'Y',
-          'N',
-          `${item.method} · ${item.date}`,
-        ])
+        await supabase.from('monthly_payments').insert({
+          id: `pay_${Date.now()}_${confirmed}`,
+          tenant_id: item.tenantId, year_month: month,
+          rent_billed: item.amount, rent_paid: item.amount,
+          rent_paid_date: item.date,
+          memo: `${item.method} · ${item.date}`,
+        })
       }
       confirmed++
     }

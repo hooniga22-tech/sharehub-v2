@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { getSheetData, updateRow } from '@/lib/sheets'
 import { createAdminClient } from '@/lib/supabase/server'
 import { listOrEmpty } from '@/lib/supabase/helpers'
 
@@ -63,18 +62,20 @@ export async function GET(req: Request) {
   }
 }
 
-// PATCH는 Step 4.4에서 전환 예정 - Sheets 유지
 export async function PATCH(req: Request) {
   try {
     const { paymentId, transferred } = await req.json()
     if (!paymentId) return NextResponse.json({ error: 'paymentId required' }, { status: 400 })
-    const rows = await getSheetData('수납')
-    const idx = rows.findIndex(r => r[0] === paymentId)
-    if (idx < 0) return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
-    const row = [...rows[idx]]
-    while (row.length < 13) row.push('')
-    row[12] = transferred ? 'Y' : ''
-    await updateRow('수납', idx, row)
+    const supabase = createAdminClient()
+    // monthly_payments에는 transferred 컬럼이 없으므로 memo에 기록
+    const update: Record<string, any> = {}
+    if (transferred) {
+      update.memo = '이체완료'
+    } else {
+      update.memo = ''
+    }
+    const { error } = await supabase.from('monthly_payments').update(update).eq('id', paymentId)
+    if (error) return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
     return NextResponse.json({ ok: true })
   } catch (e) {
     console.error(e)

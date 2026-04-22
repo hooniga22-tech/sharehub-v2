@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { getSheetData, appendRow, updateRow } from '@/lib/sheets'
 import { createAdminClient } from '@/lib/supabase/server'
 import { listOrEmpty } from '@/lib/supabase/helpers'
 
@@ -49,13 +48,21 @@ export async function GET() {
   }
 }
 
-// POST/PUT는 Step 4.5 - Sheets 유지
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const id = `vac_${Date.now()}`
-    await appendRow('공실', [id, body.지점명 || '', body.방코드 || '', body.공실유형 || '현재공실', body.공실시작일 || '', body.퇴실예정일 || '', body.예정자명 || '', body.예정자연락처 || '', body.예정입주일 || '', body.보증금상태 || '', body.메모 || '', body.상태 || '진행중'])
-    return NextResponse.json({ success: true, id })
+    const supabase = createAdminClient()
+    // 공실 등록 = 해당 방의 vacancy_status를 업데이트
+    if (body.지점명 && body.방코드) {
+      const { data: rooms } = await supabase.from('rooms').select('id, branches!inner(name)')
+        .eq('room_code', body.방코드).eq('branches.name', body.지점명).limit(1)
+      if (rooms && rooms[0]) {
+        await supabase.from('rooms').update({
+          vacancy_status: body.공실유형 || '공실', memo: body.메모 || null,
+        }).eq('id', rooms[0].id)
+      }
+    }
+    return NextResponse.json({ success: true, id: `vac_${Date.now()}` })
   } catch (e) { return NextResponse.json({ error: String(e) }, { status: 500 }) }
 }
 
@@ -63,11 +70,15 @@ export async function PUT(req: Request) {
   try {
     const body = await req.json()
     const { id, ...data } = body
-    const rows = await getSheetData('공실')
-    const idx = rows.findIndex(r => r[0] === id)
-    if (idx === -1) return NextResponse.json({ error: '없음' }, { status: 404 })
-    const e = rows[idx]
-    await updateRow('공실', idx, [e[0], e[1], e[2], data.공실유형 ?? e[3], data.공실시작일 ?? e[4], data.퇴실예정일 ?? e[5], data.예정자명 ?? e[6], data.예정자연락처 ?? e[7], data.예정입주일 ?? e[8], data.보증금상태 ?? e[9], data.메모 ?? (e[10] || ''), data.상태 ?? (e[11] || '진행중')])
+    const supabase = createAdminClient()
+    // id가 vac_room_xxx 형식이면 room ID 추출
+    const roomId = id?.startsWith('vac_') ? id.replace('vac_', '') : id
+    const update: Record<string, any> = {}
+    if (data.상태 === '완료') update.vacancy_status = '입주중'
+    else if (data.공실유형) update.vacancy_status = data.공실유형
+    if (data.메모 !== undefined) update.memo = data.메모
+    const { error } = await supabase.from('rooms').update(update).eq('id', roomId)
+    if (error) return NextResponse.json({ error: '없음' }, { status: 404 })
     return NextResponse.json({ success: true })
   } catch (e) { return NextResponse.json({ error: String(e) }, { status: 500 }) }
 }

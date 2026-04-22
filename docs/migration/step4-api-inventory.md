@@ -80,13 +80,13 @@
 - [x] `/api/tenants/portal/supply` POST - Supabase supplies_applications - `src/app/api/tenants/portal/supply/route.ts`
 - [x] `/api/payments` POST, PUT - Supabase monthly_payments (generate mode included) - `src/app/api/payments/route.ts`
 - [x] `/api/payments/:id` PUT - Supabase monthly_payments - `src/app/api/payments/[id]/route.ts`
-- [ ] `/api/payments/generate` POST - Sheets - `src/app/api/payments/generate/route.ts`
-- [ ] `/api/payments/confirm` POST - Sheets - `src/app/api/payments/confirm/route.ts`
-- [ ] `/api/payments/bulk-confirm` POST - Sheets - `src/app/api/payments/bulk-confirm/route.ts`
-- [ ] `/api/payments/upload` POST - Sheets - `src/app/api/payments/upload/route.ts`
-- [ ] `/api/platform-transfers` PATCH - Sheets - `src/app/api/platform-transfers/route.ts`
-- [ ] `/api/vacancies` POST, PUT - Sheets - `src/app/api/vacancies/route.ts`
-- [ ] `/api/sheets` GET, POST, PUT - Sheets - `src/app/api/sheets/route.ts`
+- [x] `/api/payments/generate` POST - Supabase monthly_payments bulk insert - `src/app/api/payments/generate/route.ts`
+- [x] `/api/payments/confirm` POST - Supabase monthly_payments upsert - `src/app/api/payments/confirm/route.ts`
+- [x] `/api/payments/bulk-confirm` POST - Supabase monthly_payments bulk update - `src/app/api/payments/bulk-confirm/route.ts`
+- [x] `/api/payments/upload` POST - Supabase tenants (Excel matching) - `src/app/api/payments/upload/route.ts`
+- [x] `/api/platform-transfers` PATCH - Supabase monthly_payments memo - `src/app/api/platform-transfers/route.ts`
+- [x] `/api/vacancies` POST, PUT - Supabase rooms vacancy_status - `src/app/api/vacancies/route.ts`
+- [x] `/api/sheets` - 삭제됨 (호출처 0곳, Supabase 전환 후 불필요)
 
 ## Step 4.5 - 이슈/신청서/지출 쓰기 (높은 위험도)
 
