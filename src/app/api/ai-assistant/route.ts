@@ -1,16 +1,22 @@
 import { NextResponse } from 'next/server'
-import { getSheetData } from '@/lib/sheets'
+import { createAdminClient } from '@/lib/supabase/server'
+import { listOrEmpty } from '@/lib/supabase/helpers'
 
 export async function POST(req: Request) {
   try {
     const { message } = await req.json()
-    const tenants = await getSheetData('입주자')
+    const supabase = createAdminClient()
 
-    // Build tenant summary for context
-    // 입주자: [0]ID [2]지점명 [3]방코드 [5]이름 [6]입주일 [7]퇴실일 [8]상태 [9]보증금 [10]월세 [11]관리비
-    const tenantSummary = tenants.slice(0, 50).map(r => ({
-      id: r[0], houseName: r[2], roomCode: r[3], name: r[5],
-      rent: r[10], mgmt: r[11], deposit: r[9], startDate: r[6], endDate: r[7], status: r[8],
+    const rows = await listOrEmpty<any>(
+      supabase.from('tenants').select('id, name, branch_id, branches(name), rooms(room_code), move_in_date, move_out_date, status, deposit, monthly_rent, management_fee')
+        .limit(50)
+    )
+
+    const tenantSummary = rows.map(r => ({
+      id: r.id, houseName: r.branches?.name || '', roomCode: r.rooms?.room_code || '',
+      name: r.name || '', rent: String(r.monthly_rent || 0), mgmt: String(r.management_fee || 0),
+      deposit: String(r.deposit || 0), startDate: r.move_in_date || '', endDate: r.move_out_date || '',
+      status: r.status || '',
     }))
 
     const systemPrompt = `당신은 쉐어하우스 운영 관리 AI입니다.
@@ -40,7 +46,6 @@ ${JSON.stringify(tenantSummary, null, 2)}
 
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) {
-      // API 키 없으면 간단한 패턴 매칭으로 처리
       return NextResponse.json(parseSimple(message, tenantSummary))
     }
 
@@ -73,9 +78,7 @@ ${JSON.stringify(tenantSummary, null, 2)}
   }
 }
 
-// Fallback: 간단한 패턴 매칭 (API 키 없을 때)
 function parseSimple(msg: string, tenants: { id: string; houseName: string; roomCode: string; name: string; rent: string; status: string }[]) {
-  // "워너비 302호 월세 50만" 패턴
   const rentMatch = msg.match(/([가-힣]+)\s*(?:[\w\-]+호?)\s*(?:([가-힣]+)\s+)?월세\s*(\d+)\s*만/)
   if (rentMatch) {
     const house = rentMatch[1]
