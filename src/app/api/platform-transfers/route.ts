@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { listOrEmpty } from '@/lib/supabase/helpers'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 function kstMonth(): string {
   const d = new Date()
@@ -10,6 +11,7 @@ function kstMonth(): string {
 
 export async function GET(req: Request) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const { searchParams } = new URL(req.url)
     const month = searchParams.get('month') || kstMonth()
 
@@ -64,6 +66,7 @@ export async function GET(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const { paymentId, transferred } = await req.json()
     if (!paymentId) return NextResponse.json({ error: 'paymentId required' }, { status: 400 })
     const supabase = createAdminClient()

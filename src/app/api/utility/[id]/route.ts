@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { listOrEmpty } from '@/lib/supabase/helpers'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 const KO_CODE: Record<string, string> = { '전기': 'electricity', '가스': 'gas', '수도': 'water', '인터넷': 'internet', '정수기': 'water_purifier', '청소': 'cleaning', '기타': 'other' }
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const { id } = await params
     const body = await req.json()
     const supabase = createAdminClient()

@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { listOrEmpty } from '@/lib/supabase/helpers'
 import * as XLSX from 'xlsx'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const formData = await req.formData()
     const file = formData.get('file') as File
     if (!file) return NextResponse.json({ error: 'no file' }, { status: 400 })

@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getOrThrow } from '@/lib/supabase/helpers'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const { id } = await params
     const supabase = createAdminClient()
     const b = await getOrThrow<any>(supabase.from('branches').select('*').eq('id', id).single())
@@ -22,6 +24,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const { id } = await params
     const body = await req.json()
     const supabase = createAdminClient()

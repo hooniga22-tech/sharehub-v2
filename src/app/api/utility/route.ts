@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { listOrEmpty } from '@/lib/supabase/helpers'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 const CODE_KO: Record<string, string> = { electricity: '전기', gas: '가스', water: '수도', internet: '인터넷', water_purifier: '정수기' }
 const KO_CODE: Record<string, string> = Object.fromEntries(Object.entries(CODE_KO).map(([k, v]) => [v, k]))
 
 export async function GET(req: Request) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const { searchParams } = new URL(req.url)
     const year = searchParams.get('year')
     const month = searchParams.get('month')
@@ -33,6 +35,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const body = await req.json()
     const supabase = createAdminClient()
     const ym = `${body.연도}-${String(body.월).padStart(2, '0')}`
@@ -73,6 +76,7 @@ export async function POST(req: Request) {
 
 export async function PUT(req: Request) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const body = await req.json()
     const supabase = createAdminClient()
 

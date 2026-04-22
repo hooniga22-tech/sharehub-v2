@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { listOrEmpty } from '@/lib/supabase/helpers'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 interface ConfirmItem {
   tenantId: string
@@ -15,6 +16,7 @@ interface ConfirmItem {
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const { items, month } = await req.json() as { items: ConfirmItem[]; month: string }
     if (!items || items.length === 0) return NextResponse.json({ error: 'no items' }, { status: 400 })
 

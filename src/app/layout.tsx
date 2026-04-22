@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Noto_Sans_KR } from 'next/font/google'
 import './globals.css'
 import BottomNav from '@/components/layout/BottomNav'
+import LogoutButton from '@/components/layout/LogoutButton'
 
 const notoSansKR = Noto_Sans_KR({
   subsets: ['latin'],
@@ -28,6 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         >
           {children}
+          <LogoutButton />
           <BottomNav />
           <div style={{ height: 58 }} />
         </div>

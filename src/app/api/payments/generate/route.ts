@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { listOrEmpty } from '@/lib/supabase/helpers'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const { year, month } = await req.json()
     if (!year || !month) return NextResponse.json({ error: 'year/month required' }, { status: 400 })
 

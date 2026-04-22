@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 export const runtime = 'nodejs'
 
@@ -19,6 +20,7 @@ type Body = {
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const body = (await req.json()) as Body
     if (!body.지점명 || !String(body.지점명).trim()) {
       return NextResponse.json({ error: '지점명 누락' }, { status: 400 })

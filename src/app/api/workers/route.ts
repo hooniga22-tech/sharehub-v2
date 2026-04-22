@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { listOrEmpty } from '@/lib/supabase/helpers'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 // issues 테이블 -> 용역(work) 응답 매핑
 function issueToWork(i: any, idx: number) {
@@ -16,6 +17,7 @@ function issueToWork(i: any, idx: number) {
 
 export async function GET(req: Request) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const { searchParams } = new URL(req.url)
     const token = searchParams.get('token')
     const year = searchParams.get('year')
@@ -58,6 +60,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const body = await req.json()
     const supabase = createAdminClient()
     const id = `work_${Date.now()}`
@@ -90,6 +93,7 @@ export async function POST(req: Request) {
 
 export async function PUT(req: Request) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const body = await req.json()
     const { id, ...data } = body
     const supabase = createAdminClient()

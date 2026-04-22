@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { listOrEmpty } from '@/lib/supabase/helpers'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 export async function GET(req: Request) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const { searchParams } = new URL(req.url)
     const year = searchParams.get('year') || String(new Date().getFullYear())
     const month = searchParams.get('month') || String(new Date().getMonth() + 1)

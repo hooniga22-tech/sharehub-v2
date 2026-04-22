@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const { id } = await params
     const supabase = createAdminClient()
     const { data: i, error } = await supabase.from('issues').select('*, branches(name), rooms(room_code), workers(name)').eq('id', id).single()
@@ -23,6 +25,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const { id } = await params
     const body = await req.json()
     const supabase = createAdminClient()
@@ -47,6 +50,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const { id } = await params
     const supabase = createAdminClient()
     const { error } = await supabase.from('issues').delete().eq('id', id)

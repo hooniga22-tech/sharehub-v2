@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { listOrEmpty } from '@/lib/supabase/helpers'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 function getMonday(): string {
   const now = new Date()
@@ -18,6 +19,7 @@ function parseMemo(memo: string | null): Record<string, string> {
 
 export async function GET(req: Request) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const { searchParams } = new URL(req.url)
     const house = searchParams.get('house')
     if (!house) return NextResponse.json({ error: 'house 필수' }, { status: 400 })
@@ -54,6 +56,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const body = await req.json()
     const supabase = createAdminClient()
 
@@ -95,6 +98,7 @@ export async function POST(req: Request) {
 
 export async function PUT(req: Request) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const body = await req.json()
     const { id, ...data } = body
     const supabase = createAdminClient()

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { listOrEmpty } from '@/lib/supabase/helpers'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 // 용역담당자 -> Supabase workers 테이블
 function workerToStaff(w: any, idx: number) {
@@ -24,6 +25,7 @@ function workerToStaff(w: any, idx: number) {
 
 export async function GET() {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const supabase = createAdminClient()
     const rows = await listOrEmpty<any>(supabase.from('workers').select('*').order('name'))
     return NextResponse.json(rows.map((r, i) => workerToStaff(r, i)))
@@ -34,6 +36,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const body = await req.json()
     const supabase = createAdminClient()
     const id = `staff_${Date.now()}`

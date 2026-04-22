@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { listOrEmpty } from '@/lib/supabase/helpers'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 export async function GET() {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const supabase = createAdminClient()
     // workers 테이���에서 활성 담당자 이름 목록
     const workers = await listOrEmpty<any>(supabase.from('workers').select('name').eq('is_active', true))

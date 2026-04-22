@@ -6,6 +6,7 @@ import {
   makeStaffId, makeToken,
 } from '@/lib/workers-helper'
 import type { Worker, WorkerWithStats, WorkerField, WorkerStatus } from '@/types/worker'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 function sbToWorker(w: any): Worker {
   return {
@@ -19,6 +20,7 @@ function sbToWorker(w: any): Worker {
 
 export async function GET() {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const supabase = createAdminClient()
     const ymPrefix = kstYearMonth()
 
@@ -55,6 +57,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const body = await req.json()
     const name = (body?.name || '').trim()
     if (!name) return NextResponse.json({ error: 'name 필수' }, { status: 400 })

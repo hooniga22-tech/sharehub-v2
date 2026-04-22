@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { listOrEmpty } from '@/lib/supabase/helpers'
 import { kstYearMonth } from '@/lib/workers-helper'
 import type { Worker, WorkerField, WorkerStatus, WorkerWithStats } from '@/types/worker'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 function sbToWorker(w: any): Worker {
   return {
@@ -19,6 +20,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const { id } = await params
     const supabase = createAdminClient()
     const { data: w, error } = await supabase.from('workers').select('*').eq('id', id).single()
@@ -44,6 +46,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const { id } = await params
     const body = await req.json()
     const supabase = createAdminClient()

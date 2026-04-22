@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { listOrEmpty } from '@/lib/supabase/helpers'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 // vacancies 테이블 없음 -> rooms+tenants 조인으로 공실 계산
 export async function GET() {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const supabase = createAdminClient()
     const [rooms, tenants] = await Promise.all([
       listOrEmpty<any>(supabase.from('rooms').select('id, room_code, branch_id, vacancy_status, branches(name)')),
@@ -50,6 +52,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const body = await req.json()
     const supabase = createAdminClient()
     // 공실 등록 = 해당 방의 vacancy_status를 업데이트
@@ -68,6 +71,7 @@ export async function POST(req: Request) {
 
 export async function PUT(req: Request) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const body = await req.json()
     const { id, ...data } = body
     const supabase = createAdminClient()

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { listOrEmpty } from '@/lib/supabase/helpers'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 // CORS preflight
 export async function OPTIONS() {
@@ -12,6 +13,7 @@ export async function OPTIONS() {
 // GET - 이슈 빠른 생성 (쿼리 파라미터로 생성)
 export async function GET(req: Request) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const { searchParams } = new URL(req.url)
     const title = searchParams.get('title')
     if (!title) return NextResponse.json({ error: 'title required' }, { status: 400 })

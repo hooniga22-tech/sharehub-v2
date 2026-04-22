@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const body = await req.json()
     const confirmItems: { id: string; 납부액: number; 납부일: string }[] = body.items || []
     if (confirmItems.length === 0) return NextResponse.json({ error: 'no items' }, { status: 400 })

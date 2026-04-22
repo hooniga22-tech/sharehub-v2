@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 function parseMemo(memo: string | null): Record<string, string> {
   if (!memo) return {}
@@ -8,6 +9,7 @@ function parseMemo(memo: string | null): Record<string, string> {
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const { id } = await params
     const body = await req.json()
     const supabase = createAdminClient()

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { listOrEmpty } from '@/lib/supabase/helpers'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 // Supabase branches -> 프론트엔드 기대 필드명 매핑
 function branchToHouse(b: any, idx: number) {
@@ -24,6 +25,7 @@ function branchToHouse(b: any, idx: number) {
 
 export async function GET(req: Request) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const { searchParams } = new URL(req.url)
     const id = searchParams.get('id')
     const gu = searchParams.get('gu')
@@ -50,6 +52,7 @@ export async function GET(req: Request) {
 
 export async function PUT(req: Request) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const body = await req.json()
     const { id, ...data } = body
     const supabase = createAdminClient()

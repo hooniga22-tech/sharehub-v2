@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { listOrEmpty } from '@/lib/supabase/helpers'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 const UTIL_CODES = ['electricity', 'gas', 'water', 'internet', 'water_purifier', 'cleaning', 'other'] as const
 const CODE_KO: Record<string, string> = { electricity: '전기', gas: '가스', water: '수도', internet: '인터넷', water_purifier: '정수기', cleaning: '청소', other: '기타' }
@@ -8,6 +9,7 @@ const KO_CODE: Record<string, string> = Object.fromEntries(Object.entries(CODE_K
 
 export async function GET(req: Request) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const { searchParams } = new URL(req.url)
     const year = searchParams.get('year') || String(new Date().getFullYear())
     const month = searchParams.get('month') || String(new Date().getMonth() + 1)
@@ -57,6 +59,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const body = await req.json()
     const { houseName, year: y, month: m, ...fields } = body
     const supabase = createAdminClient()

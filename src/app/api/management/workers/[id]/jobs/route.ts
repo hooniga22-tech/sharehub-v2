@@ -2,12 +2,14 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { listOrEmpty } from '@/lib/supabase/helpers'
 import type { WorkerJob } from '@/types/worker'
+import { requireAdmin } from '@/lib/auth-helpers'
 
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const auth = await requireAdmin(); if (auth.error) return auth.error
     const { id } = await params
     const { searchParams } = new URL(req.url)
     const limitRaw = searchParams.get('limit')
