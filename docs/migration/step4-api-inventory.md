@@ -18,7 +18,7 @@
 - [x] `/api/houses/:id` GET - Supabase branches - `src/app/api/houses/[id]/route.ts`
 - [x] `/api/houses/districts` GET - Supabase branches - `src/app/api/houses/districts/route.ts`
 - [x] `/api/rooms` GET - Supabase rooms+branches - `src/app/api/rooms/route.ts`
-- [ ] `/api/investors` GET - Sheets - 건너뜀: investor_branches 조인 테이블 없음
+- [x] `/api/investors` GET - Supabase investors+branches (investor_id FK) - `src/app/api/investors/route.ts`
 - [ ] `/api/workers` GET - Sheets - 건너뜀: 용역 시트(work orders) 중심, issues 테이블 구조 불일치
 - [ ] `/api/workers/list` GET - Sheets - 건너뜀: 용역 시트에서 unique 이름 추출
 - [x] `/api/workers/staff` GET - Supabase workers - `src/app/api/workers/staff/route.ts`

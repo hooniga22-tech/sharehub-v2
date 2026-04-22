@@ -1,11 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSheetData, appendRow, updateRow } from '@/lib/sheets'
-
-// 투자자 탭 (7열): [0]투자자ID [1]투자자명 [2]연락처 [3]계좌정보 [4]생년월일 [5]링크토큰 [6]메모
-// 투자지점 탭 (8열): [0]투자ID [1]투자자ID [2]투자자명 [3]지점명 [4]투자자비율 [5]유재훈비율 [6]공동여부 [7]메모
-// 지점 탭: [0]지점ID [1]지점명 [7]집월세
-
-const normalize = (name: string) => name.replace(/하우스$/, '').trim().toLowerCase()
+import { createAdminClient } from '@/lib/supabase/server'
+import { listOrEmpty } from '@/lib/supabase/helpers'
 
 type InvestorHouse = {
   investId: string
@@ -33,76 +29,62 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const token = searchParams.get('token')
 
-    const [investorRows, houseRows, houseInfoRows] = await Promise.all([
-      getSheetData('투자자'),
-      getSheetData('투자지점'),
-      getSheetData('지점'),
-    ])
+    const supabase = createAdminClient()
 
-    // 지점별 집월세 맵
-    const houseRentMap = new Map<string, number>()
-    for (const r of houseInfoRows) {
-      houseRentMap.set(normalize(r[1] || ''), Number(r[7]) || 0)
-    }
+    // 투자자 목록
+    const investors = await listOrEmpty<any>(supabase.from('investors').select('*'))
 
-    // Build investor map
-    const investorMap = new Map<string, {
-      id: string; name: string; phone: string; account: string; birthday: string; token: string; memo: string
-    }>()
-    for (const r of investorRows) {
-      investorMap.set(r[0], {
-        id: r[0] || '',
-        name: r[1] || '',
-        phone: r[2] || '',
-        account: r[3] || '',
-        birthday: r[4] || '',
-        token: r[5] || '',
-        memo: r[6] || '',
-      })
-    }
+    // 지점 목록 (investor_id가 있는 것만 포함해도 되지만 전체 가져옴)
+    const branches = await listOrEmpty<any>(supabase.from('branches').select('id, name, investor_id, investor_share_pct, contract_rent'))
 
-    // Build houses grouped by investor ID
+    // 투자자별 지점 매핑 (branches.investor_id -> investors.id)
     const housesById = new Map<string, InvestorHouse[]>()
-    for (const r of houseRows) {
-      const invId = r[1] || ''
-      if (!invId) continue
-      if (!housesById.has(invId)) housesById.set(invId, [])
-      housesById.get(invId)!.push({
-        investId: r[0] || '',
-        houseName: r[3] || '',
-        investorRatio: Number(r[4]) || 0,
-        jaehoonRatio: Number(r[5]) || 0,
-        isJoint: r[6] === 'Y',
-        memo: r[7] || '',
-        houseRent: houseRentMap.get(normalize(r[3] || '')) || 0,
+    for (const b of branches) {
+      if (!b.investor_id) continue
+      if (!housesById.has(b.investor_id)) housesById.set(b.investor_id, [])
+      const pct = b.investor_share_pct || 0
+      housesById.get(b.investor_id)!.push({
+        investId: `${b.investor_id}_${b.id}`,
+        houseName: b.name || '',
+        investorRatio: pct,
+        jaehoonRatio: 100 - pct,
+        isJoint: pct > 0 && pct < 100,
+        memo: '',
+        houseRent: b.contract_rent || 0,
       })
     }
 
-    // Token query: single investor portal
-    if (token) {
-      const investor = [...investorMap.values()].find(i => i.token === token)
-      if (!investor) return NextResponse.json({ error: '없음' }, { status: 404 })
-
-      const houses = housesById.get(investor.id) || []
-      return NextResponse.json({ investor, houses })
-    }
-
-    // Admin list: all investors with their houses
-    const investors: InvestorResponse[] = []
-    for (const inv of investorMap.values()) {
-      investors.push({
-        ...inv,
+    // 투자자 -> 프론트엔드 응답 매핑
+    function toResponse(inv: any): InvestorResponse {
+      return {
+        id: inv.id || '',
+        name: inv.name || '',
+        phone: inv.phone || '',
+        account: inv.account_info || '',
+        birthday: inv.birth_date || '',
+        token: inv.access_token || '',
+        memo: inv.memo || '',
         houses: housesById.get(inv.id) || [],
-      })
+      }
     }
 
-    return NextResponse.json(investors)
+    // 토큰 조회: 단일 투자자 포털
+    if (token) {
+      const inv = investors.find(i => i.access_token === token)
+      if (!inv) return NextResponse.json({ error: '없음' }, { status: 404 })
+      const mapped = toResponse(inv)
+      return NextResponse.json({ investor: mapped, houses: mapped.houses })
+    }
+
+    // 관리자: 전체 목록
+    return NextResponse.json(investors.map(toResponse))
   } catch (e) {
     console.error(e)
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }
 }
 
+// POST/PUT는 Step 4.4에서 전환 예정 - Sheets 유지
 export async function POST(req: Request) {
   try {
     const body = await req.json()
