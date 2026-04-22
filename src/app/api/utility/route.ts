@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { getSheetData, appendRow, updateRow } from '@/lib/sheets'
 import { createAdminClient } from '@/lib/supabase/server'
 import { listOrEmpty } from '@/lib/supabase/helpers'
 
-const codeMap: Record<string, string> = { electricity: '전기', gas: '가스', water: '수도', internet: '인터넷', water_purifier: '정수기' }
+const CODE_KO: Record<string, string> = { electricity: '전기', gas: '가스', water: '수도', internet: '인터넷', water_purifier: '정수기' }
+const KO_CODE: Record<string, string> = Object.fromEntries(Object.entries(CODE_KO).map(([k, v]) => [v, k]))
 
 export async function GET(req: Request) {
   try {
@@ -31,31 +31,82 @@ export async function GET(req: Request) {
   } catch (e) { return NextResponse.json({ error: String(e) }, { status: 500 }) }
 }
 
-// POST/PUT는 Step 4.5 - Sheets 유지
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const rows = await getSheetData('공과금')
-    const idx = rows.findIndex(r => r[1] === body.지점명 && r[2] === body.연도 && r[3] === body.월)
-    if (idx >= 0) {
-      const e = rows[idx]
-      await updateRow('공과금', idx, [e[0], body.지점명, body.연도, body.월, body.전기 ?? e[4], body.가스 ?? e[5], body.수도 ?? e[6], body.인터넷 ?? e[7], body.정수기 ?? e[8], body.메모 ?? (e[9] || '')])
-      return NextResponse.json({ success: true, mode: 'update' })
+    const supabase = createAdminClient()
+    const ym = `${body.연도}-${String(body.월).padStart(2, '0')}`
+
+    const { data: branch } = await supabase.from('branches').select('id').eq('name', body.지점명).limit(1).single()
+    if (!branch) return NextResponse.json({ error: 'branch not found' }, { status: 404 })
+
+    const cats = await listOrEmpty<any>(supabase.from('expense_categories').select('id, code'))
+    const catMap = new Map(cats.map((c: any) => [c.code, c.id]))
+
+    let mode = 'create'
+    for (const koName of ['전기', '가스', '수도', '인터넷', '정수기']) {
+      const val = body[koName]
+      if (val === undefined) continue
+      const code = KO_CODE[koName]
+      const catId = catMap.get(code)
+      if (!catId) continue
+      const amount = Number(val) || 0
+
+      const existing = await listOrEmpty<any>(
+        supabase.from('expenses').select('id').eq('branch_id', branch.id).eq('year_month', ym).eq('category_id', catId)
+      )
+      if (existing.length > 0) {
+        await supabase.from('expenses').update({ amount, memo: body.메모 || null }).eq('id', existing[0].id)
+        mode = 'update'
+      } else if (amount > 0) {
+        await supabase.from('expenses').insert({
+          id: `util_${Date.now()}_${code}`, branch_id: branch.id, category_id: catId,
+          year_month: ym, amount, paid_date: new Date().toISOString().slice(0, 10),
+          memo: body.메모 || null,
+        })
+      }
     }
-    const id = `util_${Date.now()}`
-    await appendRow('공과금', [id, body.지점명, body.연도, body.월, body.전기 || 0, body.가스 || 0, body.수도 || 0, body.인터넷 || 0, body.정수기 || 0, body.메모 || ''])
-    return NextResponse.json({ success: true, mode: 'create', id })
+
+    return NextResponse.json({ success: true, mode })
   } catch (e) { return NextResponse.json({ error: String(e) }, { status: 500 }) }
 }
 
 export async function PUT(req: Request) {
   try {
     const body = await req.json()
-    const rows = await getSheetData('공과금')
-    const idx = rows.findIndex(r => r[0] === body.ID)
-    if (idx === -1) return NextResponse.json({ error: '없음' }, { status: 404 })
-    const e = rows[idx]
-    await updateRow('공과금', idx, [e[0], e[1], e[2], e[3], body.전기 ?? e[4], body.가스 ?? e[5], body.수도 ?? e[6], body.인터넷 ?? e[7], body.정수기 ?? e[8], body.메모 ?? (e[9] || '')])
+    const supabase = createAdminClient()
+
+    // ID로 기존 row 찾기
+    const { data: existing, error } = await supabase.from('expenses').select('*, expense_categories(code)').eq('id', body.ID).single()
+    if (error || !existing) return NextResponse.json({ error: '없음' }, { status: 404 })
+
+    const ym = existing.year_month
+    const branchId = existing.branch_id
+    const cats = await listOrEmpty<any>(supabase.from('expense_categories').select('id, code'))
+    const catMap = new Map(cats.map((c: any) => [c.code, c.id]))
+
+    // 각 공과금 항목 업데이트
+    for (const koName of ['전기', '가스', '수도', '인터넷', '정수기']) {
+      if (body[koName] === undefined) continue
+      const code = KO_CODE[koName]
+      const catId = catMap.get(code)
+      if (!catId) continue
+      const amount = Number(body[koName]) || 0
+
+      const rows = await listOrEmpty<any>(
+        supabase.from('expenses').select('id').eq('branch_id', branchId).eq('year_month', ym).eq('category_id', catId)
+      )
+      if (rows.length > 0) {
+        await supabase.from('expenses').update({ amount, memo: body.메모 || null }).eq('id', rows[0].id)
+      } else if (amount > 0) {
+        await supabase.from('expenses').insert({
+          id: `util_${Date.now()}_${code}`, branch_id: branchId, category_id: catId,
+          year_month: ym, amount, paid_date: new Date().toISOString().slice(0, 10),
+          memo: body.메모 || null,
+        })
+      }
+    }
+
     return NextResponse.json({ success: true })
   } catch (e) { return NextResponse.json({ error: String(e) }, { status: 500 }) }
 }
