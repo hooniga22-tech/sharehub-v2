@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { createBrowserClient } from '@supabase/ssr';
 
 const BLUE = '#3182F6', GREEN = '#00B493', RED = '#e03131';
 
@@ -125,6 +126,33 @@ export default function ManageMobile() {
               </div>
             </div>
           ))}
+        </div>
+
+        {/* 로그아웃 */}
+        <div style={{ marginTop: 24 }}>
+          <button
+            onClick={async () => {
+              const supabase = createBrowserClient(
+                process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+              )
+              await supabase.auth.signOut()
+              router.push('/login')
+            }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              width: '100%', padding: '14px 16px',
+              background: '#FFFFFF', border: 'none', borderRadius: 14,
+              fontSize: 14, color: '#8B95A1', cursor: 'pointer',
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8B95A1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            로그아웃
+          </button>
         </div>
       </div>
     </div>

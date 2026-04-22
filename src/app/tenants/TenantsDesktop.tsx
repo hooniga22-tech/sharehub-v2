@@ -6,6 +6,7 @@ import { fetcher } from '@/lib/fetcher';
 import Link from 'next/link';
 import { buildTimelines, barStyle, MONTHS, DAYS_IN_MONTH } from '@/lib/timeline';
 import type { TenantSpan, HandoverSpan, HouseTimeline } from '@/types/timeline';
+import SidebarLogout from '@/components/layout/SidebarLogout'
 
 /* ─── Types ─── */
 type Tenant = {
@@ -243,6 +244,7 @@ export default function TenantsDesktop() {
             </Link>
           ))}
         </nav>
+        <SidebarLogout />
       </div>
 
       {/* ═══ Main ═══ */}

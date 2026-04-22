@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import IssuesMobile from './IssuesMobile';
+import SidebarLogout from '@/components/layout/SidebarLogout'
 
 /* ─── Types (mirrored from IssuesMobile) ─── */
 type Issue = {
@@ -334,6 +335,7 @@ export default function IssuesDesktop() {
             </Link>
           ))}
         </nav>
+        <SidebarLogout />
 
       </div>
 

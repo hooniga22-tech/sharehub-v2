@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import SidebarLogout from '@/components/layout/SidebarLogout'
 
 /* ─── Design Tokens ─── */
 const T = {
@@ -122,6 +123,7 @@ export default function ManageDesktop() {
             </Link>
           ))}
         </nav>
+        <SidebarLogout />
       </div>
 
       {/* Main */}

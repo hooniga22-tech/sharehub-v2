@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import SidebarLogout from '@/components/layout/SidebarLogout'
 
 /* ─── Types (from DashboardMobile) ─── */
 type Tenant = Record<string, string>;
@@ -354,6 +355,7 @@ export default function DashboardDesktop() {
             </Link>
           ))}
         </nav>
+        <SidebarLogout />
       </div>
 
       {/* ═══ Main ═══ */}

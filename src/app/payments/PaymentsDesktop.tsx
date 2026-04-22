@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import SidebarLogout from '@/components/layout/SidebarLogout'
 
 /* ─── Types ─── */
 type Payment = {
@@ -272,6 +273,7 @@ export default function PaymentsDesktop() {
             </Link>
           ))}
         </nav>
+        <SidebarLogout />
       </div>
 
       {/* ═══ Main ═══ */}

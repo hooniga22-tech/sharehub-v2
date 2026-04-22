@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import SidebarLogout from '@/components/layout/SidebarLogout'
 
 type Tenant = Record<string, string>;
 
@@ -131,6 +132,7 @@ export default function VacancyDesktop() {
         <nav style={{ flex: 1, padding: '0 10px' }}>
           {MENU.map(m => (<Link key={m.label} href={m.href} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, marginBottom: 2, background: m.active ? T.blueLight : 'transparent', color: m.active ? T.blueDark : T.textSub, fontWeight: m.active ? 600 : 400, fontSize: 13, textDecoration: 'none' }}><m.icon />{m.label}</Link>))}
         </nav>
+        <SidebarLogout />
       </div>
 
       {/* Main */}

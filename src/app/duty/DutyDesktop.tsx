@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import SidebarLogout from '@/components/layout/SidebarLogout'
 
 /* ─── Types ─── */
 type Duty = { 당번ID: string; 지점명: string; 주차시작일: string; 방코드: string; 입주자명: string; 당번유형: string; 완료여부: string; 완료일시: string; 완료처리자: string; 면제사유: string };
@@ -152,6 +153,7 @@ export default function DutyDesktop() {
         <nav style={{ flex: 1, padding: '0 10px' }}>
           {MENU.map(m => (<Link key={m.label} href={m.href} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, marginBottom: 2, background: m.active ? T.blueLight : 'transparent', color: m.active ? T.blueDark : T.textSub, fontWeight: m.active ? 600 : 400, fontSize: 13, textDecoration: 'none' }}><m.icon />{m.label}</Link>))}
         </nav>
+        <SidebarLogout />
       </div>
 
       {/* Main */}
