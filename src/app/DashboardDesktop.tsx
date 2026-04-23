@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SidebarLogout from '@/components/layout/SidebarLogout'
+import { DashboardGenCard } from '@/components/PaymentGenerationCard'
 
 /* ─── Types (from DashboardMobile) ─── */
 type Tenant = Record<string, string>;
@@ -464,6 +465,8 @@ export default function DashboardDesktop() {
 
           {/* Right: KPI Stack */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' }}>
+            {/* Card 0: 자동 수납 생성 */}
+            <DashboardGenCard onClick={() => router.push('/revenue')} />
             {/* Card 1: 입주율 */}
             <div style={{ background: T.card, borderRadius: 12, padding: 20, border: `1px solid ${T.line}` }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: T.textMute, marginBottom: 8 }}>전체 입주율</div>

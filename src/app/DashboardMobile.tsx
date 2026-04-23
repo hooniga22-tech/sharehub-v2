@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Chip from '@/components/ui/Chip';
+import { DashboardGenCard } from '@/components/PaymentGenerationCard';
 
 const BLUE = '#3182F6', GRAY = '#888888';
 const CHECKOUT_COLOR = '#E24B4A', CHECKIN_COLOR = '#3182F6', REPAIR_COLOR = '#F59E0B', CLEAN_COLOR = '#00B493';
@@ -277,6 +278,11 @@ export default function DashboardMobile() {
             <div style={kpiVal(unpaidAmount > 0 ? '#FCA5A5' : '#fff')}>{loadingP ? '—' : <>{unpaidAmount > 0 ? Math.round(unpaidAmount / 10000) : 0}<span style={{ fontSize: 13, fontWeight: 400 }}>만원</span></>}</div>
           </div>
         </div>
+      </div>
+
+      {/* 자동 수납 생성 카드 */}
+      <div style={{ padding: '12px 16px 0' }}>
+        <DashboardGenCard onClick={() => router.push('/revenue')} />
       </div>
 
       {/* 오늘 할 일 */}
