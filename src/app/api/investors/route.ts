@@ -77,8 +77,9 @@ export async function GET(req: Request) {
       return NextResponse.json({ investor: mapped, houses: mapped.houses })
     }
 
-    // 관리자: 전체 목록
-    return NextResponse.json(investors.map(toResponse))
+    // 관리자: 투자자 목록 (is_investor=false인 운영용 레코드 제외)
+    const filtered = investors.filter(i => i.is_investor !== false)
+    return NextResponse.json(filtered.map(toResponse))
   } catch (e) {
     console.error(e)
     return NextResponse.json({ error: String(e) }, { status: 500 })
