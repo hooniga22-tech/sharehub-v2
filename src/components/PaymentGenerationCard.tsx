@@ -105,7 +105,7 @@ export function DashboardGenCard({ onClick }: { onClick: () => void }) {
 /**
  * Revenue page generate card with manual trigger button
  */
-export function RevenueGenCard({ onGenerated }: { onGenerated?: () => void }) {
+export function MonthlyPaymentGenCard({ onGenerated }: { onGenerated?: () => void }) {
   const [info, setInfo] = useState<LastGen | null>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)

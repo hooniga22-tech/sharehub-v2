@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SidebarLogout from '@/components/layout/SidebarLogout'
-import { RevenueGenCard } from '@/components/PaymentGenerationCard'
 
 /* ─── Types ─── */
 type HouseData = {
@@ -112,10 +111,6 @@ export default function RevenueDesktop() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ padding: '18px 28px', background: T.card, borderBottom: `1px solid ${T.line}`, flexShrink: 0 }}>
           <div style={{ fontSize: 22, fontWeight: 800, color: T.text }}>수익 현황</div>
-        </div>
-
-        <div style={{ padding: '12px 28px 0', flexShrink: 0 }}>
-          <RevenueGenCard />
         </div>
 
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>

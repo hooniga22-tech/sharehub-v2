@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { getPaymentLabel } from '@/lib/status';
+import { MonthlyPaymentGenCard } from '@/components/PaymentGenerationCard';
 
 const BLUE = '#3182F6', RED = '#e03131', GREEN = '#00B493';
 const fmt = (n: number) => n.toLocaleString() + '원';
@@ -221,6 +222,10 @@ export default function PaymentsMobile() {
             </button>
           </div>
         </div>
+      </div>
+
+      <div style={{ padding: '10px 14px 0' }}>
+        <MonthlyPaymentGenCard onGenerated={() => { fetchData() }} />
       </div>
 
       {loading ? (

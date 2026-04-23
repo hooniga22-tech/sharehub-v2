@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SidebarLogout from '@/components/layout/SidebarLogout'
+import { MonthlyPaymentGenCard } from '@/components/PaymentGenerationCard'
 
 /* ─── Types ─── */
 type Payment = {
@@ -294,6 +295,10 @@ export default function PaymentsDesktop() {
           <div style={{ fontSize: 13, color: T.textMute, marginTop: 4 }}>
             전체 {localSummary.total}명 · 납부율 {localSummary.paidRate}% · 미납 {unpaidCount}건
           </div>
+        </div>
+
+        <div style={{ padding: '12px 28px 0', flexShrink: 0 }}>
+          <MonthlyPaymentGenCard onGenerated={() => { fetchData() }} />
         </div>
 
         {/* Tab bar */}

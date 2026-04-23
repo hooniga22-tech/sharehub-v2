@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronRight } from 'lucide-react';
-import { RevenueGenCard } from '@/components/PaymentGenerationCard';
 
 const BLUE = '#3182f6', GRAY = '#8b95a1';
 const fmt = (n: number) => n.toLocaleString() + '원';
@@ -52,10 +51,6 @@ export default function RevenueMobile() {
             </button>
           ))}
         </div>
-      </div>
-
-      <div style={{ padding: '12px 16px 0' }}>
-        <RevenueGenCard />
       </div>
 
       <div style={{ padding: 16 }}>
