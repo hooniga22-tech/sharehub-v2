@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { listOrEmpty } from '@/lib/supabase/helpers'
 import { requireAdmin } from '@/lib/auth-helpers'
 import { TENANT_STATUS_REVERSE } from '@/lib/status'
+import { generateMonthlyPayments, kstYearMonth } from '@/lib/generatePayments'
 
 // Supabase tenants+rooms+branches -> 프론트엔드 기대 필드 매핑
 function sbToTenant(t: any, idx: number) {
@@ -92,6 +93,17 @@ export async function POST(req: Request) {
       access_token: token,
     })
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    // Auto-generate current month payment for new active tenant
+    const resolvedStatus = TENANT_STATUS_REVERSE[body.상태] || body.status || 'active'
+    if (resolvedStatus === 'active') {
+      try {
+        await generateMonthlyPayments(kstYearMonth(), 'tenant_create', auth.user.email, [id])
+      } catch (e) {
+        console.error('Auto payment generation failed for new tenant:', e)
+      }
+    }
+
     return NextResponse.json({ success: true, id, token })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
