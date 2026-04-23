@@ -54,9 +54,10 @@ export const config = {
      * - /api/tenant-duty/* (tenant duty API)
      * - /api/house-guide/* (public house guide)
      * - /api/channeltalk/* (webhook)
+     * - /api/cron/* (Vercel Cron - auth via CRON_SECRET inside handler)
      * - /_next/* (Next.js internals)
      * - /favicon.ico, /icon*, /apple-icon* (static files)
      */
-    '/((?!login|portal|apply|api/apply|api/portal|api/investor-portal|api/tenant-portal|api/workers/by-token|api/workers/portal|api/tenants/portal|api/tenant-duty|api/house-guide|api/channeltalk|_next|favicon\\.ico|icon|apple-icon|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff|woff2|ttf|eot)).*)',
+    '/((?!login|portal|apply|api/apply|api/portal|api/investor-portal|api/tenant-portal|api/workers/by-token|api/workers/portal|api/tenants/portal|api/tenant-duty|api/house-guide|api/channeltalk|api/cron|_next|favicon\\.ico|icon|apple-icon|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff|woff2|ttf|eot)).*)',
   ],
 }
